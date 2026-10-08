@@ -1,5 +1,5 @@
 {
-  "name": "Purplehat - Karaoke Controller",
+  "name": "Purplehat - Controller",
   "short_name": "Purplehat",
   "description": "Controller karaoke: cari lagu, atur antrian, kontrol player.",
   "start_url": "/controller/index.html",

@@ -17,7 +17,8 @@ async function init() {
       sessionStorage.setItem('ph_code', roomCode);
     }
     document.getElementById('join-code').textContent = roomCode;
-    const qr = await fetch('/api/qr?text=' + encodeURIComponent(location.origin + '/?pair=' + roomCode));
+    // QR mengarah ke qr.html -> gate-install.html -> controller
+    const qr = await fetch('/api/qr?text=' + encodeURIComponent(location.origin + '/controller/qr.html?pair=' + roomCode));
     const qrd = await qr.json();
     const img = document.getElementById('qr-img');
     img.src = qrd.dataUrl;

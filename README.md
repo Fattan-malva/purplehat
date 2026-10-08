@@ -5,7 +5,8 @@ Aplikasi karaoke: desktop = player, mobile = controller (search + kontrol). Real
 ## Cara Kerja
 
 - Buka `http://localhost:3000/` di desktop → otomatis jadi **Player**, tampilkan kode pairing + QR.
-- Buka URL yang sama di HP (atau scan QR) → otomatis jadi **Controller**, masukkan kode pairing atau scan QR → langsung terhubung.
+- Buka URL yang sama di HP → masuk **`qr.html`** → **`gate-install.html`** (gerbang: wajib pasang PWA dulu; progress bar hanya maju saat kejadian nyata dari Chrome — tanpa timer tebakan, tanpa opsi "lanjut di browser") → setelah terpasang app langsung dibuka → **`index.html`** = tampilan **Controller**.
+- **Aturan keras:** di HP, `index.html` tidak akan pernah tampil di tab browser. Skrip di `<head>` memantulkannya kembali ke gerbang (`back=1`) sebelum `<body>` dirender, sampai Purplehat berjalan sebagai aplikasi (standalone). Desktop tetap bisa membuka controller langsung (mode preview/dev).
 - Controller: cari lagu via backend FastAPI (YouTube search), tambah ke antrian, kontrol play/pause/seek/skip/volume.
 - Player: yang memutar YouTube iframe, state authority, queue auto-play.
 
@@ -20,7 +21,7 @@ Karaoke Web App/
 ├── public/
 │   ├── index.html        # landing (auto-detect device)
 │   ├── screen/           # desktop player
-│   ├── controller/       # mobile controller
+│   ├── controller/       # mobile controller (qr.html, gate-install.html, index.html)
 │   └── shared/protocol.js
 ├── server/
 │   ├── server.js         # Express + WebSocket relay + QR + pairing

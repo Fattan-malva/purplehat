@@ -59,9 +59,11 @@ app.get('/', (req, res) => {
   // sebenarnya. Kalau sendFile, browser tetap di "/" sehingga link relatif
   // (controller.css, controller.js) di-resolve ke "/controller.css" -> 404,
   // akibatnya CSS tidak tampil dan JS tidak jalan di HP.
+  // HP: masuk lewat qr.html -> gate-install.html (wajib pasang PWA)
+  //     -> index.html (controller).
   const qs = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
   if (isMobile) {
-    res.redirect('/controller/index.html' + qs);
+    res.redirect('/controller/qr.html' + qs);
   } else {
     res.redirect('/screen/index.html');
   }
@@ -146,7 +148,7 @@ app.post('/api/room/create', (req, res) => {
   const finalBase = process.env.PUBLIC_URL
     ? process.env.PUBLIC_URL.replace(/\/$/, '')
     : (req.protocol + '://' + (forwardedHost || req.get('host'))).replace(/\/$/, '');
-  res.json({ code, qr: finalBase + '/?pair=' + code, baseUrl: finalBase });
+  res.json({ code, qr: finalBase + '/controller/qr.html?pair=' + code, baseUrl: finalBase });
 });
 
 // API: check room (full state for polling fallback)

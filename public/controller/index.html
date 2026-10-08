@@ -23,6 +23,37 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="controller.css">
 
+    <script>
+        // ==== ATURAN KERAS: controller hanya boleh tampil sebagai aplikasi ====
+        // Script blocking di <head>: HP yang membuka index.html di tab browser
+        // langsung dipantulkan ke gerbang instalasi SEBELUM <body> dirender,
+        // jadi controller tidak pernah (sempat) tampil di browser.
+        // Bendera back=1 memberi tahu gate bahwa upaya membuka aplikasi gagal.
+        (function () {
+            function phMustBounce() {
+                var standalone = window.matchMedia('(display-mode: standalone)').matches ||
+                    window.navigator.standalone === true;
+                var mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+                return !standalone && (mobile || localStorage.getItem('ph_gate_pending') === '1');
+            }
+            function phBounce() {
+                // Sembunyikan dulu supaya controller tidak sempat "berkedip"
+                // di browser selama navigasi ke gerbang berlangsung.
+                document.documentElement.style.visibility = 'hidden';
+                location.replace('gate-install.html' +
+                    (location.search ? location.search + '&' : '?') + 'back=1');
+            }
+            if (phMustBounce()) phBounce();
+            else document.documentElement.style.visibility = 'visible';
+            // Halaman dipulihkan dari bfcache (tombol Kembali) -> evaluasi ulang
+            window.addEventListener('pageshow', function (e) {
+                if (!e.persisted) return;
+                if (phMustBounce()) phBounce();
+                else document.documentElement.style.visibility = 'visible';
+            });
+        })();
+    </script>
+
     <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
     <script src="/shared/protocol.js"></script>
     <script src="/vendor/jsqr/dist/jsQR.js"></script>
@@ -58,43 +89,9 @@
             <button id="scan-stop-btn" class="btn-secondary">Tutup Kamera</button>
         </div>
 
-        <!-- Modal pasang aplikasi (Android).
-             Muncul LANGSUNG saat user membuka link controller dari browser HP
-             (hasil scan QR pakai kamera bawaan / Google Lens, bukan dari
-             aplikasi yang sudah terpasang). Modal tanpa tombol close -> user
-             memilih Pasang dulu, baru lanjut. -->
-        <div id="install-modal" class="install-modal hidden" role="dialog" aria-modal="true">
-            <div class="install-modal-box">
-                <div class="install-modal-icon"><i class="fas fa-hat-wizard"></i></div>
-                <h3>Pasang Purplehat</h3>
-                <p id="install-modal-text">Agar lebih cepat dan seperti aplikasi asli, pasang Purplehat ke layar utama HP kamu. Setelah terpasang, buka Purplehat dari ikonnya.</p>
-                <button id="install-btn" class="btn-primary">Pasang Sekarang</button>
-                <button id="install-later" class="btn-ghost hidden">Lanjut di browser</button>
-                <ol id="install-steps-modal" class="hidden">
-                    <li>Ketuk <b>⋮</b> (menu Chrome) di pojok kanan atas.</li>
-                    <li>Pilih <b>Tambahkan ke layar utama</b> / <b>Instal aplikasi</b>.</li>
-                    <li>Konfirmasi <b>Instal</b>, lalu buka Purplehat dari ikonnya.</li>
-                </ol>
-            </div>
-        </div>
-
-        <!-- Banner iOS Safari: tidak ada API instalasi otomatis -> petunjuk manual -->
-        <div id="install-banner" class="install-banner hidden">
-            <div class="install-text">
-                <i data-lucide="smartphone"></i>
-                <span id="install-hint">Pasang Purplehat sebagai aplikasi di HP kamu.</span>
-            </div>
-            <div class="install-actions">
-                <button id="install-dismiss" class="icon-btn" title="Tutup" aria-label="Tutup">
-                    <i data-lucide="x"></i>
-                </button>
-            </div>
-            <ol id="install-steps" class="hidden">
-                <li>Ketuk tombol <b>Bagikan</b> di Safari (ikon kotak dengan panah).</li>
-                <li>Pilih <b>Tambahkan ke Layar Utama</b>, lalu <b>Tambah</b>.</li>
-                <li>Buka Purplehat dari ikon layar utama, lalu masukkan kode pairing lagi sekali.</li>
-            </ol>
-        </div>
+        <!-- Catatan: alur pasang aplikasi (PWA) tidak lagi ada di halaman ini.
+             Link QR dari layar player masuk lewat qr.html -> gate-install.html
+             (wajib pasang sebelum controller), jadi tampilan ini murni controller. -->
     </section>
 
     <!-- Main Controller UI (hidden until paired)
