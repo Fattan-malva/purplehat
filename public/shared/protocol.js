@@ -16,7 +16,8 @@ const MSG = {
   QUEUE_UPDATE: 'queue_update',
   NOW_PLAYING: 'now_playing',
   ERROR: 'error',
-  CONTROLLER_JOINED: 'controller_joined'
+  CONTROLLER_JOINED: 'controller_joined',
+  CONTROLLER_LEFT: 'controller_left'
 };
 
 function createMsg(type, payload = {}) {

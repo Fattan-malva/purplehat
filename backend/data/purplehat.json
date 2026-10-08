@@ -99,6 +99,116 @@
       "volume": 80,
       "position": 0,
       "duration": 0
+    },
+    "GR648G": {
+      "code": "GR648G",
+      "createdAt": 1791473728447,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
+    },
+    "K6A6JR": {
+      "code": "K6A6JR",
+      "createdAt": 1791474319736,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
+    },
+    "AMUJ6Q": {
+      "code": "AMUJ6Q",
+      "createdAt": 1791474321839,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
+    },
+    "998YKJ": {
+      "code": "998YKJ",
+      "createdAt": 1791474328098,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
+    },
+    "AXE8WW": {
+      "code": "AXE8WW",
+      "createdAt": 1791474743134,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
+    },
+    "Z53K42": {
+      "code": "Z53K42",
+      "createdAt": 1791474853240,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
+    },
+    "ZBP8SK": {
+      "code": "ZBP8SK",
+      "createdAt": 1791474857353,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
+    },
+    "WZ7LV3": {
+      "code": "WZ7LV3",
+      "createdAt": 1791474857619,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
+    },
+    "JNQR6W": {
+      "code": "JNQR6W",
+      "createdAt": 1791474857872,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
+    },
+    "HPF7FU": {
+      "code": "HPF7FU",
+      "createdAt": 1791474858118,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
+    },
+    "B7VYUC": {
+      "code": "B7VYUC",
+      "createdAt": 1791474878874,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
     }
   }
 }

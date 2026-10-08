@@ -42,8 +42,13 @@ app.use(express.json());
 app.get('/', (req, res) => {
   const ua = req.get('user-agent') || '';
   const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
+  // Redirect (bukan sendFile) supaya URL browser ikut berubah ke path
+  // sebenarnya. Kalau sendFile, browser tetap di "/" sehingga link relatif
+  // (controller.css, controller.js) di-resolve ke "/controller.css" -> 404,
+  // akibatnya CSS tidak tampil dan JS tidak jalan di HP.
+  const qs = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
   if (isMobile) {
-    res.sendFile(path.join(publicDir, 'controller', 'index.html'));
+    res.redirect('/controller/index.html' + qs);
   } else {
     res.redirect('/screen/index.html');
   }
@@ -163,7 +168,7 @@ wss.on('connection', (ws, req) => {
   sockets.set(ws, { role, code, id: Date.now() + Math.random() });
 
   if (role === 'controller') {
-    broadcastToRoom(code, { type: 'CONTROLLER_JOINED' }, 'controller');
+    broadcastToRoom(code, { type: 'controller_joined', payload: {}, ts: Date.now() }, 'controller');
   }
 
   ws.on('message', (raw) => {
@@ -200,6 +205,16 @@ wss.on('connection', (ws, req) => {
 
   ws.on('close', () => {
     sockets.delete(ws);
+    // Kalau controller terakhir putus, layar player kembali ke tampilan awal (QR)
+    if (role === 'controller') {
+      let remaining = 0;
+      sockets.forEach((meta) => {
+        if (meta.code === code && meta.role === 'controller') remaining++;
+      });
+      if (remaining === 0) {
+        broadcastToRoom(code, { type: 'controller_left', payload: {}, ts: Date.now() }, 'controller');
+      }
+    }
   });
 });
 

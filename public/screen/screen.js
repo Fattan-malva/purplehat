@@ -79,7 +79,22 @@ function handleMessage(msg) {
     case PH.MSG.SEEK: seekTo(p.to); break;
     case PH.MSG.VOLUME: setVolume(p.vol); break;
     case PH.MSG.REQUEST_STATE: broadcastState(); break;
+    case PH.MSG.CONTROLLER_JOINED:
+      setOverlayVisible(false);
+      break;
+    case PH.MSG.CONTROLLER_LEFT:
+      setOverlayVisible(true);
+      break;
   }
+}
+
+// Saat ada controller terhubung, layar hanya menampilkan player.
+// Antrian & QR kembali muncul kalau semua controller putus / logout.
+function setOverlayVisible(visible) {
+  document.getElementById('overlay').style.display = visible ? '' : 'none';
+  document.body.classList.toggle('immersive', !visible);
+  const logoutBtn = document.getElementById('screen-logout');
+  if (logoutBtn) logoutBtn.classList.toggle('hidden', visible);
 }
 
 function addSong(videoId, title) {
@@ -101,6 +116,8 @@ function removeSong(index) {
   broadcastState();
 }
 
+var pendingVideoId = null;
+
 function playNext() {
   if (queue.length === 0) {
     currentIndex = -1;
@@ -111,7 +128,12 @@ function playNext() {
   }
   currentIndex = (currentIndex + 1) % queue.length;
   const song = queue[currentIndex];
-  if (player && player.loadVideoById) player.loadVideoById({ videoId: song.videoId, suggestedQuality: 'hd720' });
+  if (player && player.loadVideoById) {
+    player.loadVideoById({ videoId: song.videoId, suggestedQuality: 'hd720' });
+  } else {
+    // Player belum siap (YouTube IFrame API belum selesai load)
+    pendingVideoId = song.videoId;
+  }
   updateUI();
   send(PH.MSG.NOW_PLAYING, { song, index: currentIndex });
   broadcastState();
@@ -162,9 +184,37 @@ function updateQueueUI() {
 // YouTube IFrame API
 function onYouTubeIframeAPIReady() {
   player = new YT.Player('player', {
-    height: '100%', width: '100%', videoId: null,
-    playerVars: { autoplay: 1, controls: 0, modestbranding: 1, rel: 0, showinfo: 0, disablekb: 1, fs: 1 },
-    events: { onReady: () => { document.getElementById('status').textContent += ' | Player siap'; }, onStateChange: (e) => { isPlaying = e.data === YT.PlayerState.PLAYING; if (e.data === YT.PlayerState.ENDED) playNext(); broadcastState(); }, onError: () => setTimeout(playNext, 1500) }
+    height: '100%', width: '100%',
+    playerVars: {
+      autoplay: 0,
+      controls: 0,
+      modestbranding: 1,
+      rel: 0,
+      playsinline: 1,
+      origin: location.origin,
+      fs: 1
+    },
+    events: {
+      onReady: () => {
+        document.getElementById('status').textContent += ' | Player siap';
+        // Load lagu yang ditambahkan sebelum player siap
+        if (pendingVideoId) {
+          player.loadVideoById({ videoId: pendingVideoId, suggestedQuality: 'hd720' });
+          pendingVideoId = null;
+        }
+      },
+      onStateChange: (e) => {
+        isPlaying = e.data === YT.PlayerState.PLAYING;
+        if (e.data === YT.PlayerState.ENDED) playNext();
+        broadcastState();
+      },
+      onError: (e) => {
+        // Kode error YouTube: 2 (id tidak valid), 5 (HTML5 error), 100 (tidak ditemukan),
+        // 101/150 (embedding dilarang pemilik video) -> lewati ke lagu berikutnya.
+        document.getElementById('status').textContent = 'Status: Video tidak bisa diputar (error ' + e.data + '), lanjut ke berikutnya...';
+        setTimeout(playNext, 1500);
+      }
+    }
   });
 }
 var tag = document.createElement('script');
@@ -172,5 +222,18 @@ tag.src = 'https://www.youtube.com/iframe_api';
 document.getElementsByTagName('script')[0].parentNode.insertBefore(tag, document.getElementsByTagName('script')[0]);
 window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
 
+// Browser memblokir autoplay bersuara sebelum ada gesture dari user.
+// Klik pertama di layar akan memulai pemutaran yang tertunda.
+document.addEventListener('click', () => {
+  if (player && player.playVideo && currentIndex >= 0) player.playVideo();
+}, { once: true });
+
 init();
 setInterval(broadcastState, 5000);
+
+// Logout player: kembali ke tampilan awal (QR + kode baru)
+document.getElementById('screen-logout').addEventListener('click', () => {
+  try { if (ws) ws.close(); } catch {}
+  try { if (player && player.stopVideo) player.stopVideo(); } catch {}
+  location.reload();
+});

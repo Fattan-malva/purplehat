@@ -6,3 +6,10 @@ venv
 .DS_Store
 dist
 build
+
+# VPS Configuration
+Dockerfile
+docker-compose
+docker-compose.yml
+restart.sh
+compose.yaml

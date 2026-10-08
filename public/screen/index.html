@@ -5,30 +5,37 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Purplehat - Screen (Player)</title>
   <link rel="stylesheet" href="screen.css">
-  <script src="/shared/protocol.js"></script>
-</head>
+  <script src="/shared/protocol.js"></script></head>
 <body>
   <div class="container">
+    <header class="brand">
+      <div class="brand-logo"><i class="fas fa-hat-wizard"></i></div>
+      <h1>PURPLE<span>HAT</span></h1>
+      <button id="screen-logout" class="hidden logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</button>
+    </header>
+
     <div id="player-wrapper">
       <div id="player"></div>
     </div>
+
     <div id="overlay">
-      <div class="info">
+      <div class="info glass-panel">
         <div id="now-playing">Menunggu lagu pertama...</div>
         <div id="queue-count">Antrian: 0</div>
         <div id="status">Status: Menyiapkan...</div>
         <div id="pairing">
           <div class="pair-code">Kode: <span id="join-code">-</span></div>
-          <img id="qr-img" alt="QR Pairing" style="width:120px;height:120px;border-radius:12px;margin-top:8px;display:none">
+          <img id="qr-img" alt="QR Pairing">
         </div>
       </div>
-      <div class="queue">
+      <div class="queue glass-panel">
         <h3>Antrian Berikutnya</h3>
         <ul id="queue-list"></ul>
       </div>
     </div>
   </div>
 
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="screen.js"></script>
 </body>
 </html>
