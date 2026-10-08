@@ -181,8 +181,8 @@ function bindUI() {
     send(PH.MSG.SEEK, { to });
   });
 
-  document.getElementById('vol-down').addEventListener('click', () => setVolume((state.volume ?? 80) - 5));
-  document.getElementById('vol-up').addEventListener('click', () => setVolume((state.volume ?? 80) + 5));
+  document.getElementById('vol-down').addEventListener('click', () => setVolume((state.volume ?? 80) - 2));
+  document.getElementById('vol-up').addEventListener('click', () => setVolume((state.volume ?? 80) + 2));
 
   // Toggle playback modes
   document.getElementById('btn-loop').addEventListener('click', () => toggleMode('btn-loop', PH.MSG.LOOP));

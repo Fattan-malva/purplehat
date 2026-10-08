@@ -26,6 +26,20 @@ var mediaDuration = 0;          // detik, dari frame
 
 function isSC() { return currentSource === 'soundcloud'; }
 
+// ==== Mode desktop: dijalankan di dalam wrapper WinForms WebView2 ====
+// window.chrome.webview ada hanya saat halaman dimuat di WebView2.
+// Dalam mode ini "master volume" controller mengatur volume OS Windows,
+// dan volume YouTube/SoundCloud di-frame dipaksa 100 (OP dinamis sudah
+// dikendalikan oleh sistem).
+var isDesktop = !!(window.chrome && window.chrome.webview && window.chrome.webview.postMessage);
+
+function frameVolume() { return isDesktop ? 100 : volume; }
+
+function postToHost(m) {
+  if (!isDesktop) return;
+  try { window.chrome.webview.postMessage(JSON.stringify(m)); } catch (e) {}
+}
+
 function send(type, payload) {
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(PH.createMsg(type, payload)));
@@ -62,8 +76,8 @@ function sendFrame(m) {
 
 function sendLoad(song) {
   sendFrame(song.source === 'soundcloud'
-    ? { cmd: 'load', trackId: song.trackId, volume: volume }
-    : { cmd: 'load', videoId: song.videoId, volume: volume });
+    ? { cmd: 'load', trackId: song.trackId, volume: frameVolume() }
+    : { cmd: 'load', videoId: song.videoId, volume: frameVolume() });
 }
 
 // Muat lagu ke frame; ganti dokumen frame jika sumber berbeda
@@ -94,7 +108,7 @@ window.addEventListener('message', (e) => {
       sendLoad(pendingSong);
       pendingSong = null;
     } else {
-      sendFrame({ cmd: 'volume', vol: volume });
+      sendFrame({ cmd: 'volume', vol: frameVolume() });
     }
   } else if (d.type === 'state') {
     isPlaying = !!d.playing;
@@ -284,8 +298,20 @@ function seekTo(to) {
 }
 
 function setVolume(vol) {
-  volume = Math.max(0, Math.min(100, vol));
-  sendFrame({ cmd: 'volume', vol: volume });
+  let v = Math.max(0, Math.min(100, vol));
+  // Mode desktop (WebView2 WinForms): step volume 2-2 (0,2,4,...,100).
+  // Nilai dikirim LANGSUNG ke host -> SetSystemVolume mem-pin volume OS
+  // tepat di angka itu (sinkron, tanpa OSD, tanpa worker/timer).
+  if (isDesktop) v = Math.round(v / 2) * 2;
+  volume = v;
+  // Mode desktop: master volume controller mengatur volume OS Windows.
+  // Volume frame dibiarkan 100 agar tidak dobel.
+  if (isDesktop) {
+    postToHost({ type: 'volume', value: volume });
+    sendFrame({ cmd: 'volume', vol: 100 });
+  } else {
+    sendFrame({ cmd: 'volume', vol: volume });
+  }
   broadcastState();
 }
 

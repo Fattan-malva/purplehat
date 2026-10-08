@@ -134,8 +134,17 @@ function getRoom(code) {
   return rooms[code];
 }
 
+var saveTimer = null;
+
 function persistRoom(code) {
-  saveData({ rooms });
+  // Deferred write: STATE_SYNC dari layar bisa datang beruntun saat tombol
+  // volume ditekan cepat. writeFileSync sinkron per pesan memblokir event loop
+  // Node sehingga relay perintah lain (play/next/seek) ikut tersendat.
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    try { saveData({ rooms }); } catch (e) {}
+  }, 400);
 }
 
 function broadcastToRoom(code, msg, exceptRole) {
