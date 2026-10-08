@@ -5,12 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Purplehat - Connect Screen</title>
   <link rel="stylesheet" href="screen.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="/shared/protocol.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 </head>
 <body>
+  <!-- Background video lokal fullscreen (mute, loop, transparan gelap) -->
+  <div id="bg-video" aria-hidden="true">
+    <video id="bg-video-el" src="/assets/bg-vid.webm" autoplay muted loop playsinline disablepictureinpicture></video>
+    <div class="bg-dim"></div>
+  </div>
+
   <div class="container menu-container">
     <header class="brand">
-      <div class="brand-logo"><i class="fas fa-hat-wizard"></i></div>
+      <div class="brand-logo"><i class="fas fa-hat-wizard icon-glow"></i></div>
       <h1>PURPLE<span>HAT</span></h1>
     </header>
 
@@ -23,15 +31,15 @@
     <div class="promo-slider">
       <div class="slides" id="slides">
         <div class="slide slide-1">
-          <h2>🎤 Karaoke Bareng</h2>
+          <h2><i data-lucide="mic" class="icon-glow"></i> Karaoke Bareng</h2>
           <p>Hubungkan HP kamu & mulai nyanyi sekarang.</p>
         </div>
         <div class="slide slide-2">
-          <h2>🎶 Antrian Pintar</h2>
+          <h2><i data-lucide="list-music" class="icon-glow"></i> Antrian Pintar</h2>
           <p>Pilih lagu, atur urutan, tanpa rebutan mic.</p>
         </div>
         <div class="slide slide-3">
-          <h2>🔥 Malam Karaoke</h2>
+          <h2><i data-lucide="flame" class="icon-glow"></i> Malam Karaoke</h2>
           <p>Ajak teman & keluarga, party jadi makin seru!</p>
         </div>
       </div>
@@ -39,7 +47,7 @@
     </div>
   </div>
 
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="menu.js"></script>
+  <script>if (window.lucide) lucide.createIcons();</script>
 </body>
 </html>

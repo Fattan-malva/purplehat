@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Purplehat - Karaoke Controller</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <script>
         tailwind.config = {
@@ -85,6 +86,22 @@
             box-shadow: 0 0 12px rgba(168, 85, 247, 0.5);
         }
         .queue-item button { touch-action: manipulation; }
+
+        /* Lucide icons */
+        .lucide {
+            width: 1em;
+            height: 1em;
+            display: inline-block;
+            vertical-align: -0.15em;
+            stroke-width: 2;
+        }
+        .icon-glow { filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.65)); }
+        .icon-glow-red { filter: drop-shadow(0 0 6px rgba(248, 113, 113, 0.65)); }
+        .icon-glow-sky { filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.65)); }
+        .mode-active .lucide { filter: drop-shadow(0 0 8px rgba(216, 180, 254, 0.9)); }
+        .btn-play-main .lucide { filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.55)); }
+        .src-tab .lucide { filter: drop-shadow(0 0 5px currentColor); }
+        .q-btn:hover .lucide { filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.8)); }
     </style>
     <script src="/shared/protocol.js"></script>
     <script src="/vendor/jsqr/dist/jsQR.js"></script>
@@ -102,7 +119,7 @@
         </div>
         <div id="pair-status" class="hidden text-sm mb-4 text-blue-300"></div>
         <button id="scan-btn" class="w-full py-3 rounded-xl border border-dashed border-purple-500/50 text-purple-400 hover:bg-purple-500/20 transition-colors flex items-center justify-center gap-2">
-            <i class="fas fa-qrcode"></i> Scan QR
+            <i data-lucide="qr-code"></i> Scan QR
         </button>
         <div class="mt-3 text-xs text-gray-500 leading-relaxed">
             <span class="text-gray-400 font-medium">Cara scan QR:</span> klik tombol di atas, izinkan akses kamera saat diminta browser, lalu arahkan kamera ke kode QR yang tampil di layar player.
@@ -122,7 +139,7 @@
             <div class="glass-panel rounded-3xl p-5 flex-1 flex flex-col overflow-hidden min-h-[250px] landscape:min-h-0">
                 <div class="flex items-center justify-between mb-4 shrink-0">
                     <h3 class="font-semibold text-lg flex items-center gap-2">
-                        <i class="fas fa-list-ul text-purple-500"></i> Up Next
+                        <i data-lucide="list-music" class="text-purple-500 icon-glow"></i> Up Next
                     </h3>
                     <span class="text-xs bg-purple-500/20 text-purple-300 px-3 py-1 rounded-full font-medium border border-purple-500/30"><span id="queue-badge">0</span> Lagu</span>
                 </div>
@@ -133,16 +150,22 @@
         </aside>
 
         <!-- Tengah: Search -->
-        <section id="search-col" class="order-2 landscape:order-2 flex-1 flex flex-col gap-4 min-w-0 landscape:h-full landscape:overflow-y-auto">
+        <section id="search-col" class="order-2 landscape:order-2 flex-1 flex flex-col gap-4 min-w-0 landscape:h-full">
             <div class="relative glass-panel rounded-2xl p-2 shrink-0">
-                <i class="fas fa-search absolute left-6 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                <i data-lucide="search" class="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400"></i>
                 <input type="text" id="search-input" placeholder="Search songs, artists..."
                     class="w-full bg-black/40 text-white rounded-xl py-3 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-transparent focus:border-purple-500/50 transition-all placeholder-gray-500">
             </div>
-            <div id="results" class="glass-panel rounded-3xl p-4 overflow-y-auto max-h-[45vh] landscape:max-h-[40vh] hidden shrink-0"></div>
-            <div class="glass-panel rounded-3xl p-6 landscape:flex flex-1 items-center justify-center text-gray-600 text-sm text-center hidden" id="search-hint">
-                Ketik judul lagu lalu tekan Enter untuk mulai mencari.
+            <!-- Chip badge sumber pencarian (di bawah form search) -->
+            <div class="flex flex-wrap gap-3 shrink-0" id="search-tabs">
+                <button class="src-tab mode-active inline-flex items-center gap-2 px-5 py-2 rounded-full bg-white/5 border border-white/10 text-sm font-semibold hover:bg-white/10 transition-all" data-src="youtube">
+                    <i class="fab fa-youtube text-red-500 hover:text-red-400 transition-colors cursor-pointer" title="Available on YouTube"></i> YouTube
+                </button>
+                <button class="src-tab inline-flex items-center gap-2 px-5 py-2 rounded-full bg-white/5 border border-white/10 text-sm font-semibold hover:bg-white/10 transition-all" data-src="soundcloud">
+                    <i class="fab fa-soundcloud text-orange-500 hover:text-orange-400 transition-colors cursor-pointer" title="Available on SoundCloud"></i> SoundCloud
+                </button>
             </div>
+            <div id="results" class="glass-panel rounded-3xl p-4 overflow-y-auto flex-1 min-h-0 hidden"></div>
         </section>
 
         <!-- Paling kanan: Controller -->
@@ -157,9 +180,8 @@
                     <h1 class="text-xl font-bold tracking-wider">PURPLE<span class="text-purple-500">HAT</span></h1>
                 </div>
                 <div class="flex items-center gap-2">
-                    <div id="status" class="text-xs text-gray-400 glass-panel rounded-full px-3 py-1.5 truncate max-w-[120px]">Belum terhubung</div>
                     <button id="btn-logout" title="Logout" class="w-9 h-9 rounded-full glass-panel flex items-center justify-center hover:bg-white/10 transition-colors text-gray-300">
-                        <i class="fas fa-sign-out-alt text-sm"></i>
+                        <i data-lucide="log-out" class="text-sm"></i>
                     </button>
                 </div>
             </header>
@@ -167,8 +189,9 @@
             <!-- Now Playing -->
             <section class="glass-panel rounded-3xl p-6 flex flex-col sm:flex-row items-center gap-6 shrink-0 relative overflow-hidden">
                 <div class="absolute -top-20 -right-20 w-64 h-64 bg-purple-600/20 rounded-full blur-3xl pointer-events-none"></div>
-                <div class="relative w-28 h-28 sm:w-36 sm:h-36 rounded-2xl overflow-hidden shadow-2xl shrink-0 bg-dark-800 flex items-center justify-center">
-                    <i class="fas fa-music text-4xl text-purple-500/50"></i>
+                <div class="relative w-28 h-28 sm:w-36 sm:h-36 rounded-2xl overflow-hidden shadow-2xl shrink-0 bg-dark-800 flex items-center justify-center" id="np-art">
+                    <i data-lucide="music" class="text-4xl text-purple-500/50 icon-glow"></i>
+                    <img id="np-thumb" class="hidden absolute inset-0 w-full h-full object-cover" alt="">
                 </div>
                 <div class="flex-1 w-full flex flex-col justify-center">
                     <div class="text-center sm:text-left mb-6">
@@ -191,46 +214,46 @@
             <section class="glass-panel rounded-3xl p-6 flex flex-col gap-5 shrink-0">
                 <div class="flex items-center justify-center gap-6 sm:gap-8">
                     <button id="btn-replay" class="text-gray-400 hover:text-white transition-colors p-3" title="Replay">
-                        <i class="fas fa-redo text-lg"></i>
+                        <i data-lucide="rotate-ccw" class="text-lg icon-glow"></i>
                     </button>
-                    <button id="btn-play" class="w-20 h-20 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-neon hover:shadow-neon-intense transition-all active:scale-95 text-white text-2xl border border-purple-400/30">
-                        <i class="fas fa-pause" id="play-icon"></i>
+                    <button id="btn-play" class="btn-play-main w-20 h-20 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-neon hover:shadow-neon-intense transition-all active:scale-95 text-white text-2xl border border-purple-400/30">
+                        <span id="play-icon" class="flex items-center justify-center"><i data-lucide="pause"></i></span>
                     </button>
                     <button id="btn-next" class="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors shadow-lg active:scale-95" title="Skip / Next">
-                        <i class="fas fa-step-forward text-white"></i>
+                        <i data-lucide="skip-forward" class="text-white"></i>
                     </button>
                 </div>
                 <div class="flex items-center justify-center gap-4">
                     <button id="btn-loop" title="Loop lagu ini" class="w-11 h-11 rounded-xl bg-white/5 border border-white/10 text-gray-400 hover:text-white transition-all active:scale-95">
-                        <i class="fas fa-repeat"></i>
+                        <i data-lucide="repeat"></i>
                     </button>
                     <button id="btn-shuffle" title="Acak urutan" class="w-11 h-11 rounded-xl bg-white/5 border border-white/10 text-gray-400 hover:text-white transition-all active:scale-95">
-                        <i class="fas fa-random"></i>
+                        <i data-lucide="shuffle"></i>
                     </button>
                     <button id="btn-loopq" title="Loop semua antrian" class="w-11 h-11 rounded-xl bg-white/5 border border-white/10 text-gray-400 hover:text-white transition-all active:scale-95">
-                        <i class="fas fa-infinity"></i>
+                        <i data-lucide="infinity"></i>
                     </button>
                 </div>
             </section>
 
             <section class="glass-panel rounded-3xl p-6 flex flex-col gap-6 shrink-0">
                 <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                    <i class="fas fa-sliders-h text-purple-500"></i> Audio Mix
+                    <i data-lucide="sliders-horizontal" class="text-purple-500 icon-glow"></i> Audio Mix
                 </h3>
                 <div class="flex flex-col gap-2">
                     <div class="flex items-center justify-between">
-                        <span class="text-sm font-medium flex items-center gap-2"><i class="fas fa-volume-up text-purple-400 w-5"></i> Master</span>
+                        <span class="text-sm font-medium flex items-center gap-2"><i data-lucide="volume-2" class="text-purple-400 w-5 h-5 icon-glow"></i> Master</span>
                         <span class="text-xs text-gray-300 font-mono" id="vol-label">80%</span>
                     </div>
                     <div class="flex items-center gap-3">
                         <button id="vol-down" class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 active:scale-95 transition-all" title="Volume turun">
-                            <i class="fas fa-minus"></i>
+                            <i data-lucide="minus"></i>
                         </button>
                         <div class="flex-1 h-2 bg-dark-800/80 rounded-full overflow-hidden border border-white/5">
                             <div id="vol-progress" class="h-full bg-gradient-to-r from-purple-600 to-purple-400 rounded-full w-4/5"></div>
                         </div>
                         <button id="vol-up" class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 active:scale-95 transition-all" title="Volume naik">
-                            <i class="fas fa-plus"></i>
+                            <i data-lucide="plus"></i>
                         </button>
                     </div>
                 </div>
@@ -238,25 +261,25 @@
 
             <section class="glass-panel rounded-3xl p-6 flex flex-col gap-6 shrink-0">
                 <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                    <i class="fas fa-magic text-purple-500"></i> FX &amp; Tuning
+                    <i data-lucide="wand-sparkles" class="text-purple-500 icon-glow"></i> FX &amp; Tuning
                 </h3>
                 <div class="flex flex-col gap-5">
                     <div class="flex flex-col gap-2">
                         <div class="flex items-center justify-between">
-                            <span class="text-sm font-medium flex items-center gap-2"><i class="fas fa-wave-square text-purple-400 w-5"></i> Echo Delay</span>
+                            <span class="text-sm font-medium flex items-center gap-2"><i data-lucide="audio-waveform" class="text-purple-400 w-5 h-5 icon-glow"></i> Echo Delay</span>
                             <span class="text-xs text-gray-300 font-mono" id="echo-val">40%</span>
                         </div>
                         <input type="range" min="0" max="100" value="40" class="w-full" oninput="document.getElementById('echo-val').innerText = this.value + '%'">
                     </div>
                     <div class="flex items-center justify-between gap-4">
-                        <span class="text-sm font-medium flex items-center gap-2"><i class="fas fa-sort-numeric-up text-purple-400 w-5"></i> Key Shift</span>
+                        <span class="text-sm font-medium flex items-center gap-2"><i data-lucide="music-2" class="text-purple-400 w-5 h-5 icon-glow"></i> Key Shift</span>
                         <div class="flex items-center justify-between bg-dark-900/50 rounded-xl p-1 border border-white/10 shrink-0">
                             <button class="w-9 h-9 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors active:scale-95" onclick="adjustPitch(-1)">
-                                <i class="fas fa-minus text-sm text-gray-300"></i>
+                                <i data-lucide="minus" class="text-sm text-gray-300"></i>
                             </button>
                             <div class="font-mono text-base font-bold w-10 text-center" id="pitch-display">0</div>
                             <button class="w-9 h-9 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors active:scale-95" onclick="adjustPitch(1)">
-                                <i class="fas fa-plus text-sm text-gray-300"></i>
+                                <i data-lucide="plus" class="text-sm text-gray-300"></i>
                             </button>
                         </div>
                     </div>

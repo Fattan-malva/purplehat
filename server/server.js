@@ -82,6 +82,30 @@ app.get('/api/search', async (req, res) => {
   }
 });
 
+// Proxy search SoundCloud ke backend FastAPI (soundcloud/main.py)
+app.get('/api/search-soundcloud', async (req, res) => {
+  try {
+    const qs = new URLSearchParams(req.query).toString();
+    const r = await fetch(`http://localhost:${process.env.API_PORT || 8000}/soundcloud/search?${qs}`);
+    const data = await r.json();
+    res.json(data);
+  } catch (e) {
+    res.status(502).json({ error: 'Backend API tidak tersedia. Jalankan backend di port 8000.' });
+  }
+});
+
+// Proxy detail track SoundCloud (dipakai halaman player-sc.html)
+app.get('/api/soundcloud/track', async (req, res) => {
+  try {
+    const qs = new URLSearchParams(req.query).toString();
+    const r = await fetch(`http://localhost:${process.env.API_PORT || 8000}/soundcloud/track?${qs}`);
+    const data = await r.json();
+    res.json(data);
+  } catch (e) {
+    res.status(502).json({ error: 'Backend API tidak tersedia. Jalankan backend di port 8000.' });
+  }
+});
+
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 

@@ -5,17 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Purplehat - Player</title>
   <link rel="stylesheet" href="screen.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="/shared/protocol.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 </head>
 <body class="immersive">
   <button id="screen-logout" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</button>
 
   <div id="player-wrapper">
-    <div id="player"></div>
+    <!-- Penadah: iframe ini memuat youtube/player-yt.html ATAU soundcloud/player-sc.html.
+         Dokumen diganti total saat pindah sumber, sehingga pemutar lama pasti berhenti. -->
+    <iframe id="player-frame" class="hidden" allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe>
     <div id="idle-screen">
       <div class="brand-logo idle-logo"><i class="fas fa-hat-wizard"></i></div>
       <div class="idle-title">PURPLE<span>HAT</span></div>
-      <div class="idle-text"><i class="fas fa-music"></i> Menunggu lagu berikutnya...</div>
+      <div class="idle-text"><i data-lucide="music" class="icon-glow"></i> Menunggu lagu berikutnya...</div>
     </div>
   </div>
 
@@ -28,7 +32,7 @@
     <ul id="queue-list"></ul>
   </div>
 
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="screen.js"></script>
+  <script>if (window.lucide) lucide.createIcons();</script>
 </body>
 </html>

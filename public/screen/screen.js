@@ -1,7 +1,13 @@
-// Purplehat Screen - Authoritative player
+// Purplehat Screen - Authoritative player (host)
+// Playback dipecah ke dokumen terpisah di dalam iframe:
+//   youtube/player-yt.html    -> YouTube IFrame API
+//   soundcloud/player-sc.html -> SoundCloud Widget API
+// Host hanya mengirim perintah via postMessage. Saat pindah sumber,
+// dokumen frame diganti total sehingga pemutar lama dijamin berhenti
+// (tidak ada lagi YT masih bunyi saat lagu SoundCloud mulai).
+
 var ws;
 var roomCode = null;
-var player;
 var queue = [];
 var currentIndex = -1;
 var isPlaying = false;
@@ -9,6 +15,16 @@ var volume = 80;
 var modeLoop = false;       // ulangi lagu yang sedang diputar
 var modeShuffle = false;    // acak urutan
 var modeLoopQueue = false;  // loop semua antrian (lagu tidak dihapus setelah diputar)
+
+// ==== Frame playback ====
+var currentSource = 'youtube'; // sumber lagu aktif
+var frameSrc = null;            // dokumen yang sedang dimuat di iframe ('youtube'|'soundcloud')
+var frameReady = false;         // frame sudah kirim pesan 'ready'
+var pendingSong = null;         // lagu yang menunggu frame siap
+var mediaPosition = 0;          // detik, dari frame
+var mediaDuration = 0;          // detik, dari frame
+
+function isSC() { return currentSource === 'soundcloud'; }
 
 function send(type, payload) {
   if (ws && ws.readyState === WebSocket.OPEN) {
@@ -25,12 +41,77 @@ function getState() {
     current: queue[currentIndex] ? Object.assign({}, queue[currentIndex], { index: currentIndex }) : null,
     queue: queue,
     playing: isPlaying,
-    position: player && typeof player.getCurrentTime === 'function' ? Math.floor(player.getCurrentTime()) : 0,
-    duration: player && typeof player.getDuration === 'function' ? Math.floor(player.getDuration()) : 0,
+    position: Math.floor(mediaPosition),
+    duration: Math.floor(mediaDuration),
     volume: volume,
     modes: { loop: modeLoop, shuffle: modeShuffle, loopQueue: modeLoopQueue }
   };
 }
+
+// ==== Komunikasi dengan frame pemutar ====
+function frameURL(src) {
+  return src === 'soundcloud'
+    ? '/screen/soundcloud/player-sc.html'
+    : '/screen/youtube/player-yt.html';
+}
+
+function sendFrame(m) {
+  const f = document.getElementById('player-frame');
+  if (f && f.contentWindow) f.contentWindow.postMessage(Object.assign({ ph: 1 }, m), '*');
+}
+
+function sendLoad(song) {
+  sendFrame(song.source === 'soundcloud'
+    ? { cmd: 'load', trackId: song.trackId, volume: volume }
+    : { cmd: 'load', videoId: song.videoId, volume: volume });
+}
+
+// Muat lagu ke frame; ganti dokumen frame jika sumber berbeda
+function startSong(song) {
+  const src = song.source === 'soundcloud' ? 'soundcloud' : 'youtube';
+  const f = document.getElementById('player-frame');
+  currentSource = src;
+  if (f) f.classList.remove('hidden');
+  if (frameSrc !== src) {
+    // Ganti dokumen frame -> pemutar lama dimatikan total
+    frameSrc = src;
+    frameReady = false;
+    pendingSong = song;
+    if (f) f.src = frameURL(src);
+  } else if (frameReady) {
+    sendLoad(song);
+  } else {
+    pendingSong = song;
+  }
+}
+
+window.addEventListener('message', (e) => {
+  const d = e.data;
+  if (!d || !d.ph) return;
+  if (d.type === 'ready') {
+    frameReady = true;
+    if (pendingSong) {
+      sendLoad(pendingSong);
+      pendingSong = null;
+    } else {
+      sendFrame({ cmd: 'volume', vol: volume });
+    }
+  } else if (d.type === 'state') {
+    isPlaying = !!d.playing;
+    mediaPosition = d.position || 0;
+    mediaDuration = d.duration || 0;
+    broadcastState();
+  } else if (d.type === 'ended') {
+    isPlaying = false;
+    if (modeLoop) sendFrame({ cmd: 'replay' });
+    else playNext();
+  } else if (d.type === 'error') {
+    const st = document.getElementById('status');
+    if (st) st.textContent = 'Status: Video tidak bisa diputar, lanjut ke berikutnya...';
+    isPlaying = false;
+    setTimeout(playNext, 1500);
+  }
+});
 
 async function init() {
   roomCode = sessionStorage.getItem('ph_code');
@@ -41,7 +122,6 @@ async function init() {
   }
 
   ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/?role=screen&code=' + roomCode);
-  // ws uses same server; express static + ws both on http server; ws path is just host root
   ws.onopen = () => {
     broadcastState();
   };
@@ -64,7 +144,7 @@ function handleMessage(msg) {
     case PH.MSG.JOIN:
       send(PH.MSG.STATE_SYNC, { state: getState() });
       break;
-    case PH.MSG.ADD_SONG: addSong(p.videoId, p.title); break;
+    case PH.MSG.ADD_SONG: addSong(p); break;
     case PH.MSG.REMOVE_SONG: removeSong(p.index); break;
     case PH.MSG.PLAY_PAUSE: togglePlay(); break;
     case PH.MSG.NEXT:
@@ -86,9 +166,19 @@ function handleMessage(msg) {
   }
 }
 
-function addSong(videoId, title) {
-  if (!videoId) return;
-  queue.push({ videoId, title: title || videoId });
+function addSong(p) {
+  const payload = p || {};
+  const videoId = payload.videoId;
+  const isSoundCloud = payload.source === 'soundcloud';
+  if (!videoId && !isSoundCloud) return;
+  queue.push({
+    videoId: videoId || null,
+    trackId: payload.trackId || null,
+    source: isSoundCloud ? 'soundcloud' : 'youtube',
+    title: payload.title || videoId || String(payload.trackId || ''),
+    artist: payload.artist || '',
+    thumbnail: payload.thumbnail || (videoId ? 'https://img.youtube.com/vi/' + videoId + '/hqdefault.jpg' : '')
+  });
   updateQueueUI();
   send(PH.MSG.QUEUE_UPDATE, { queue });
   if (currentIndex < 0) playNext();
@@ -103,31 +193,6 @@ function removeSong(index) {
   updateQueueUI();
   send(PH.MSG.QUEUE_UPDATE, { queue });
   broadcastState();
-}
-
-var pendingVideoId = null;
-
-// Putar video; kalau autoplay diblokir browser, coba mute dulu lalu unmute setelah jalan
-function forcePlay() {
-  if (!player || !player.playVideo) return;
-  try { player.playVideo(); } catch {}
-  setTimeout(() => {
-    try {
-      const s = player.getPlayerState ? player.getPlayerState() : -1;
-      if (s !== YT.PlayerState.PLAYING) {
-        player.mute();
-        player.playVideo();
-        const unmute = setInterval(() => {
-          try {
-            if (player.getPlayerState && player.getPlayerState() === YT.PlayerState.PLAYING) {
-              clearInterval(unmute);
-              player.unMute();
-            }
-          } catch { clearInterval(unmute); }
-        }, 300);
-      }
-    } catch {}
-  }, 800);
 }
 
 // Geser lagu naik/turun dalam antrian
@@ -158,7 +223,9 @@ function nextIndexFrom(oldIndex, len) {
 function stopPlayback() {
   currentIndex = -1;
   isPlaying = false;
-  if (player && player.stopVideo) player.stopVideo();
+  mediaPosition = 0;
+  mediaDuration = 0;
+  sendFrame({ cmd: 'stop' });
   updateUI();
   send(PH.MSG.QUEUE_UPDATE, { queue });
   broadcastState();
@@ -189,38 +256,36 @@ function playNext(skipRemoveCurrent) {
 
   currentIndex = nextIndex;
   const song = queue[currentIndex];
-  if (player && player.loadVideoById) {
-    player.loadVideoById({ videoId: song.videoId, suggestedQuality: 'hd720' });
-    setTimeout(forcePlay, 500);
-  } else {
-    // Player belum siap (YouTube IFrame API belum selesai load)
-    pendingVideoId = song.videoId;
+  if (!(song.source === 'soundcloud' ? song.trackId : song.videoId)) {
+    // ID tidak valid -> lewati
+    setTimeout(playNext, 300);
+    return;
   }
+  startSong(song);
   updateUI();
   send(PH.MSG.NOW_PLAYING, { song: Object.assign({}, song, { index: currentIndex }), index: currentIndex });
   broadcastState();
 }
 
 function replay() {
-  if (player && player.seekTo) { player.seekTo(0); player.playVideo(); }
+  sendFrame({ cmd: 'replay' });
   broadcastState();
 }
 
 function togglePlay() {
-  if (!player) return;
-  const s = player.getPlayerState ? player.getPlayerState() : -1;
-  if (s === YT.PlayerState.PLAYING) player.pauseVideo(); else player.playVideo();
+  sendFrame({ cmd: isPlaying ? 'pause' : 'play' });
+  isPlaying = !isPlaying;
   broadcastState();
 }
 
 function seekTo(to) {
-  if (player && player.seekTo) player.seekTo(Math.max(0, to || 0));
+  sendFrame({ cmd: 'seek', to: Math.max(0, to || 0) });
   broadcastState();
 }
 
 function setVolume(vol) {
   volume = Math.max(0, Math.min(100, vol));
-  if (player && player.setVolume) player.setVolume(volume);
+  sendFrame({ cmd: 'volume', vol: volume });
   broadcastState();
 }
 
@@ -250,66 +315,19 @@ function updateQueueUI() {
   });
 }
 
-// YouTube IFrame API
-function onYouTubeIframeAPIReady() {
-  player = new YT.Player('player', {
-    height: '100%', width: '100%',
-    playerVars: {
-      autoplay: 1,
-      controls: 0,
-      modestbranding: 1,
-      rel: 0,
-      playsinline: 1,
-      origin: location.origin,
-      fs: 1
-    },
-    events: {
-      onReady: () => {
-        // Izinkan autoplay pada iframe YouTube (penting untuk WebView)
-        try {
-          const iframe = document.querySelector('#player iframe');
-          if (iframe) iframe.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture; fullscreen');
-        } catch {}
-        // Load lagu yang ditambahkan sebelum player siap
-        if (pendingVideoId) {
-          player.loadVideoById({ videoId: pendingVideoId, suggestedQuality: 'hd720' });
-          pendingVideoId = null;
-          setTimeout(forcePlay, 500);
-        }
-      },
-      onStateChange: (e) => {
-        isPlaying = e.data === YT.PlayerState.PLAYING;
-        if (e.data === YT.PlayerState.ENDED) { if (modeLoop) replay(); else playNext(); }
-        if (e.data === YT.PlayerState.CUED || e.data === YT.PlayerState.UNSTARTED) forcePlay();
-        broadcastState();
-      },
-      onError: (e) => {
-        // Kode error YouTube: 2 (id tidak valid), 5 (HTML5 error), 100 (tidak ditemukan),
-        // 101/150 (embedding dilarang pemilik video) -> lewati ke lagu berikutnya.
-        document.getElementById('status').textContent = 'Status: Video tidak bisa diputar (error ' + e.data + '), lanjut ke berikutnya...';
-        setTimeout(playNext, 1500);
-      }
-    }
-  });
-}
-var tag = document.createElement('script');
-tag.src = 'https://www.youtube.com/iframe_api';
-document.getElementsByTagName('script')[0].parentNode.insertBefore(tag, document.getElementsByTagName('script')[0]);
-window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
-
 // Browser memblokir autoplay bersuara sebelum ada gesture dari user.
 // Klik pertama di layar akan memulai pemutaran yang tertunda.
 document.addEventListener('click', () => {
-  if (player && player.playVideo && currentIndex >= 0) player.playVideo();
+  if (currentIndex >= 0) sendFrame({ cmd: 'play' });
 }, { once: true });
 
 init();
 setInterval(broadcastState, 5000);
 
-// Logout player: hapus room di server + kembali ke tampilan awal (QR + kode baru)
+// Logout player: berhentikan frame, hapus room di server + kembali ke tampilan awal
 document.getElementById('screen-logout').addEventListener('click', () => {
   try { if (ws) ws.close(); } catch {}
-  try { if (player && player.stopVideo) player.stopVideo(); } catch {}
+  sendFrame({ cmd: 'stop' });
   const code = roomCode;
   if (code) {
     fetch('/api/room/' + code, { method: 'DELETE' }).catch(() => {});

@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SoundCloud Player</title>
+  <script src="https://w.soundcloud.com/player/api.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+    }
+
+    body {
+      overflow: hidden;
+      background: #111;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+
+      /* Tambahan agar pas di tengah (vertikal & horizontal) */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .bg {
+      position: fixed;
+      inset: -80px;
+      z-index: 0;
+      background-size: cover;
+      background-position: center;
+      filter: blur(80px) brightness(.35) saturate(1.3);
+      transform: scale(1.15);
+      transition: background-image .6s ease;
+    }
+
+    .bg-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      background: radial-gradient(ellipse at center, rgba(0, 0, 0, .15) 0%, rgba(0, 0, 0, .65) 100%);
+    }
+
+    .content {
+      position: relative;
+      z-index: 2;
+      width: min(1120px, calc(100% - 48px));
+      height: min(500px, calc(100vh - 48px));
+      display: grid;
+      grid-template-columns: min(46vw, 500px) minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr) 166px;
+      align-content: center;
+      align-items: stretch;
+      justify-content: center;
+      column-gap: clamp(30px, 4vw, 64px);
+      padding: 0;
+      margin: auto;
+    }
+
+    .artwork {
+      grid-column: 1;
+      grid-row: 1 / span 2;
+      width: 100%;
+      height: 100%;
+      min-width: 0;
+      min-height: 0;
+      justify-self: stretch;
+      align-self: stretch;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, .6);
+      background: rgba(255, 255, 255, .06);
+    }
+
+    .artwork img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      opacity: 0;
+      transition: opacity .4s ease;
+    }
+
+    #loadingWrap {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 5;
+    }
+
+    .artwork img.loaded {
+      opacity: 1;
+    }
+
+    .info {
+      grid-column: 2;
+      grid-row: 1;
+      text-align: left;
+      max-width: none;
+      width: 100%;
+      min-width: 0;
+      align-self: start;
+      padding-top: 4px;
+      /* Tambahan agar teks yang berjalan tidak bocor */
+      overflow: hidden;
+    }
+
+    .info h1 {
+      color: #fff;
+      font-size: clamp(24px, 4vw, 36px);
+      /* Ukuran diperbesar */
+      font-weight: 700;
+      white-space: nowrap;
+
+      /* Tambahan untuk animasi teks berjalan (marquee) */
+      display: inline-block;
+      padding-left: 100%;
+      animation: scrollText 12s linear infinite;
+    }
+
+    /* Keyframes untuk menggerakkan teks */
+    @keyframes scrollText {
+      0% {
+        transform: translateX(0);
+      }
+
+      100% {
+        transform: translateX(-100%);
+      }
+    }
+
+    .info h2 {
+      color: rgba(255, 255, 255, .7);
+      font-size: clamp(14px, 2vw, 18px);
+      margin-top: 6px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .info .stats {
+      color: rgba(255, 255, 255, .45);
+      font-size: 13px;
+      margin-top: 16px;
+      display: flex;
+      gap: 18px;
+      justify-content: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .player {
+      grid-column: 2;
+      grid-row: 2;
+      width: 100%;
+      height: 166px;
+      max-width: none;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, .5);
+      align-self: end;
+      background: rgba(0, 0, 0, .2);
+    }
+
+    .player iframe {
+      width: 100%;
+      height: 166px;
+      border: 0;
+      display: block;
+      background: #333;
+    }
+
+    @media (max-width:760px) {
+      .content {
+        width: 100%;
+        height: auto;
+        min-height: 100%;
+        display: grid;
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto auto;
+        align-content: center;
+        justify-items: center;
+        align-items: center;
+        row-gap: 28px;
+        padding: 24px 18px;
+        overflow: auto;
+      }
+
+      .artwork {
+        grid-column: 1;
+        grid-row: 1;
+        width: min(78vw, 360px);
+        height: auto;
+        aspect-ratio: 1;
+        justify-self: center;
+        align-self: auto;
+      }
+
+      .info {
+        grid-column: 1;
+        grid-row: 2;
+        text-align: center;
+        width: 100%;
+        padding-top: 0;
+        align-self: auto;
+      }
+
+      .info .stats {
+        justify-content: center;
+      }
+
+      .player {
+        grid-column: 1;
+        grid-row: 3;
+        width: 100%;
+        height: 166px;
+        align-self: auto;
+      }
+    }
+
+    #controls {
+      display: none;
+      position: fixed;
+      left: 50%;
+      bottom: 26px;
+      transform: translateX(-50%);
+      z-index: 20;
+      align-items: center;
+      gap: 14px;
+      background: rgba(0, 0, 0, .72);
+      border: 1px solid rgba(255, 255, 255, .12);
+      padding: 12px 22px;
+      border-radius: 50px;
+      box-shadow: 0 10px 32px rgba(0, 0, 0, .5);
+      backdrop-filter: blur(8px);
+    }
+
+    #controls .ctl-btn {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      font-size: 18px;
+      color: #fff;
+      background: rgba(255, 255, 255, .12);
+      transition: background .2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #controls .ctl-btn:hover {
+      background: rgba(255, 255, 255, .25);
+    }
+
+    #controls .ctl-btn.main {
+      background: #ff5500;
+    }
+
+    .loading {
+      color: rgba(255, 255, 255, .8);
+      font-size: 14px;
+      letter-spacing: .5px;
+    }
+
+    .spinner {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: 3px solid rgba(255, 255, 255, .15);
+      border-top-color: #ff5500;
+      animation: spin .8s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .click-hint {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, .65);
+      color: #fff;
+      cursor: pointer;
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: .5px;
+    }
+
+    .click-hint .play-ico {
+      width: 84px;
+      height: 84px;
+      border-radius: 50%;
+      background: #ff5500;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+      box-shadow: 0 12px 40px rgba(255, 85, 0, .5);
+    }
+
+    .click-hint .play-ico::after {
+      content: "";
+      display: block;
+      width: 0;
+      height: 0;
+      border-left: 26px solid #fff;
+      border-top: 16px solid transparent;
+      border-bottom: 16px solid transparent;
+      margin-left: 6px;
+    }
+
+    .error {
+      color: #fff;
+      font-size: 16px;
+      text-align: center;
+      max-width: 480px;
+      padding: 20px;
+    }
+
+    .error small {
+      display: block;
+      margin-top: 10px;
+      color: rgba(255, 255, 255, .5);
+      font-size: 12px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="bg" id="bg"></div>
+  <div class="bg-overlay"></div>
+
+  <div class="content" id="content">
+    <div id="loadingWrap" style="display:flex;flex-direction:column;align-items:center;gap:16px">
+      <div class="spinner"></div>
+      <div class="loading">Loading track...</div>
+    </div>
+  </div>
+
+  <div id="controls">
+    <button class="ctl-btn" id="btnReplay" title="Replay">&#9198;</button>
+    <button class="ctl-btn" id="btnPrev" title="Pause">&#9208;</button>
+    <button class="ctl-btn main" id="btnPlay" title="Play">&#9654;</button>
+    <button class="ctl-btn" id="btnNext" title="Next">&#9197;</button>
+  </div>
+
+  <script>
+    (function () {
+      var params = new URLSearchParams(location.search);
+
+      var widget = null;
+      var currentTrackId = null;
+      var startVolume = 80;
+      var playingFlag = false;
+      var lastPos = 0;   // detik
+      var lastDur = 0;   // detik
+      var lastProgressSec = -1;
+      var hintShown = false;
+      var hintEl = null;
+
+      // ==== Protokol dengan halaman induk (player.html) ====
+      function post(m) {
+        try { parent.postMessage(Object.assign({ ph: 1 }, m), '*'); } catch (e) {}
+      }
+
+      function reportState() {
+        post({
+          type: 'state',
+          playing: playingFlag,
+          position: lastPos,
+          duration: lastDur
+        });
+      }
+
+      function showError(msg) {
+        var wrap = document.getElementById('loadingWrap');
+        wrap.style.display = 'none';
+        var err = document.createElement('div');
+        err.className = 'error track-el';
+        err.innerHTML = '<strong>' + (msg || 'Failed to load track') + '</strong>' +
+          '<small>Check that the trackId is valid and the track is public.</small>';
+        document.getElementById('content').appendChild(err);
+        post({ type: 'error' });
+      }
+
+      function fmt(n) {
+        if (n == null) return null;
+        return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+      }
+
+      function removeHint() {
+        if (hintEl) { hintEl.remove(); hintEl = null; }
+        hintShown = false;
+      }
+
+      // Bersihkan konten track sebelumnya (saat ganti lagu)
+      function clearContent() {
+        var content = document.getElementById('content');
+        content.querySelectorAll('.track-el').forEach(function (el) { el.remove(); });
+        document.getElementById('loadingWrap').style.display = 'flex';
+        removeHint();
+        playingFlag = false;
+        lastPos = 0;
+        lastDur = 0;
+        lastProgressSec = -1;
+      }
+
+      function loadTrack(trackId) {
+        currentTrackId = trackId;
+        clearContent();
+        fetch('/api/soundcloud/track?trackId=' + encodeURIComponent(trackId))
+          .then(function (res) {
+            if (!res.ok) throw new Error('Track not found (HTTP ' + res.status + ')');
+            return res.json();
+          })
+          .then(render)
+          .catch(function (e) { showError(e.message); });
+      }
+
+      function render(track) {
+        document.title = (track.title || 'SoundCloud') + ' - ' + (track.artist || '');
+        document.getElementById('loadingWrap').style.display = 'none';
+
+        var art = track.thumbnail || '';
+        if (art) document.getElementById('bg').style.backgroundImage = "url('" + art + "')";
+
+        var content = document.getElementById('content');
+
+        var artwork = document.createElement('div');
+        artwork.className = 'artwork track-el';
+        var img = document.createElement('img');
+        img.id = 'artworkImg';
+        img.alt = track.title || '';
+        img.onload = function () { this.classList.add('loaded'); };
+        img.src = art;
+        artwork.appendChild(img);
+        content.appendChild(artwork);
+
+        var info = document.createElement('div');
+        info.className = 'info track-el';
+        info.innerHTML = '<h1>' + (track.title || 'Unknown') + '</h1>' +
+          '<h2>' + (track.artist || '') + '</h2>';
+        var stats = [];
+        if (track.plays) stats.push('&#9654; ' + track.plays + ' plays');
+        if (track.likes) stats.push('&#9829; ' + track.likes + ' likes');
+        if (track.duration) stats.push('&#9201; ' + track.duration);
+        if (stats.length) info.innerHTML += '<div class="stats">' + stats.map(function (s) { return '<span>' + s + '</span>'; }).join('') + '</div>';
+        content.appendChild(info);
+
+        var player = document.createElement('div');
+        player.className = 'player track-el';
+        var iframe = document.createElement('iframe');
+        iframe.id = 'scWidget';
+        iframe.setAttribute('allow', 'autoplay');
+        iframe.setAttribute('scrolling', 'no');
+        iframe.setAttribute('frameborder', '0');
+        iframe.src = 'https://w.soundcloud.com/player/?url=' +
+          encodeURIComponent('https://api.soundcloud.com/tracks/' + track.trackId) +
+          '&auto_play=true&visual=false&show_artwork=false&show_comments=false' +
+          '&show_user=false&show_playcount=false&buying=false&sharing=false' +
+          '&download=false&hide_related=true&color=%23ff5500';
+        player.appendChild(iframe);
+        content.appendChild(player);
+        initWidget();
+      }
+
+      function playSound() {
+        if (widget) widget.play();
+      }
+
+      function pauseSound() {
+        if (widget) widget.pause();
+      }
+
+      function replaySound() {
+        if (widget) {
+          widget.seekTo(0);
+          widget.play();
+        }
+      }
+
+      function ensureHint() {
+        if (hintShown || hintEl) return;
+        hintShown = true;
+        hintEl = document.createElement('div');
+        hintEl.className = 'click-hint';
+        hintEl.innerHTML = '<div class="play-ico"></div><div>Click to play</div>';
+        hintEl.addEventListener('click', function () {
+          playSound();
+          removeHint();
+        });
+        document.body.appendChild(hintEl);
+      }
+
+      function initWidget() {
+        if (typeof SC === 'undefined' || !SC.Widget) {
+          setTimeout(function () {
+            if (typeof SC !== 'undefined' && SC.Widget) {
+              initWidget();
+            } else {
+              ensureHint();
+            }
+          }, 1500);
+          return;
+        }
+
+        var iframe = document.getElementById('scWidget');
+        if (!iframe) return;
+
+        widget = SC.Widget(iframe);
+        var E = SC.Widget.Events;
+
+        widget.bind(E.READY, function () {
+          try { widget.getDuration(function (d) { lastDur = (d || 0) / 1000; }); } catch (e) {}
+          try { widget.setVolume(startVolume); } catch (e) {}
+          reportState();
+
+          widget.bind(E.PLAY, function () {
+            playingFlag = true;
+            reportState();
+          });
+
+          widget.bind(E.PAUSE, function () {
+            playingFlag = false;
+            reportState();
+          });
+
+          widget.bind(E.PLAY_PROGRESS, function (d) {
+            if (d && typeof d.currentPosition === 'number') lastPos = d.currentPosition / 1000;
+            var sec = Math.floor(lastPos);
+            if (sec !== lastProgressSec) {
+              lastProgressSec = sec;
+              reportState();
+            }
+          });
+
+          widget.bind(E.FINISH, function () {
+            playingFlag = false;
+            reportState();
+            post({ type: 'ended' });
+          });
+
+          widget.bind(E.ERROR, function (err) {
+            console.error('[SC] ERROR:', err);
+            post({ type: 'error' });
+          });
+
+          // Kalau autoplay diblokir browser, tampilkan layar "Click to play"
+          setTimeout(function () {
+            widget.isPlaying(function (playing) {
+              if (!playing) ensureHint();
+            });
+          }, 3000);
+        });
+      }
+
+      // ==== Kontrol dari halaman induk (player.html) ====
+      window.addEventListener('message', function (e) {
+        var d = e.data;
+        if (!d || !d.ph) return;
+        switch (d.cmd) {
+          case 'load':
+            if (d.volume != null) startVolume = d.volume;
+            if (d.trackId) loadTrack(d.trackId);
+            else if (widget) widget.play();
+            break;
+          case 'play':
+            if (widget) widget.play(); else ensureHint();
+            break;
+          case 'pause':
+            if (widget) widget.pause();
+            break;
+          case 'seek':
+            if (widget) widget.seekTo(Math.max(0, d.to || 0) * 1000);
+            break;
+          case 'volume':
+            startVolume = d.vol;
+            if (widget) { try { widget.setVolume(d.vol); } catch (err) {} }
+            break;
+          case 'replay':
+            replaySound();
+            break;
+          case 'stop':
+            if (widget) { try { widget.pause(); widget.seekTo(0); } catch (err) {} }
+            break;
+        }
+      });
+
+      // Kontrol tersembunyi (halaman ini dikendalikan dari induk)
+      document.getElementById('btnPlay').addEventListener('click', playSound);
+      document.getElementById('btnPrev').addEventListener('click', pauseSound);
+      document.getElementById('btnReplay').addEventListener('click', replaySound);
+      document.getElementById('btnNext').addEventListener('click', replaySound);
+
+      var startTrackId = params.get('trackId');
+      post({ type: 'ready' });
+      if (startTrackId) loadTrack(startTrackId);
+    })();
+  </script>
+</body>
+
+</html>

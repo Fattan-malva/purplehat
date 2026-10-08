@@ -88,6 +88,28 @@ body {
 
 #player { width: 100%; height: 100%; }
 
+/* Frame penadah player: youtube/player-yt.html atau soundcloud/player-sc.html */
+#player-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  z-index: 1;
+  background: #000;
+}
+
+/* Lucide icons */
+.lucide {
+  width: 1em;
+  height: 1em;
+  display: inline-block;
+  vertical-align: -0.15em;
+  stroke-width: 2;
+}
+.icon-glow { filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.65)); }
+.idle-text .lucide { color: #c084fc; margin-right: 6px; }
+
 /* Tampilan idle player (belum ada lagu diputar) */
 #player-wrapper { position: relative; }
 #idle-screen {
@@ -229,8 +251,39 @@ body.immersive #screen-logout {
 }
 
 /* Halaman menu awal: pairing code di atas + slider promo */
-.menu-container { align-items: center; }
+.menu-container { align-items: center; position: relative; z-index: 1; }
 
+/* === Background video YouTube fullscreen di menu pairing === */
+#bg-video {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background: #07070d;
+  pointer-events: none;
+}
+/* Video di-crop cover layar (rapat ke semua sisi) */
+#bg-video video {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100vw;
+  height: 56.25vw;
+  min-width: 177.78vh;
+  min-height: 100vh;
+  object-fit: cover;
+  border: 0;
+  pointer-events: none;
+}
+/* Lapisan gelap transparan supaya teks tetap terbaca */
+.bg-dim {
+  position: absolute;
+  inset: 0;
+  background: rgba(3, 3, 8, 0.85);
+  backdrop-filter: brightness(0.55) blur(1.5px);
+  -webkit-backdrop-filter: brightness(0.55) blur(1.5px);
+}
 .pair-banner {
   border-radius: 24px;
   padding: 28px 40px;
