@@ -177,7 +177,9 @@
             el('gate-open-link').href = controllerUrl;
             el('gate-manual-open').href = controllerUrl;
 
-            // Klik "Buka Purplehat" (link) di Android -> lewat protocol handler
+            // Klik "Buka Purplehat" di Android -> openNow() langsung meminta
+            // Android mencari & membuka aplikasi terpasang (via intent),
+            // BUKAN navigasi ahref biasa supaya tab ini tidak reload.
             el('gate-open-link').addEventListener('click', function (e) {
                 if (isAndroid) { e.preventDefault(); openNow(); }
             });
@@ -215,33 +217,39 @@
                 el('gate-open-link').href = controllerUrl;
             }
 
-            // ==== Peluncur aplikasi via protocol handler ====
-            // Navigasi biasa ke URL dalam scope TIDAK membuka WebAPK dari
-            // dalam tab Chrome (hanya dari app lain, mis. hasil scan QR) ->
-            // tombol "Buka" jadi terasa seperti reload. Manifest memasang
-            // protocol handler "purplehat://" yang terdaftar di Android
-            // sebagai intent filter WebAPK, sehingga klik tombol benar-benar
-            // meluncurkan aplikasinya.
+            // ==== Peluncur aplikasi via intent (langsung cari app-nya) ====
+            // Manifest mendaftarkan protocol handler "web+purplehat" pada
+            // WebAPK. Tanpa navigasi ahref: pakai intent:// supaya Chrome
+            // menyerahkan ke Android intent resolver yang LANGSUNG mencari
+            // aplikasi dengan intent-filter web+purplehat. Kalau ketemu ->
+            // app terbuka; kalau tidak -> tab TIDAK reload (cuma notifikasi
+            // "no apps" sekilas) dan petunjuk cadangan muncul di bawah.
             function appLaunchUrl() {
-                return 'purplehat://pair/' + encodeURIComponent(pair || 'open');
+                return 'web+purplehat:pair/' + encodeURIComponent(pair || 'open');
             }
 
             function openNow() {
-                if (isAndroid) {
-                    // Coba buka aplikasi via protocol handler. Kalau ternyata
-                    // belum terdaftar (Chrome belum memperbarui WebAPK),
-                    // tab tetap di sini dan petunjuk di bawah tetap terlihat.
-                    location.href = appLaunchUrl();
-                    setTimeout(function () {
-                        if (!document.hidden && stage === 'open') {
-                            el('gate-open-hint').textContent =
-                                'Belum membuka aplikasi? Buka Purplehat dari ikon di layar utama HP kamu, ' +
-                                'atau tutup Chrome lalu buka Purplehat dari ikon.';
-                        }
-                    }, 1500);
-                } else {
-                    location.href = controllerUrl;
+                if (!isAndroid) return location.href = controllerUrl;
+
+                // intent data yang diterima aplikasi = web+purplehat:pair/KODE
+                const intentUrl = 'intent://pair/' + encodeURIComponent(pair || 'open') +
+                    '#Intent;scheme=web+purplehat;end';
+                try {
+                    window.location.href = intentUrl;
+                } catch (e) {
+                    window.open(appLaunchUrl(), '_self'); // pemutar tanpa dukungan intent://
                 }
+
+                // Kalau aplikasinya tidak tertangkap, tab tetap terlihat ->
+                // beri tahu langkah yang pasti (halaman tidak diubah).
+                setTimeout(function () {
+                    if (!document.hidden && stage === 'open') {
+                        el('gate-open-hint').textContent =
+                            'Belum membuka aplikasi? Kalau Purplehat sudah terpasang tapi tombol ini tidak bisa membukanya, ' +
+                            'hapus lalu pasang ulang dari halaman ini (Chrome perlu mendaftarkan pintu "web+purplehat"), ' +
+                            'atau buka Purplehat langsung dari ikon di layar utama HP kamu.';
+                    }
+                }, 1200);
             }
 
             function onInstalled() {
@@ -256,7 +264,14 @@
                     'Kalau yang terbuka tetap tab ini, ketuk tombol "Buka Purplehat" atau buka Purplehat dari ikon di layar utama HP kamu.';
                 setProgress(100, 'Tahap 3/3 · Membuka aplikasi Purplehat…', true);
                 el('gate-open-link').href = controllerUrl;
-                openNow();
+
+                // Jeda "settle" sebentar setelah event appinstalled sebelum
+                // mencoba buka otomatis. Ini bukan tebakan status — progress
+                // sudah 100% dari kejadian nyata; tujuannya hanya memberi
+                // waktu WebAPK selesai commit pemasangannya.
+                setTimeout(function () {
+                    if (stage === 'open' && !document.hidden) openNow();
+                }, 1200);
             }
 
             // Pemasangan selesai (kejadian nyata dari Chrome)
@@ -304,7 +319,10 @@
                 try { choice = await ev.userChoice; } catch (err) { }
 
                 if (choice && choice.outcome === 'accepted') {
-                    onInstalled(); // appinstalled juga akan memanggil ini (dijaga guard stage)
+                    // Baru DISETUJUI, belum tentu SELESAI. "Terpasang!" hanya
+                    // boleh muncul dari event appinstalled (kejadian nyata).
+                    // Tetap di tahap 2 sambil menunggu event tersebut.
+                    setProgress(90, 'Tahap 2/3 · Menyelesaikan pemasangan…', true);
                 } else if (choice) {
                     el('gate-steps').classList.remove('hidden');
                     setInstallIdle('Pemasangan dibatalkan. Ketuk "Pasang Sekarang" lagi, atau pasang lewat menu ⋮.');
@@ -327,16 +345,19 @@
             } else if (cameBack) {
                 setInstallIdle('Purplehat belum terpasang. Selesaikan pemasangan dulu lewat langkah di atas.');
             } else if (localStorage.getItem('ph_installed') === '1') {
-                // Sudah pernah terpasang (scan QR berikutnya) -> langsung coba buka app
+                // Sudah pernah terpasang (scan QR berikutnya). Peluncuran
+                // protocol dari script saat LOAD sangat mungkin diblokir Chrome
+                // (butuh user gesture), jadi tidak auto-launch: user ketuk
+                // tombol "Buka Purplehat" -> openNow() me-resolve via intent.
                 stage = 'open';
                 showCard('gate-open');
-                el('gate-open-title').textContent = 'Membuka Aplikasi…';
-                el('gate-open-text').textContent = 'Purplehat sudah terpasang di HP ini.';
+                el('gate-open-title').textContent = 'Purplehat Terpasang';
+                el('gate-open-text').textContent =
+                    'Purplehat sudah terpasang di HP ini. Ketuk tombol di bawah untuk membukanya.';
                 el('gate-open-hint').textContent =
                     'Kalau halaman ini terbuka kembali di browser, ketuk tombol di bawah atau buka Purplehat dari ikon di layar utama.';
                 el('gate-open-link').href = controllerUrl;
-                setProgress(100, 'Tahap 3/3 · Aplikasi sudah terpasang. Membuka Purplehat…', true);
-                openNow();
+                setProgress(100, 'Tahap 3/3 · Aplikasi sudah terpasang. Ketuk "Buka Purplehat" untuk membuka…', false);
             } else if (noPromptLikely) {
                 // Kapabilitas (deteksi UA, bukan timer): langsung buka langkah
                 // manual supaya tidak menunggu "Chrome" selamanya di browser

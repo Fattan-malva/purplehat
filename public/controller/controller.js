@@ -530,11 +530,7 @@ function startScan() {
         const code = jsQR(imageData.data, imageData.width, imageData.height);
         if (code) {
           stopScan();
-          let extracted = '';
-          try {
-            const u = new URL(code.data);
-            extracted = u.searchParams.get('pair') || '';
-          } catch { extracted = code.data; }
+          const extracted = extractPairFromQr(code.data);
           if (extracted) connect(extracted);
         }
       }, 300);
@@ -562,6 +558,25 @@ function escapeHtml(t) {
 
 function escapeAttr(t) {
   return String(t == null ? '' : t).replace(/["'&<>]/g, c => ({ '"': '&quot;', "'": '&#39;', '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+}
+
+function extractPairFromQr(data) {
+  // Format 1: URL http(s)://host/...?pair=KODE
+  try {
+    const u = new URL(data);
+    const p = u.searchParams.get('pair');
+    if (p) return p.toUpperCase().trim();
+  } catch {}
+
+  // Format 2: web+purplehat:pair/KODE atau purplehat:pair/KODE
+  const m = data.match(/^(?:web\+)?purplehat:pair\/([A-Za-z0-9-]+)$/i);
+  if (m) return m[1].toUpperCase().trim();
+
+  // Format 3: KODE mentah (4-10 karakter)
+  const raw = data.trim();
+  if (/^[A-Za-z0-9-]{4,10}$/.test(raw)) return raw.toUpperCase();
+
+  return '';
 }
 
 bindUI();
