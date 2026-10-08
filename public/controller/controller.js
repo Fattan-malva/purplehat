@@ -45,6 +45,9 @@ function connect(code) {
     })
     .then(() => {
       statusEl.textContent = 'Menghubungi realtime...';
+      // Simpan kode terakhir: dipakai lagi saat aplikasi dibuka dari
+      // layar utama (standalone), di mana URL tidak lagi membawa ?pair=
+      localStorage.setItem('ph_last_code', roomCode);
       openSocket(0);
     })
     .catch((e) => {
@@ -444,9 +447,108 @@ function escapeAttr(t) {
 bindUI();
 refreshIcons();
 
+// ==== PWA: pasang ke layar utama & koneksi otomatis dari app standalone ====
+const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+function setupInstallUI() {
+  // Sudah dibuka sebagai aplikasi -> tidak perlu prompt apa pun
+  if (isStandalone) return;
+
+  const modal = document.getElementById('install-modal');
+  const btn = document.getElementById('install-btn');
+  const later = document.getElementById('install-later');
+  const text = document.getElementById('install-modal-text');
+  const stepsModal = document.getElementById('install-steps-modal');
+  const banner = document.getElementById('install-banner');
+  const hint = document.getElementById('install-hint');
+  const steps = document.getElementById('install-steps');
+  const dismiss = document.getElementById('install-dismiss');
+
+  const isAndroid = /Android/i.test(navigator.userAgent);
+  let deferredPrompt = null;
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+  });
+
+  window.addEventListener('appinstalled', () => {
+    if (modal) modal.classList.add('hidden');
+    showInstalledMsg();
+  });
+
+  function showInstalledMsg() {
+    if (banner) {
+      banner.classList.remove('hidden');
+      if (hint) hint.textContent = 'Berhasil dipasang! Buka Purplehat dari ikon di layar utama.';
+      if (steps) steps.classList.add('hidden');
+    }
+  }
+
+  // ==== Android: modal muncul langsung saat URL dari QR dibuka di browser ====
+  if (isAndroid) {
+    if (modal) modal.classList.remove('hidden');
+
+    if (btn) btn.addEventListener('click', async () => {
+      // beforeinstallprompt kadang baru dikirim beberapa detik setelah load;
+      // tunggu sebentar sebelum menyerah.
+      for (let i = 0; i < 20 && !deferredPrompt; i++) {
+        await new Promise(r => setTimeout(r, 250));
+      }
+      if (!deferredPrompt) {
+        // Chrome tidak menawarkan prompt (pernah ditolak / browser lain)
+        // -> tampilkan petunjuk manual, tanpa tombol close
+        if (text) text.textContent = 'Pasang manual lewat menu browser:';
+        if (stepsModal) stepsModal.classList.remove('hidden');
+        if (later) later.classList.remove('hidden');
+        return;
+      }
+      modal.classList.add('hidden');
+      deferredPrompt.prompt();
+      try {
+        const choice = await deferredPrompt.userChoice;
+        if (choice && choice.outcome === 'accepted') {
+          // Terpasang: Chrome akan menawarkan "Buka" otomatis, dan saat
+          // dibuka dari ikon layar utama app langsung masuk mode standalone.
+          showInstalledMsg();
+        } else {
+          // User menutup prompt Chrome -> tampil kembali petunjuk manual
+          if (modal) modal.classList.remove('hidden');
+          if (text) text.textContent = 'Pasang manual lewat menu browser:';
+          if (stepsModal) stepsModal.classList.remove('hidden');
+          if (later) later.classList.remove('hidden');
+        }
+      } catch {}
+      deferredPrompt = null;
+    });
+
+    if (later) later.addEventListener('click', () => {
+      if (modal) modal.classList.add('hidden');
+    });
+    return;
+  }
+
+  // ==== iOS Safari: tidak ada beforeinstallprompt -> petunjuk manual ====
+  if (isIOS) {
+    if (banner) banner.classList.remove('hidden');
+    if (hint) hint.textContent = 'Pasang Purplehat ke layar utama agar terasa seperti aplikasi native:';
+    if (steps) steps.classList.remove('hidden');
+    if (dismiss) dismiss.addEventListener('click', () => banner.classList.add('hidden'));
+  }
+}
+setupInstallUI();
+
 // auto-connect if pair param present
 const params = new URLSearchParams(location.search);
 const pair = params.get('pair');
-if (pair) connect(pair);
+if (pair) {
+  connect(pair);
+} else if (isStandalone) {
+  // Dibuka dari ikon layar utama: hubungkan otomatis ke kode terakhir
+  const lastCode = localStorage.getItem('ph_last_code');
+  if (lastCode) connect(lastCode);
+}
 
 setInterval(() => { if (!fallbackMode) send(PH.MSG.REQUEST_STATE, {}); }, 3000);
