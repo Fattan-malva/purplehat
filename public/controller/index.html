@@ -21,7 +21,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="controller.css?v=20261009d">
+    <link rel="stylesheet" href="controller.css?v=20261009e">
 
     <script>
         // ==== ATURAN KERAS: controller hanya boleh tampil sebagai aplikasi ====
@@ -84,8 +84,9 @@
     </section>
 
     <!-- Main Controller UI (hidden until paired)
-         Search di atas, controller di tengah (scroll), player dock fixed di bawah,
-         Up Next & FX sebagai modal + floating button. -->
+         Search isi area tengah (scroll, infinite pagination),
+         di bawahnya stack: panel Now, lalu panel Controls (fixed),
+         Up Next & FX sebagai modal + floating button di atas panel now. -->
     <div id="main-ui" class="hidden">
 
         <!-- ===== HEADER (paling atas) ===== -->
@@ -126,7 +127,42 @@
             <div id="results" class="results hidden"></div>
         </section>
 
-        <!-- ===== KONTROLLER (scroll area) ===== -->
+        <!-- ===== NOW PLAYING + CONTROLS =====
+             Stack di bawah: panel NOW di atas panel CONTROLS.
+             Floating Up Next melayang tepat di atas panel now. -->
+        <section id="player-dock">
+
+            <!-- Floating Up Next: melayang di atas panel now -->
+            <button id="btn-upnext" class="fab-upnext" title="Up Next" aria-label="Up Next">
+                <i data-lucide="list-music"></i>
+                <span class="fab-badge" id="queue-badge">0</span>
+            </button>
+
+            <section class="panel now">
+                <div class="art" id="np-art">
+                    <i data-lucide="music" class="art-placeholder"></i>
+                    <img id="np-thumb" class="hidden" alt="">
+                </div>
+                <div class="now-body">
+                    <div>
+                        <h2 class="now-title" id="np-title">Menunggu lagu...</h2>
+                        <p class="now-sub" id="np-sub">Purplehat Karaoke</p>
+                    </div>
+                    <div>
+                        <div class="time">
+                            <span id="pos">0:00</span>
+                            <span id="dur">0:00</span>
+                        </div>
+                        <div class="progress" id="progress-container">
+                            <div class="progress-bar" id="progress-bar"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </section>
+
+        <!-- ===== KONTROL (dok bawah, di bawah panel now) ===== -->
         <section id="controller-col">
 
             <!-- Controls + Master digabung jadi satu panel -->
@@ -167,39 +203,6 @@
             </section>
 
         </section>
-
-        <!-- ===== NOW PLAYING + CONTROLS (fixed di bawah) ===== -->
-        <section id="player-dock">
-
-            <section class="panel now">
-                <div class="art" id="np-art">
-                    <i data-lucide="music" class="art-placeholder"></i>
-                    <img id="np-thumb" class="hidden" alt="">
-                </div>
-                <div class="now-body">
-                    <div>
-                        <h2 class="now-title" id="np-title">Menunggu lagu...</h2>
-                        <p class="now-sub" id="np-sub">Purplehat Karaoke</p>
-                    </div>
-                    <div>
-                        <div class="time">
-                            <span id="pos">0:00</span>
-                            <span id="dur">0:00</span>
-                        </div>
-                        <div class="progress" id="progress-container">
-                            <div class="progress-bar" id="progress-bar"></div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-        </section>
-
-        <!-- ===== FLOATING UP NEXT ===== -->
-        <button id="btn-upnext" class="fab-upnext" title="Up Next" aria-label="Up Next">
-            <i data-lucide="list-music"></i>
-            <span class="fab-badge" id="queue-badge">0</span>
-        </button>
 
     </div>
 
@@ -287,7 +290,7 @@
             pitchDisplay.classList.toggle('is-on', currentPitch !== 0);
         }
     </script>
-    <script src="controller.js?v=20261009d"></script>
+    <script src="controller.js?v=20261009e"></script>
 </body>
 
 </html>

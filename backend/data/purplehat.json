@@ -339,6 +339,26 @@
       "volume": 80,
       "position": 0,
       "duration": 0
+    },
+    "GR7JK2": {
+      "code": "GR7JK2",
+      "createdAt": 1791500472378,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
+    },
+    "8ARATS": {
+      "code": "8ARATS",
+      "createdAt": 1791500641616,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
     }
   }
 }

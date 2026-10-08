@@ -35,7 +35,7 @@ function send(type, payload) {
 
 function setStatus(text) {
   const el = document.getElementById('status');
-  if (el) el.textContent = text;
+  if (el) el.innerHTML = text;
 }
 
 function refreshIcons() {
@@ -78,7 +78,7 @@ function openSocket(attempt) {
   ws = new WebSocket(proto + location.host + '/?role=controller&code=' + roomCode);
 
   ws.onopen = () => {
-    setStatus('Terhubung ke ' + roomCode);
+    setStatus('Terhubung ke <b class="status-code">' + roomCode + '</b>');
     showMainUI();
     send(PH.MSG.JOIN, {});
   };
@@ -100,7 +100,7 @@ function openSocket(attempt) {
       fallbackMode = true;
       statusEl.style.color = '#fbbf24';
       statusEl.textContent = 'Mode polling (realtime tidak aktif di koneksi ini). Tetap berfungsi.';
-      setStatus('Terhubung (polling) ke ' + roomCode);
+      setStatus('Terhubung (polling) ke <b class="status-code">' + roomCode + '</b>');
       showMainUI();
       pollState();
     }
@@ -234,23 +234,80 @@ function bindUI() {
   });
 }
 
+// ===== Pencarian + pagination tak berujung (terpicu saat scroll ke bawah) =====
+var resultsState = { query: '', src: null, page: 1, offset: 0, hasMore: false, loading: false, limit: 20 };
+
 async function search() {
   const q = document.getElementById('search-input').value.trim();
   if (!q) return;
   const el = document.getElementById('results');
   el.classList.remove('hidden');
+  resultsState = { query: q, src: searchSource, page: 1, offset: 0, hasMore: true, loading: true, limit: 20 };
   el.innerHTML = '<div class="state-msg"><i data-lucide="loader-circle" class="spin"></i> Mencari di ' + (searchSource === 'soundcloud' ? 'SoundCloud' : 'YouTube') + '...</div>';
   refreshIcons();
   try {
-    const endpoint = searchSource === 'soundcloud'
-      ? `${API_BASE}/api/search-soundcloud?q=${encodeURIComponent(q)}&limit=30`
-      : `${API_BASE}/api/search?q=${encodeURIComponent(q)}&limit=30`;
-    const res = await fetch(endpoint);
-    const data = await res.json();
-    const items = searchSource === 'soundcloud' ? (data.data || []) : data;
-    renderResults(items);
+    const r = await fetchPage(false);
+    advanceState(r.items.length, r.hasMore);
+    renderResults(r.items);
   } catch (e) {
     el.innerHTML = '<div class="state-msg error">Gagal mencari</div>';
+  } finally {
+    resultsState.loading = false;
+  }
+}
+
+// Ambil satu halaman hasil. Kembali: { items, hasMore }.
+async function fetchPage(append) {
+  const q = resultsState.query;
+  let url;
+  if (resultsState.src === 'soundcloud') {
+    url = `${API_BASE}/api/search-soundcloud?q=${encodeURIComponent(q)}&limit=${resultsState.limit}&page=${append ? resultsState.page : 1}`;
+  } else {
+    url = `${API_BASE}/api/search?q=${encodeURIComponent(q)}&limit=${resultsState.limit}&offset=${append ? resultsState.offset : 0}`;
+  }
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const data = await res.json();
+  if (resultsState.src === 'soundcloud') {
+    const items = data.data || [];
+    return { items, hasMore: !!(data.hasNext && items.length === resultsState.limit) };
+  }
+  const items = data || [];
+  return { items, hasMore: items.length === resultsState.limit };
+}
+
+function advanceState(loaded, hasMore) {
+  if (resultsState.src === 'soundcloud') resultsState.page += 1;
+  else resultsState.offset += loaded;
+  resultsState.hasMore = hasMore;
+  resultsState.loading = false;
+}
+
+async function loadMore() {
+  if (resultsState.loading || !resultsState.hasMore || !resultsState.query) return;
+  const el = document.getElementById('results');
+  resultsState.loading = true;
+  const loader = document.createElement('div');
+  loader.className = 'state-msg';
+  loader.innerHTML = '<i data-lucide="loader-circle" class="spin"></i> Memuat hasil lagi...';
+  el.appendChild(loader);
+  refreshIcons();
+  try {
+    const r = await fetchPage(true);
+    advanceState(r.items.length, r.hasMore);
+    loader.remove();
+    renderResults(r.items, true);
+    if (!resultsState.hasMore) {
+      const end = document.createElement('div');
+      end.className = 'results-end';
+      end.textContent = '— Akhir dari hasil —';
+      el.appendChild(end);
+    }
+  } catch (e) {
+    if (loader.parentNode) loader.remove();
+    resultsState.hasMore = false;
+  } finally {
+    resultsState.loading = false;
   }
 }
 
@@ -260,40 +317,46 @@ function sourceIcon(src) {
     : '<i class="fab fa-youtube src-yt" title="Available on YouTube"></i>';
 }
 
-function renderResults(items) {
-  const el = document.getElementById('results');
-  el.innerHTML = '';
-  el.classList.remove('hidden');
-  if (!items || items.length === 0) {
-    el.innerHTML = '<div class="state-msg">Tidak ada hasil</div>';
-    return;
-  }
-  items.forEach(item => {
-    const isSC = item.source === 'soundcloud' || !!item.trackId;
-    const sub = [item.artist || item.channelName || '', item.duration || ''].filter(Boolean).join(' • ');
-    const thumb = item.thumbnail
-      ? `<img class="thumb" src="${item.thumbnail}" alt="${escapeHtml(item.title || '')}">`
-      : `<div class="thumb"><i data-lucide="music"></i></div>`;
-    const div = document.createElement('div');
-    div.className = 'result-row';
-    div.setAttribute('role', 'button');
-    div.setAttribute('tabindex', '0');
-    div.innerHTML = `
+function buildResultRow(item) {
+  const isSC = item.source === 'soundcloud' || !!item.trackId;
+  const sub = [item.artist || item.channelName || '', item.duration || ''].filter(Boolean).join(' • ');
+  const thumb = item.thumbnail
+    ? `<img class="thumb" src="${item.thumbnail}" alt="${escapeHtml(item.title || '')}">`
+    : `<div class="thumb"><i data-lucide="music"></i></div>`;
+  const div = document.createElement('div');
+  div.className = 'result-row';
+  div.setAttribute('role', 'button');
+  div.setAttribute('tabindex', '0');
+  div.innerHTML = `
       ${thumb}
       <div class="row-main">
         <div class="row-title">${escapeHtml(item.title || '')}</div>
         <div class="row-sub">${sourceIcon(isSC ? 'soundcloud' : 'youtube')} <span class="truncate">${escapeHtml(sub)}</span></div>
       </div>
       <i data-lucide="plus" class="row-add"></i>`;
-    div.addEventListener('click', () => {
-      if (isSC) {
-        send(PH.MSG.ADD_SONG, { source: 'soundcloud', trackId: item.trackId, title: item.title, artist: item.artist, thumbnail: item.thumbnail });
-      } else {
-        send(PH.MSG.ADD_SONG, { source: 'youtube', videoId: item.videoId, title: item.title, artist: item.channelName, thumbnail: item.thumbnail });
-      }
-    });
-    el.appendChild(div);
+  div.addEventListener('click', () => {
+    if (isSC) {
+      send(PH.MSG.ADD_SONG, { source: 'soundcloud', trackId: item.trackId, title: item.title, artist: item.artist, thumbnail: item.thumbnail });
+    } else {
+      send(PH.MSG.ADD_SONG, { source: 'youtube', videoId: item.videoId, title: item.title, artist: item.channelName, thumbnail: item.thumbnail });
+    }
   });
+  return div;
+}
+
+function renderResults(items, append) {
+  const el = document.getElementById('results');
+  el.classList.remove('hidden');
+  if (append) {
+    (items || []).forEach(item => el.appendChild(buildResultRow(item)));
+  } else {
+    el.innerHTML = '';
+    if (!items || items.length === 0) {
+      el.innerHTML = '<div class="state-msg">Tidak ada hasil</div>';
+      return;
+    }
+    items.forEach(item => el.appendChild(buildResultRow(item)));
+  }
   refreshIcons();
 }
 
@@ -319,7 +382,7 @@ function render() {
   } else {
     subEl.textContent = 'Purplehat Karaoke';
   }
-  setStatus(state.playing ? 'Sedang Memutar • ' + roomCode : 'Terhubung ke ' + roomCode);
+  setStatus(state.playing ? 'Sedang Memutar • <b class="status-code">' + roomCode + '</b>' : 'Terhubung ke <b class="status-code">' + roomCode + '</b>');
   document.getElementById('queue-badge').textContent = state.queue.length;
   const pos = state.position || 0, dur = state.duration || 0;
   document.getElementById('pos').textContent = formatTime(pos);
@@ -517,3 +580,16 @@ if (gateRedirected) {
 }
 
 setInterval(() => { if (!fallbackMode) send(PH.MSG.REQUEST_STATE, {}); }, 3000);
+
+// Pagination tak berujung: saat pengguna scroll hasil sampai dekat bawah, muat halaman berikutnya.
+(function initInfiniteScroll() {
+  const resultsEl = document.getElementById('results');
+  if (!resultsEl) return;
+  resultsEl.addEventListener('scroll', () => {
+    if (resultsEl.scrollTop + resultsEl.clientHeight >= resultsEl.scrollHeight - 220) loadMore();
+  }, { passive: true });
+})();
+
+// Default pencarian: query "breakbeat" sudah terisi, hasil langsung tampil sejak awal.
+document.getElementById('search-input').value = 'breakbeat';
+search();

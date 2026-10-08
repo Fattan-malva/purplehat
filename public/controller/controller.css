@@ -357,6 +357,12 @@ input:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  flex: 1;
+  min-height: 0;
+}
+
+#search-col>.panel.search,
+#search-col>.chips {
   flex-shrink: 0;
 }
 
@@ -364,16 +370,14 @@ input:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  flex: 1;
+  flex-shrink: 0;
   min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
   padding-bottom: 4px;
 }
 
-/* Player dock fixed di bawah */
+/* Player dock fixed di bawah (panel Now di atas, Controls di bawahnya) */
 #player-dock {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -430,6 +434,13 @@ input:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 220px;
+}
+
+/* Room code di header: tebal + ungu */
+#status .status-code {
+  color: var(--accent);
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
 .icon-btn {
@@ -985,13 +996,15 @@ input[type="range"]::-moz-range-thumb {
   color: #fb923c;
 }
 
-/* ---------- Results: tanpa wrapper rounded, scrollbar disembunyikan ---------- */
+/* ---------- Results: isi area tengah, scrollbar disembunyikan ---------- */
 .results {
   display: flex;
   flex-direction: column;
   gap: 6px;
   padding: 4px 0 12px;
-  max-height: 46vh;
+  flex: 1;
+  min-height: 0;
+  max-height: none;
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
@@ -1003,6 +1016,15 @@ input[type="range"]::-moz-range-thumb {
   -ms-overflow-style: none;
   -webkit-mask-image: linear-gradient(to bottom, #000 88%, transparent 100%);
   mask-image: linear-gradient(to bottom, #000 88%, transparent 100%);
+}
+
+.results-end {
+  flex-shrink: 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+  padding: 10px 0 6px;
+  opacity: .8;
 }
 
 .results::-webkit-scrollbar {
@@ -1198,11 +1220,12 @@ input[type="range"]::-moz-range-thumb {
   touch-action: manipulation;
 }
 
-/* ---------- Floating Up Next ---------- */
+/* ---------- Floating Up Next (melayang tepat di atas panel now) ---------- */
 .fab-upnext {
-  position: fixed;
-  right: calc(var(--safe-r) + 16px);
-  bottom: calc(var(--safe-b) + 18px);
+  position: absolute;
+  right: calc(var(--safe-r) + 14px);
+  bottom: 100%;
+  margin-bottom: 12px;
   width: 52px;
   height: 52px;
   border-radius: 50%;
@@ -1337,14 +1360,15 @@ input[type="range"]::-moz-range-thumb {
 
   #main-ui.flex {
     display: grid;
-    grid-template-columns: minmax(280px, 1fr) minmax(0, 1.25fr);
-    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
     grid-template-areas:
-      "header  header"
-      "search  controller"
-      "dock    dock";
+      "header"
+      "search"
+      "dock"
+      "controls";
     gap: 12px;
-    max-width: 1280px;
+    max-width: 760px;
     height: calc(100dvh - var(--safe-t) - var(--safe-b) - 24px);
   }
 
@@ -1358,19 +1382,13 @@ input[type="range"]::-moz-range-thumb {
     overflow: hidden;
   }
 
-  #controller-col {
-    grid-area: controller;
-    min-height: 0;
-  }
-
   #player-dock {
     grid-area: dock;
-    flex-direction: row;
   }
 
-  #player-dock>.now {
-    flex: 1;
-    min-width: 0;
+  #controller-col {
+    grid-area: controls;
+    min-height: 0;
   }
 
   #search-col .results {
@@ -1418,10 +1436,6 @@ input[type="range"]::-moz-range-thumb {
   .btn-mode {
     height: 38px;
   }
-
-  .fab-upnext {
-    bottom: calc(var(--safe-b) + 16px);
-  }
 }
 
 /* Very short landscape phones */
@@ -1444,6 +1458,12 @@ input[type="range"]::-moz-range-thumb {
   }
 
   .controls {
+    gap: 8px;
+    padding: 10px 14px;
+  }
+
+  .now {
+    padding: 8px 12px;
     gap: 8px;
   }
 
