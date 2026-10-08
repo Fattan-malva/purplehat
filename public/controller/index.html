@@ -1,301 +1,227 @@
 ﻿<!DOCTYPE html>
 <html lang="id">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#07060b">
+    <meta name="color-scheme" content="dark">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Purplehat">
+    <meta name="format-detection" content="telephone=no">
     <title>Purplehat - Karaoke Controller</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="controller.css">
 
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: { sans: ['Poppins', 'sans-serif'] },
-                    colors: {
-                        purple: { 400: '#c084fc', 500: '#a855f7', 600: '#9333ea' },
-                        dark: { 900: '#0a0a0c', 800: '#131316', 700: '#1c1c21' }
-                    },
-                    boxShadow: {
-                        'neon': '0 0 15px rgba(168, 85, 247, 0.5)',
-                        'neon-intense': '0 0 25px rgba(168, 85, 247, 0.8)',
-                    },
-                    animation: { 'gradient-xy': 'gradient-xy 15s ease infinite' },
-                    keyframes: {
-                        'gradient-xy': {
-                            '0%, 100%': { 'background-size': '400% 400%', 'background-position': 'left center' },
-                            '50%': { 'background-size': '200% 200%', 'background-position': 'right center' }
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-
-    <style>
-        body {
-            background: linear-gradient(-45deg, #0a0a0c, #1a0b2e, #0a0a0c, #130624);
-            background-size: 400% 400%;
-            animation: gradient-xy 15s ease infinite;
-            color: white;
-            overscroll-behavior-y: none;
-        }
-
-        .glass-panel {
-            background: rgba(20, 20, 25, 0.6);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(168, 85, 247, 0.15);
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
-        }
-
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(168, 85, 247, 0.3); border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: rgba(168, 85, 247, 0.5); }
-
-        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
-        input[type=range]:focus { outline: none; }
-        input[type=range]::-webkit-slider-runnable-track {
-            width: 100%; height: 6px; cursor: pointer;
-            background: rgba(255, 255, 255, 0.1); border-radius: 4px;
-        }
-        input[type=range]::-webkit-slider-thumb {
-            height: 16px; width: 16px; border-radius: 50%;
-            background: #a855f7; cursor: pointer; -webkit-appearance: none;
-            margin-top: -5px; box-shadow: 0 0 10px rgba(168, 85, 247, 0.8);
-            transition: transform 0.1s;
-        }
-        input[type=range]::-webkit-slider-thumb:active { transform: scale(1.2); }
-
-        .toggle-checkbox:checked { right: 0; border-color: #a855f7; }
-        .toggle-checkbox:checked + .toggle-label {
-            background-color: #a855f7;
-            box-shadow: 0 0 10px rgba(168, 85, 247, 0.5);
-        }
-
-        /* Responsive: di HP kolom utama dan sidebar tampil bertumpuk */
-        #main-ui { min-height: 0; }
-        #queue-badge { transition: all .2s; }
-        .mode-active {
-            background-color: rgba(168, 85, 247, 0.25) !important;
-            border-color: rgba(168, 85, 247, 0.7) !important;
-            color: #e9d5ff !important;
-            box-shadow: 0 0 12px rgba(168, 85, 247, 0.5);
-        }
-        .queue-item button { touch-action: manipulation; }
-
-        /* Lucide icons */
-        .lucide {
-            width: 1em;
-            height: 1em;
-            display: inline-block;
-            vertical-align: -0.15em;
-            stroke-width: 2;
-        }
-        .icon-glow { filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.65)); }
-        .icon-glow-red { filter: drop-shadow(0 0 6px rgba(248, 113, 113, 0.65)); }
-        .icon-glow-sky { filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.65)); }
-        .mode-active .lucide { filter: drop-shadow(0 0 8px rgba(216, 180, 254, 0.9)); }
-        .btn-play-main .lucide { filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.55)); }
-        .src-tab .lucide { filter: drop-shadow(0 0 5px currentColor); }
-        .q-btn:hover .lucide { filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.8)); }
-    </style>
+    <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
     <script src="/shared/protocol.js"></script>
     <script src="/vendor/jsqr/dist/jsQR.js"></script>
 </head>
-<body class="min-h-screen w-full flex flex-col overflow-y-auto p-4 md:p-6 gap-6">
+
+<body>
 
     <!-- Pairing Screen (hilang setelah terhubung) -->
-    <section id="pair-screen" class="glass-panel rounded-3xl p-6 max-w-xl w-full mx-auto mt-10">
-        <h2 class="text-xl font-bold mb-2">Hubungkan ke Player</h2>
-        <p class="text-gray-400 text-sm mb-6">Masukkan kode pairing dari layar TV/Desktop, atau scan QR.</p>
-        <div class="flex gap-3 mb-4">
+    <section id="pair-screen" class="panel pair-card">
+        <h2>Hubungkan ke Player</h2>
+        <p class="hint">Masukkan kode pairing dari layar TV/Desktop, atau scan QR.</p>
+
+        <div class="pair-row">
             <input type="text" id="pair-code-input" placeholder="KODEXX" maxlength="6" autocapitalize="characters"
-                class="flex-1 bg-black/40 text-white rounded-xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-white/10 placeholder-gray-500 tracking-widest font-mono">
-            <button id="pair-connect-btn" class="px-5 py-3 rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 font-semibold shadow-neon active:scale-95 transition-transform">Hubungkan</button>
+                autocomplete="off" spellcheck="false" aria-label="Kode pairing">
+            <button id="pair-connect-btn" class="btn-primary">Hubungkan</button>
         </div>
-        <div id="pair-status" class="hidden text-sm mb-4 text-blue-300"></div>
-        <button id="scan-btn" class="w-full py-3 rounded-xl border border-dashed border-purple-500/50 text-purple-400 hover:bg-purple-500/20 transition-colors flex items-center justify-center gap-2">
+
+        <div id="pair-status" class="hidden"></div>
+
+        <button id="scan-btn" class="btn-ghost">
             <i data-lucide="qr-code"></i> Scan QR
         </button>
-        <div class="mt-3 text-xs text-gray-500 leading-relaxed">
-            <span class="text-gray-400 font-medium">Cara scan QR:</span> klik tombol di atas, izinkan akses kamera saat diminta browser, lalu arahkan kamera ke kode QR yang tampil di layar player.
-        </div>
-        <div id="scan-area" class="hidden mt-4">
-            <video id="scan-video" autoplay playsinline muted class="w-full rounded-xl"></video>
+
+        <p class="hint">
+            <strong>Cara scan QR:</strong> klik tombol di atas, izinkan akses kamera saat diminta browser, lalu arahkan
+            kamera ke kode QR yang tampil di layar player.
+        </p>
+
+        <div id="scan-area" class="hidden scan-box">
+            <video id="scan-video" autoplay playsinline muted></video>
             <canvas id="scan-canvas" class="hidden"></canvas>
-            <button id="scan-stop-btn" class="mt-3 w-full py-2 rounded-xl bg-white/10 hover:bg-white/20">Tutup Kamera</button>
+            <button id="scan-stop-btn" class="btn-secondary">Tutup Kamera</button>
         </div>
     </section>
 
-    <!-- Main Controller UI (hidden until paired) -->
-    <div id="main-ui" class="hidden w-full flex-col landscape:flex-row gap-4 landscape:h-[calc(100dvh-2rem)]">
+    <!-- Main Controller UI (hidden until paired)
+         Portrait  : stacked  -> Controller, Search, Up Next
+         Landscape : 3 kolom  -> Controller | Search | Up Next -->
+    <div id="main-ui" class="hidden">
 
-        <!-- Paling kiri: Sidebar Up Next -->
-        <aside id="queue-col" class="order-3 landscape:order-1 w-full landscape:w-[300px] shrink-0 flex flex-col gap-4 landscape:h-full">
-            <div class="glass-panel rounded-3xl p-5 flex-1 flex flex-col overflow-hidden min-h-[250px] landscape:min-h-0">
-                <div class="flex items-center justify-between mb-4 shrink-0">
-                    <h3 class="font-semibold text-lg flex items-center gap-2">
-                        <i data-lucide="list-music" class="text-purple-500 icon-glow"></i> Up Next
-                    </h3>
-                    <span class="text-xs bg-purple-500/20 text-purple-300 px-3 py-1 rounded-full font-medium border border-purple-500/30"><span id="queue-badge">0</span> Lagu</span>
-                </div>
-                <div class="flex-1 overflow-y-auto pr-2 space-y-2" id="queue-list">
-                    <div class="text-gray-500 text-center py-6">Antrian kosong</div>
-                </div>
-            </div>
-        </aside>
+        <!-- Kolom 1: Controller -->
+        <section id="controller-col">
 
-        <!-- Tengah: Search -->
-        <section id="search-col" class="order-2 landscape:order-2 flex-1 flex flex-col gap-4 min-w-0 landscape:h-full">
-            <div class="relative glass-panel rounded-2xl p-2 shrink-0">
-                <i data-lucide="search" class="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                <input type="text" id="search-input" placeholder="Search songs, artists..."
-                    class="w-full bg-black/40 text-white rounded-xl py-3 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-transparent focus:border-purple-500/50 transition-all placeholder-gray-500">
-            </div>
-            <!-- Chip badge sumber pencarian (di bawah form search) -->
-            <div class="flex flex-wrap gap-3 shrink-0" id="search-tabs">
-                <button class="src-tab mode-active inline-flex items-center gap-2 px-5 py-2 rounded-full bg-white/5 border border-white/10 text-sm font-semibold hover:bg-white/10 transition-all" data-src="youtube">
-                    <i class="fab fa-youtube text-red-500 hover:text-red-400 transition-colors cursor-pointer" title="Available on YouTube"></i> YouTube
-                </button>
-                <button class="src-tab inline-flex items-center gap-2 px-5 py-2 rounded-full bg-white/5 border border-white/10 text-sm font-semibold hover:bg-white/10 transition-all" data-src="soundcloud">
-                    <i class="fab fa-soundcloud text-orange-500 hover:text-orange-400 transition-colors cursor-pointer" title="Available on SoundCloud"></i> SoundCloud
-                </button>
-            </div>
-            <div id="results" class="glass-panel rounded-3xl p-4 overflow-y-auto flex-1 min-h-0 hidden"></div>
-        </section>
-
-        <!-- Paling kanan: Controller -->
-        <section id="controller-col" class="order-1 landscape:order-3 w-full landscape:w-[340px] shrink-0 flex flex-col gap-4 landscape:h-full landscape:overflow-y-auto">
-
-            <!-- Header -->
-            <header class="flex items-center justify-between shrink-0 px-2">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-neon">
-                        <i class="fas fa-hat-wizard text-xl text-white"></i>
+            <header class="topbar">
+                <div class="brand">
+                    <div class="logo">
+                        <i class="fas fa-hat-wizard"></i>
                     </div>
-                    <h1 class="text-xl font-bold tracking-wider">PURPLE<span class="text-purple-500">HAT</span></h1>
+                    <div class="brand-text">
+                        <h1 class="brand-name">PURPLE<span>HAT</span></h1>
+                        <p id="status">Belum terhubung</p>
+                    </div>
                 </div>
-                <div class="flex items-center gap-2">
-                    <button id="btn-logout" title="Logout" class="w-9 h-9 rounded-full glass-panel flex items-center justify-center hover:bg-white/10 transition-colors text-gray-300">
-                        <i data-lucide="log-out" class="text-sm"></i>
-                    </button>
-                </div>
+                <button id="btn-logout" class="icon-btn" title="Logout" aria-label="Logout">
+                    <i data-lucide="log-out"></i>
+                </button>
             </header>
 
             <!-- Now Playing -->
-            <section class="glass-panel rounded-3xl p-6 flex flex-col sm:flex-row items-center gap-6 shrink-0 relative overflow-hidden">
-                <div class="absolute -top-20 -right-20 w-64 h-64 bg-purple-600/20 rounded-full blur-3xl pointer-events-none"></div>
-                <div class="relative w-28 h-28 sm:w-36 sm:h-36 rounded-2xl overflow-hidden shadow-2xl shrink-0 bg-dark-800 flex items-center justify-center" id="np-art">
-                    <i data-lucide="music" class="text-4xl text-purple-500/50 icon-glow"></i>
-                    <img id="np-thumb" class="hidden absolute inset-0 w-full h-full object-cover" alt="">
+            <section class="panel now">
+                <div class="art" id="np-art">
+                    <i data-lucide="music" class="art-placeholder"></i>
+                    <img id="np-thumb" class="hidden" alt="">
                 </div>
-                <div class="flex-1 w-full flex flex-col justify-center">
-                    <div class="text-center sm:text-left mb-6">
-                        <h2 class="text-lg sm:text-xl font-bold mb-1 truncate text-white" id="np-title">Menunggu lagu...</h2>
-                        <p class="text-purple-400 font-medium text-sm" id="np-sub">Purplehat Karaoke</p>
+                <div class="now-body">
+                    <div>
+                        <h2 class="now-title" id="np-title">Menunggu lagu...</h2>
+                        <p class="now-sub" id="np-sub">Purplehat Karaoke</p>
                     </div>
-                    <div class="w-full mb-2">
-                        <div class="flex justify-between text-xs text-gray-400 mb-2 font-medium">
+                    <div>
+                        <div class="time">
                             <span id="pos">0:00</span>
                             <span id="dur">0:00</span>
                         </div>
-                        <div class="w-full h-2 bg-dark-800/80 rounded-full cursor-pointer relative overflow-hidden border border-white/5" id="progress-container">
-                            <div class="absolute top-0 left-0 h-full bg-gradient-to-r from-purple-600 to-purple-400 rounded-full w-0 shadow-[0_0_10px_#a855f7]" id="progress-bar"></div>
+                        <div class="progress" id="progress-container">
+                            <div class="progress-bar" id="progress-bar"></div>
                         </div>
                     </div>
                 </div>
             </section>
 
             <!-- Playback Controls -->
-            <section class="glass-panel rounded-3xl p-6 flex flex-col gap-5 shrink-0">
-                <div class="flex items-center justify-center gap-6 sm:gap-8">
-                    <button id="btn-replay" class="text-gray-400 hover:text-white transition-colors p-3" title="Replay">
-                        <i data-lucide="rotate-ccw" class="text-lg icon-glow"></i>
+            <section class="panel controls">
+                <div class="transport">
+                    <button id="btn-replay" class="btn-round" title="Replay" aria-label="Replay">
+                        <i data-lucide="rotate-ccw"></i>
                     </button>
-                    <button id="btn-play" class="btn-play-main w-20 h-20 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-neon hover:shadow-neon-intense transition-all active:scale-95 text-white text-2xl border border-purple-400/30">
-                        <span id="play-icon" class="flex items-center justify-center"><i data-lucide="pause"></i></span>
+                    <button id="btn-play" class="btn-play" aria-label="Play / Pause">
+                        <span id="play-icon"><i data-lucide="pause"></i></span>
                     </button>
-                    <button id="btn-next" class="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors shadow-lg active:scale-95" title="Skip / Next">
-                        <i data-lucide="skip-forward" class="text-white"></i>
+                    <button id="btn-next" class="btn-round" title="Skip / Next" aria-label="Next">
+                        <i data-lucide="skip-forward"></i>
                     </button>
                 </div>
-                <div class="flex items-center justify-center gap-4">
-                    <button id="btn-loop" title="Loop lagu ini" class="w-11 h-11 rounded-xl bg-white/5 border border-white/10 text-gray-400 hover:text-white transition-all active:scale-95">
+                <div class="modes">
+                    <button id="btn-loop" class="btn-mode" title="Loop lagu ini" aria-label="Loop lagu ini">
                         <i data-lucide="repeat"></i>
                     </button>
-                    <button id="btn-shuffle" title="Acak urutan" class="w-11 h-11 rounded-xl bg-white/5 border border-white/10 text-gray-400 hover:text-white transition-all active:scale-95">
+                    <button id="btn-shuffle" class="btn-mode" title="Acak urutan" aria-label="Acak urutan">
                         <i data-lucide="shuffle"></i>
                     </button>
-                    <button id="btn-loopq" title="Loop semua antrian" class="w-11 h-11 rounded-xl bg-white/5 border border-white/10 text-gray-400 hover:text-white transition-all active:scale-95">
+                    <button id="btn-loopq" class="btn-mode" title="Loop semua antrian" aria-label="Loop semua antrian">
                         <i data-lucide="infinity"></i>
                     </button>
                 </div>
             </section>
 
-            <section class="glass-panel rounded-3xl p-6 flex flex-col gap-6 shrink-0">
-                <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                    <i data-lucide="sliders-horizontal" class="text-purple-500 icon-glow"></i> Audio Mix
+            <!-- Audio Mix -->
+            <section class="panel card">
+                <h3 class="section-title">
+                    <i data-lucide="sliders-horizontal"></i> Audio Mix
                 </h3>
-                <div class="flex flex-col gap-2">
-                    <div class="flex items-center justify-between">
-                        <span class="text-sm font-medium flex items-center gap-2"><i data-lucide="volume-2" class="text-purple-400 w-5 h-5 icon-glow"></i> Master</span>
-                        <span class="text-xs text-gray-300 font-mono" id="vol-label">80%</span>
+                <div class="row">
+                    <span class="label"><i data-lucide="volume-2"></i> Master</span>
+                    <span class="val" id="vol-label">80%</span>
+                </div>
+                <div class="vol-row">
+                    <button id="vol-down" class="btn-step" title="Volume turun" aria-label="Volume turun">
+                        <i data-lucide="minus"></i>
+                    </button>
+                    <div class="bar">
+                        <div id="vol-progress" style="width: 80%"></div>
                     </div>
-                    <div class="flex items-center gap-3">
-                        <button id="vol-down" class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 active:scale-95 transition-all" title="Volume turun">
+                    <button id="vol-up" class="btn-step" title="Volume naik" aria-label="Volume naik">
+                        <i data-lucide="plus"></i>
+                    </button>
+                </div>
+            </section>
+
+            <!-- FX & Tuning -->
+            <section class="panel card">
+                <h3 class="section-title">
+                    <i data-lucide="wand-sparkles"></i> FX &amp; Tuning
+                </h3>
+
+                <div class="fx-item">
+                    <div class="row">
+                        <span class="label"><i data-lucide="audio-waveform"></i> Echo Delay</span>
+                        <span class="val" id="echo-val">40%</span>
+                    </div>
+                    <input type="range" min="0" max="100" value="40" aria-label="Echo delay"
+                        oninput="document.getElementById('echo-val').innerText = this.value + '%'">
+                </div>
+
+                <div class="row">
+                    <span class="label"><i data-lucide="music-2"></i> Key Shift</span>
+                    <div class="stepper">
+                        <button class="btn-step sm" onclick="adjustPitch(-1)" aria-label="Turunkan nada">
                             <i data-lucide="minus"></i>
                         </button>
-                        <div class="flex-1 h-2 bg-dark-800/80 rounded-full overflow-hidden border border-white/5">
-                            <div id="vol-progress" class="h-full bg-gradient-to-r from-purple-600 to-purple-400 rounded-full w-4/5"></div>
-                        </div>
-                        <button id="vol-up" class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 active:scale-95 transition-all" title="Volume naik">
+                        <div class="stepper-val" id="pitch-display">0</div>
+                        <button class="btn-step sm" onclick="adjustPitch(1)" aria-label="Naikkan nada">
                             <i data-lucide="plus"></i>
                         </button>
                     </div>
                 </div>
-            </section>
 
-            <section class="glass-panel rounded-3xl p-6 flex flex-col gap-6 shrink-0">
-                <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                    <i data-lucide="wand-sparkles" class="text-purple-500 icon-glow"></i> FX &amp; Tuning
-                </h3>
-                <div class="flex flex-col gap-5">
-                    <div class="flex flex-col gap-2">
-                        <div class="flex items-center justify-between">
-                            <span class="text-sm font-medium flex items-center gap-2"><i data-lucide="audio-waveform" class="text-purple-400 w-5 h-5 icon-glow"></i> Echo Delay</span>
-                            <span class="text-xs text-gray-300 font-mono" id="echo-val">40%</span>
-                        </div>
-                        <input type="range" min="0" max="100" value="40" class="w-full" oninput="document.getElementById('echo-val').innerText = this.value + '%'">
+                <div class="row toggle-row">
+                    <div class="toggle-text">
+                        <span class="label-strong">Vocal Cancel</span>
+                        <span class="hint">Remove original track vocals</span>
                     </div>
-                    <div class="flex items-center justify-between gap-4">
-                        <span class="text-sm font-medium flex items-center gap-2"><i data-lucide="music-2" class="text-purple-400 w-5 h-5 icon-glow"></i> Key Shift</span>
-                        <div class="flex items-center justify-between bg-dark-900/50 rounded-xl p-1 border border-white/10 shrink-0">
-                            <button class="w-9 h-9 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors active:scale-95" onclick="adjustPitch(-1)">
-                                <i data-lucide="minus" class="text-sm text-gray-300"></i>
-                            </button>
-                            <div class="font-mono text-base font-bold w-10 text-center" id="pitch-display">0</div>
-                            <button class="w-9 h-9 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors active:scale-95" onclick="adjustPitch(1)">
-                                <i data-lucide="plus" class="text-sm text-gray-300"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="flex items-center justify-between bg-dark-900/40 rounded-xl p-3 border border-white/5">
-                        <div class="flex flex-col">
-                            <span class="text-sm font-medium">Vocal Cancel</span>
-                            <span class="text-xs text-gray-400">Remove original track vocals</span>
-                        </div>
-                        <div class="relative inline-block w-12 align-middle select-none transition duration-200 ease-in">
-                            <input type="checkbox" id="vocal-toggle" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 border-dark-800 appearance-none cursor-pointer transition-all duration-300 z-10 top-0 left-0"/>
-                            <label for="vocal-toggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-dark-800 border border-white/10 cursor-pointer transition-colors duration-300"></label>
-                        </div>
-                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="vocal-toggle" aria-label="Vocal Cancel">
+                        <span class="track"></span>
+                    </label>
                 </div>
             </section>
         </section>
+
+        <!-- Kolom 2: Search -->
+        <section id="search-col">
+            <div class="panel search">
+                <i data-lucide="search"></i>
+                <input type="text" id="search-input" placeholder="Search songs, artists..." autocomplete="off"
+                    enterkeyhint="search" aria-label="Cari lagu">
+            </div>
+
+            <div class="chips" id="search-tabs">
+                <button class="src-tab mode-active" data-src="youtube">
+                    <i class="fab fa-youtube src-yt" title="Available on YouTube"></i> YouTube
+                </button>
+                <button class="src-tab" data-src="soundcloud">
+                    <i class="fab fa-soundcloud src-sc" title="Available on SoundCloud"></i> SoundCloud
+                </button>
+            </div>
+
+            <div id="results" class="panel results hidden"></div>
+        </section>
+
+        <!-- Kolom 3: Up Next -->
+        <aside id="queue-col" class="panel queue-col">
+            <div class="queue-head">
+                <h3 class="section-title">
+                    <i data-lucide="list-music"></i> Up Next
+                </h3>
+                <span class="pill"><span id="queue-badge">0</span> Lagu</span>
+            </div>
+            <div class="queue-list" id="queue-list">
+                <div class="state-msg">Antrian kosong</div>
+            </div>
+        </aside>
     </div>
 
     <script>
@@ -308,10 +234,10 @@
             if (currentPitch < -6) currentPitch = -6;
             if (currentPitch > 0) pitchDisplay.innerText = '+' + currentPitch;
             else pitchDisplay.innerText = String(currentPitch);
-            if (currentPitch !== 0) pitchDisplay.classList.add('text-purple-400');
-            else pitchDisplay.classList.remove('text-purple-400');
+            pitchDisplay.classList.toggle('is-on', currentPitch !== 0);
         }
     </script>
     <script src="controller.js"></script>
 </body>
+
 </html>

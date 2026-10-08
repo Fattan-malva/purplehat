@@ -1,4 +1,5 @@
-// Purplehat Controller - Mobile UI
+// Purplehat Controller - Mobile UI (v2)
+// Logic identik dengan versi sebelumnya; hanya nama class pada markup hasil render yang disesuaikan dengan stylesheet baru.
 var ws;
 var roomCode = null;
 var fallbackMode = false;
@@ -52,6 +53,13 @@ function connect(code) {
     });
 }
 
+function showMainUI() {
+  const main = document.getElementById('main-ui');
+  main.classList.remove('hidden');
+  main.classList.add('flex');
+  document.getElementById('pair-screen').classList.add('hidden');
+}
+
 function openSocket(attempt) {
   const statusEl = document.getElementById('pair-status');
   const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
@@ -59,10 +67,7 @@ function openSocket(attempt) {
 
   ws.onopen = () => {
     setStatus('Terhubung ke ' + roomCode);
-    document.getElementById('pair-screen').classList.add('hidden');
-    const main = document.getElementById('main-ui');
-    main.classList.remove('hidden');
-    main.classList.add('flex');
+    showMainUI();
     send(PH.MSG.JOIN, {});
   };
   ws.onmessage = (e) => {
@@ -84,10 +89,7 @@ function openSocket(attempt) {
       statusEl.style.color = '#fbbf24';
       statusEl.textContent = 'Mode polling (realtime tidak aktif di koneksi ini). Tetap berfungsi.';
       setStatus('Terhubung (polling) ke ' + roomCode);
-      document.getElementById('pair-screen').classList.add('hidden');
-      const main = document.getElementById('main-ui');
-      main.classList.remove('hidden');
-      main.classList.add('flex');
+      showMainUI();
       pollState();
     }
   };
@@ -205,7 +207,7 @@ async function search() {
   if (!q) return;
   const el = document.getElementById('results');
   el.classList.remove('hidden');
-  el.innerHTML = '<div class="text-gray-400 py-4 text-center"><i data-lucide="loader-circle" class="animate-spin inline-block mr-2"></i>Mencari di ' + (searchSource === 'soundcloud' ? 'SoundCloud' : 'YouTube') + '...</div>';
+  el.innerHTML = '<div class="state-msg"><i data-lucide="loader-circle" class="spin"></i> Mencari di ' + (searchSource === 'soundcloud' ? 'SoundCloud' : 'YouTube') + '...</div>';
   refreshIcons();
   try {
     const endpoint = searchSource === 'soundcloud'
@@ -216,14 +218,14 @@ async function search() {
     const items = searchSource === 'soundcloud' ? (data.data || []) : data;
     renderResults(items);
   } catch (e) {
-    el.innerHTML = '<div class="text-red-400 py-4 text-center">Gagal mencari</div>';
+    el.innerHTML = '<div class="state-msg error">Gagal mencari</div>';
   }
 }
 
 function sourceIcon(src) {
   return src === 'soundcloud'
-    ? '<i class="fab fa-soundcloud text-orange-500 hover:text-orange-400 transition-colors cursor-pointer" title="Available on SoundCloud"></i>'
-    : '<i class="fab fa-youtube text-red-500 hover:text-red-400 transition-colors cursor-pointer" title="Available on YouTube"></i>';
+    ? '<i class="fab fa-soundcloud src-sc" title="Available on SoundCloud"></i>'
+    : '<i class="fab fa-youtube src-yt" title="Available on YouTube"></i>';
 }
 
 function renderResults(items) {
@@ -231,24 +233,26 @@ function renderResults(items) {
   el.innerHTML = '';
   el.classList.remove('hidden');
   if (!items || items.length === 0) {
-    el.innerHTML = '<div class="text-gray-400 py-4 text-center">Tidak ada hasil</div>';
+    el.innerHTML = '<div class="state-msg">Tidak ada hasil</div>';
     return;
   }
   items.forEach(item => {
     const isSC = item.source === 'soundcloud' || !!item.trackId;
     const sub = [item.artist || item.channelName || '', item.duration || ''].filter(Boolean).join(' • ');
     const thumb = item.thumbnail
-      ? `<img class="w-12 h-12 rounded-lg object-cover" src="${item.thumbnail}" alt="${escapeHtml(item.title || '')}">`
-      : `<div class="w-12 h-12 rounded-lg bg-dark-800 flex items-center justify-center"><i data-lucide="music" class="text-purple-500/60 text-2xl"></i></div>`;
+      ? `<img class="thumb" src="${item.thumbnail}" alt="${escapeHtml(item.title || '')}">`
+      : `<div class="thumb"><i data-lucide="music"></i></div>`;
     const div = document.createElement('div');
-    div.className = 'group flex items-center gap-3 p-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer border border-transparent hover:border-white/10 bg-black/20 mb-2';
+    div.className = 'result-row';
+    div.setAttribute('role', 'button');
+    div.setAttribute('tabindex', '0');
     div.innerHTML = `
       ${thumb}
-      <div class="flex-1 min-w-0">
-        <div class="text-sm font-semibold text-white truncate">${escapeHtml(item.title || '')}</div>
-        <div class="text-xs text-gray-400 truncate">${sourceIcon(isSC ? 'soundcloud' : 'youtube')} ${escapeHtml(sub)}</div>
+      <div class="row-main">
+        <div class="row-title">${escapeHtml(item.title || '')}</div>
+        <div class="row-sub">${sourceIcon(isSC ? 'soundcloud' : 'youtube')} <span class="truncate">${escapeHtml(sub)}</span></div>
       </div>
-      <i data-lucide="plus" class="text-purple-400"></i>`;
+      <i data-lucide="plus" class="row-add"></i>`;
     div.addEventListener('click', () => {
       if (isSC) {
         send(PH.MSG.ADD_SONG, { source: 'soundcloud', trackId: item.trackId, title: item.title, artist: item.artist, thumbnail: item.thumbnail });
@@ -306,31 +310,31 @@ function renderQueue() {
   const el = document.getElementById('queue-list');
   el.innerHTML = '';
   if (!state.queue || state.queue.length === 0) {
-    el.innerHTML = '<div class="text-gray-500 text-center py-6">Antrian kosong</div>';
+    el.innerHTML = '<div class="state-msg">Antrian kosong</div>';
     return;
   }
   state.queue.forEach((s, idx) => {
     const isCurrent = state.current && idx === state.current.index;
     const qthumb = s.thumbnail
-      ? `<img class="w-10 h-10 rounded-lg object-cover shrink-0" src="${escapeAttr(s.thumbnail)}" alt="">`
-      : `<div class="w-10 h-10 rounded-lg bg-dark-800 flex items-center justify-center shrink-0"><i data-lucide="music" class="text-purple-500/60 text-lg"></i></div>`;
+      ? `<img class="thumb sm" src="${escapeAttr(s.thumbnail)}" alt="">`
+      : `<div class="thumb sm"><i data-lucide="music"></i></div>`;
     const div = document.createElement('div');
-    div.className = 'queue-item group flex items-center gap-2 p-2 rounded-xl border bg-black/20' + (isCurrent ? ' border-purple-500/50 bg-purple-500/10' : ' border-transparent');
+    div.className = 'queue-item' + (isCurrent ? ' is-playing' : '');
     div.innerHTML = `
       ${qthumb}
-      <div class="flex-1 min-w-0">
-        <div class="text-sm font-semibold text-white truncate">${isCurrent ? '<i data-lucide="play" class="text-purple-400 icon-glow mr-2"></i>' : ''}${escapeHtml(s.title)}</div>
-        ${s.artist ? `<div class="text-xs text-gray-400 truncate">${escapeHtml(s.artist)}</div>` : ''}
+      <div class="row-main">
+        <div class="row-title">${isCurrent ? '<i data-lucide="play" class="now-icon"></i>' : ''}${escapeHtml(s.title)}</div>
+        ${s.artist ? `<div class="row-sub">${escapeHtml(s.artist)}</div>` : ''}
       </div>
-      <div class="flex items-center gap-1 shrink-0 opacity-70 group-hover:opacity-100 transition-opacity">
-        <button class="q-btn w-7 h-7 rounded-lg bg-white/5 hover:bg-white/15 text-gray-300 hover:text-white transition-all active:scale-90 disabled:opacity-30" title="Naikkan" data-act="up" data-idx="${idx}" ${idx === 0 ? 'disabled' : ''}>
-          <i data-lucide="chevron-up" class="text-xs"></i>
+      <div class="queue-actions">
+        <button class="q-btn" title="Naikkan" aria-label="Naikkan" data-act="up" data-idx="${idx}" ${idx === 0 ? 'disabled' : ''}>
+          <i data-lucide="chevron-up"></i>
         </button>
-        <button class="q-btn w-7 h-7 rounded-lg bg-white/5 hover:bg-white/15 text-gray-300 hover:text-white transition-all active:scale-90 disabled:opacity-30" title="Turunkan" data-act="down" data-idx="${idx}" ${idx === state.queue.length - 1 ? 'disabled' : ''}>
-          <i data-lucide="chevron-down" class="text-xs"></i>
+        <button class="q-btn" title="Turunkan" aria-label="Turunkan" data-act="down" data-idx="${idx}" ${idx === state.queue.length - 1 ? 'disabled' : ''}>
+          <i data-lucide="chevron-down"></i>
         </button>
-        <button class="q-btn w-7 h-7 rounded-lg bg-red-500/10 hover:bg-red-500/30 text-red-400 hover:text-red-300 transition-all active:scale-90" title="Hapus" data-act="del" data-idx="${idx}">
-          <i data-lucide="trash-2" class="text-xs"></i>
+        <button class="q-btn danger" title="Hapus" aria-label="Hapus" data-act="del" data-idx="${idx}">
+          <i data-lucide="trash-2"></i>
         </button>
       </div>`;
     div.querySelectorAll('.q-btn').forEach(btn => {
