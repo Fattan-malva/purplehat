@@ -316,9 +316,9 @@ function updateQueueUI() {
 }
 
 // Browser memblokir autoplay bersuara sebelum ada gesture dari user.
-// Klik pertama di layar akan memulai pemutaran yang tertunda.
+// Klik pertama di layar memberi gesture ke frame pemutar.
 document.addEventListener('click', () => {
-  if (currentIndex >= 0) sendFrame({ cmd: 'play' });
+  if (currentIndex >= 0) sendFrame({ cmd: 'gesture' });
 }, { once: true });
 
 init();
