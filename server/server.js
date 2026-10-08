@@ -69,11 +69,11 @@ app.get('/', (req, res) => {
   }
 });
 
-// HTML selalu revalidate (Cloudflare default menaruh max-age=14400 di semua
-// aset statis; tanpa ini, HP bisa menyimpan halaman lama berjam-jam).
+// HTML dan JS selalu revalidate (Cloudflare default menaruh max-age=14400 di
+// semua aset statis; tanpa ini, HP bisa menyimpan halaman lama berjam-jam).
 app.use(express.static(publicDir, {
   setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.html')) {
+    if (filePath.endsWith('.html') || filePath.endsWith('.js') || filePath.endsWith('.css')) {
       res.setHeader('Cache-Control', 'no-cache');
     }
   },

@@ -279,6 +279,36 @@
       "volume": 80,
       "position": 0,
       "duration": 0
+    },
+    "M8GQV6": {
+      "code": "M8GQV6",
+      "createdAt": 1791497495407,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
+    },
+    "XPA4UT": {
+      "code": "XPA4UT",
+      "createdAt": 1791497645193,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
+    },
+    "67GTPE": {
+      "code": "67GTPE",
+      "createdAt": 1791497726760,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
     }
   }
 }

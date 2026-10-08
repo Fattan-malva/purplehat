@@ -382,6 +382,9 @@ function updateVolUI() {
 
 function setVolume(v) {
   v = Math.max(0, Math.min(100, v));
+  // Step 2-2 konsisten dengan screen/WinForms (Math.round half-up, bukan
+  // banker's), agar nilai tampil == nilai yang diset ke OS.
+  v = Math.round(v / 2) * 2;
   state.volume = v;
   updateVolUI();
   send(PH.MSG.VOLUME, { vol: v });
