@@ -17,7 +17,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="controller.css">
+    <link rel="stylesheet" href="controller.css?v=20261009b">
 </head>
 
 <body class="gate-body">
@@ -177,6 +177,14 @@
             el('gate-open-link').href = controllerUrl;
             el('gate-manual-open').href = controllerUrl;
 
+            // Klik "Buka Purplehat" (link) di Android -> lewat protocol handler
+            el('gate-open-link').addEventListener('click', function (e) {
+                if (isAndroid) { e.preventDefault(); openNow(); }
+            });
+            el('gate-manual-open').addEventListener('click', function (e) {
+                if (isAndroid) { e.preventDefault(); openNow(); }
+            });
+
             function setInstallIdle(msg) {
                 stage = 'wait';
                 showCard('gate-install');
@@ -207,11 +215,33 @@
                 el('gate-open-link').href = controllerUrl;
             }
 
-            // Navigasi same-tab ke URL dalam scope -> ditangkap WebAPK (buka app).
-            // Kalau Chrome tidak menangkap, tab terpantul ke gerbang dengan
-            // back=1 dan controller TIDAK pernah tampil di browser.
+            // ==== Peluncur aplikasi via protocol handler ====
+            // Navigasi biasa ke URL dalam scope TIDAK membuka WebAPK dari
+            // dalam tab Chrome (hanya dari app lain, mis. hasil scan QR) ->
+            // tombol "Buka" jadi terasa seperti reload. Manifest memasang
+            // protocol handler "purplehat://" yang terdaftar di Android
+            // sebagai intent filter WebAPK, sehingga klik tombol benar-benar
+            // meluncurkan aplikasinya.
+            function appLaunchUrl() {
+                return 'purplehat://pair/' + encodeURIComponent(pair || 'open');
+            }
+
             function openNow() {
-                location.href = controllerUrl;
+                if (isAndroid) {
+                    // Coba buka aplikasi via protocol handler. Kalau ternyata
+                    // belum terdaftar (Chrome belum memperbarui WebAPK),
+                    // tab tetap di sini dan petunjuk di bawah tetap terlihat.
+                    location.href = appLaunchUrl();
+                    setTimeout(function () {
+                        if (!document.hidden && stage === 'open') {
+                            el('gate-open-hint').textContent =
+                                'Belum membuka aplikasi? Buka Purplehat dari ikon di layar utama HP kamu, ' +
+                                'atau tutup Chrome lalu buka Purplehat dari ikon.';
+                        }
+                    }, 1500);
+                } else {
+                    location.href = controllerUrl;
+                }
             }
 
             function onInstalled() {

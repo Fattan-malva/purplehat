@@ -288,45 +288,6 @@
       }
     }
 
-    .click-hint {
-      position: fixed;
-      inset: 0;
-      z-index: 10;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background: rgba(0, 0, 0, .65);
-      color: #fff;
-      cursor: pointer;
-      font-size: 20px;
-      font-weight: 600;
-      letter-spacing: .5px;
-    }
-
-    .click-hint .play-ico {
-      width: 84px;
-      height: 84px;
-      border-radius: 50%;
-      background: #ff5500;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 20px;
-      box-shadow: 0 12px 40px rgba(255, 85, 0, .5);
-    }
-
-    .click-hint .play-ico::after {
-      content: "";
-      display: block;
-      width: 0;
-      height: 0;
-      border-left: 26px solid #fff;
-      border-top: 16px solid transparent;
-      border-bottom: 16px solid transparent;
-      margin-left: 6px;
-    }
-
     .error {
       color: #fff;
       font-size: 16px;
@@ -373,8 +334,6 @@
       var lastPos = 0;   // detik
       var lastDur = 0;   // detik
       var lastProgressSec = -1;
-      var hintShown = false;
-      var hintEl = null;
 
       // ==== Protokol dengan halaman induk (player.html) ====
       function post(m) {
@@ -406,17 +365,14 @@
         return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
       }
 
-      function removeHint() {
-        if (hintEl) { hintEl.remove(); hintEl = null; }
-        hintShown = false;
-      }
+      // Hint "Click to play" dihapus: autoplay SoundCloud widget jalan
+      // langsung; gesture klik pertama di layar induk diteruskan via 'play'.
 
       // Bersihkan konten track sebelumnya (saat ganti lagu)
       function clearContent() {
         var content = document.getElementById('content');
         content.querySelectorAll('.track-el').forEach(function (el) { el.remove(); });
         document.getElementById('loadingWrap').style.display = 'flex';
-        removeHint();
         playingFlag = false;
         lastPos = 0;
         lastDur = 0;
@@ -485,7 +441,6 @@
       function playSound() {
         if (widget) widget.play();
       }
-
       function pauseSound() {
         if (widget) widget.pause();
       }
@@ -497,28 +452,10 @@
         }
       }
 
-      function ensureHint() {
-        if (hintShown || hintEl) return;
-        hintShown = true;
-        hintEl = document.createElement('div');
-        hintEl.className = 'click-hint';
-        hintEl.innerHTML = '<div class="play-ico"></div><div>Click to play</div>';
-        hintEl.addEventListener('click', function () {
-          playSound();
-          removeHint();
-        });
-        document.body.appendChild(hintEl);
-      }
-
       function initWidget() {
         if (typeof SC === 'undefined' || !SC.Widget) {
-          setTimeout(function () {
-            if (typeof SC !== 'undefined' && SC.Widget) {
-              initWidget();
-            } else {
-              ensureHint();
-            }
-          }, 1500);
+          // API SoundCloud belum termuat -> coba lagi (tanpa tombol hint)
+          setTimeout(initWidget, 1500);
           return;
         }
 
@@ -563,12 +500,10 @@
             post({ type: 'error' });
           });
 
-          // Kalau autoplay diblokir browser, tampilkan layar "Click to play"
-          setTimeout(function () {
-            widget.isPlaying(function (playing) {
-              if (!playing) ensureHint();
-            });
-          }, 3000);
+          // Autoplay: widget sudah dipanggil play() saat READY; tidak ada
+          // tombol "Click to play" lagi. Gesture klik pertama di layar
+          // induk diteruskan lewat cmd 'play'.
+          try { widget.play(); } catch (e) {}
         });
       }
 
@@ -583,7 +518,9 @@
             else if (widget) widget.play();
             break;
           case 'play':
-            if (widget) widget.play(); else ensureHint();
+          case 'gesture':
+            // Klik pertama di layar induk -> gesture autoplay
+            if (widget) widget.play();
             break;
           case 'pause':
             if (widget) widget.pause();

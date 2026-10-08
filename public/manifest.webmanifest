@@ -6,6 +6,9 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
+  "protocol_handlers": [
+    { "protocol": "purplehat", "url": "/controller/open.html?p=%s" }
+  ],
   "background_color": "#0a0a0c",
   "theme_color": "#0a0a0c",
   "icons": [

@@ -109,6 +109,76 @@
       "volume": 80,
       "position": 0,
       "duration": 0
+    },
+    "WPYYNB": {
+      "code": "WPYYNB",
+      "createdAt": 1791489900527,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
+    },
+    "WW2EZB": {
+      "code": "WW2EZB",
+      "createdAt": 1791491295299,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
+    },
+    "H3EFX6": {
+      "code": "H3EFX6",
+      "createdAt": 1791491367396,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
+    },
+    "FEUK5P": {
+      "code": "FEUK5P",
+      "createdAt": 1791491420852,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
+    },
+    "AUVZQ5": {
+      "code": "AUVZQ5",
+      "createdAt": 1791491728120,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
+    },
+    "7S42M9": {
+      "code": "7S42M9",
+      "createdAt": 1791491999134,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
+    },
+    "PZ64E4": {
+      "code": "PZ64E4",
+      "createdAt": 1791492250846,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
     }
   }
 }

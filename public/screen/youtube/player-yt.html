@@ -8,25 +8,6 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; height: 100%; background: #000; overflow: hidden; }
     #player { width: 100%; height: 100%; }
-    #click-hint {
-      position: absolute; inset: 0; z-index: 10;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      background: rgba(0, 0, 0, .65); color: #fff; cursor: pointer;
-      font: 600 20px 'Poppins', sans-serif; letter-spacing: .5px;
-      gap: 18px;
-    }
-    #click-hint .hint-btn {
-      width: 84px; height: 84px; border-radius: 50%; background: #a855f7;
-      box-shadow: 0 12px 40px rgba(168, 85, 247, .5);
-      position: relative;
-    }
-    #click-hint .hint-btn::after {
-      content: ""; position: absolute; top: 50%; left: 54%;
-      transform: translate(-50%, -50%);
-      border-left: 26px solid #fff;
-      border-top: 16px solid transparent;
-      border-bottom: 16px solid transparent;
-    }
   </style>
 </head>
 <body>
@@ -53,41 +34,13 @@
     }
 
     // Putar video dengan suara langsung (tanpa trik mute/unmute yang dulu
-    // malah bisa menjeda saat buffering). Kalau autoplay diblokir browser
-    // (belum pernah ada gesture), tampilkan overlay "klik untuk memutar"
-    // di DALAM frame -> klik = gesture asli, sehingga boleh bersuara.
-    var fallbackTimer = null;
-
+    // malah bisa menjeda saat buffering). Tidak ada overlay tombol: bila
+    // autoplay diblokir, gesture klik pertama di layar player (diteruskan
+    // induk lewat cmd 'gesture') langsung memutar video.
     function forcePlay() {
       if (!player || !player.playVideo) return;
-      clearTimeout(fallbackTimer);
+      try { player.unMute(); } catch (e) {}
       try { player.playVideo(); } catch (e) {}
-      // Kalau setelah 2.5 detik masih belum jalan/buffering, kemungkinan
-      // autoplay diblokir -> tampilkan overlay klik
-      fallbackTimer = setTimeout(function () {
-        try {
-          var s = player.getPlayerState ? player.getPlayerState() : -1;
-          if (s !== YT.PlayerState.PLAYING && s !== YT.PlayerState.BUFFERING) ensureHint();
-        } catch (e) {}
-      }, 2500);
-    }
-
-    function ensureHint() {
-      if (document.getElementById('click-hint')) return;
-      var hint = document.createElement('div');
-      hint.id = 'click-hint';
-      hint.innerHTML = '<div class="hint-btn"></div><div>Klik untuk memutar</div>';
-      hint.addEventListener('click', function () {
-        try { player.unMute(); player.playVideo(); } catch (e) {}
-        removeHint();
-      });
-      document.body.appendChild(hint);
-    }
-
-    function removeHint() {
-      var hint = document.getElementById('click-hint');
-      if (hint) hint.remove();
-      clearTimeout(fallbackTimer);
     }
 
     // Perintah dari halaman induk (player.html)
@@ -96,7 +49,6 @@
       if (!d || !d.ph) return;
       switch (d.cmd) {
         case 'load':
-          removeHint();
           if (d.volume != null) {
             volume = d.volume;
             try { if (player) player.setVolume(volume); } catch (err) {}
@@ -110,8 +62,7 @@
           forcePlay();
           break;
         case 'gesture':
-          // Klik user di layar induk -> play langsung (tanpa hint)
-          removeHint();
+          // Klik user di layar induk -> play langsung
           forcePlay();
           break;
         case 'pause':
@@ -159,8 +110,6 @@
           onStateChange: function (e) {
             if (e.data === YT.PlayerState.ENDED) {
               post({ type: 'ended' });
-            } else if (e.data === YT.PlayerState.PLAYING) {
-              removeHint();
             } else if (e.data === YT.PlayerState.CUED || e.data === YT.PlayerState.UNSTARTED) {
               forcePlay();
             }

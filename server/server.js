@@ -69,7 +69,15 @@ app.get('/', (req, res) => {
   }
 });
 
-app.use(express.static(publicDir));
+// HTML selalu revalidate (Cloudflare default menaruh max-age=14400 di semua
+// aset statis; tanpa ini, HP bisa menyimpan halaman lama berjam-jam).
+app.use(express.static(publicDir, {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache');
+    }
+  },
+}));
 app.use('/vendor', express.static(path.join(__dirname, 'node_modules')));
 
 // Proxy search ke backend FastAPI agar satu origin (tunneling friendly)
