@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Purplehat - Controller</title>
+  <link rel="stylesheet" href="controller.css">
+  <script src="/shared/protocol.js"></script>
+  <script src="/vendor/jsqr/dist/jsQR.js"></script>
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <h1>Purplehat</h1>
+      <div class="status" id="status">Belum terhubung</div>
+    </header>
+
+    <!-- Pairing Screen -->
+    <section id="pair-screen" class="pair-screen">
+      <h2>Hubungkan ke Player</h2>
+      <p>Masukkan kode pairing dari layar TV/Desktop, atau scan QR.</p>
+      <div class="pair-input">
+        <input type="text" id="pair-code-input" placeholder="KODEXX" maxlength="6" autocapitalize="characters">
+        <button id="pair-connect-btn">Hubungkan</button>
+      </div>
+      <div id="pair-status" style="display:none;color:#93c5fd;font-size:0.9rem"></div>
+      <button id="scan-btn" class="scan-btn">📷 Scan QR</button>
+      <div id="scan-area" style="display:none">
+        <video id="scan-video" autoplay playsinline muted></video>
+        <canvas id="scan-canvas" style="display:none"></canvas>
+        <button id="scan-stop-btn">Tutup Kamera</button>
+      </div>
+    </section>
+
+    <!-- Main Controller UI (hidden until paired) -->
+    <div id="main-ui" style="display:none">
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="search">Cari Lagu</button>
+        <button class="tab-btn" data-tab="queue">Antrian <span id="queue-badge">0</span></button>
+        <button class="tab-btn" data-tab="controls">Kontrol</button>
+      </div>
+
+      <main class="main">
+        <section class="tab-pane active" id="search-tab">
+          <div class="search-box">
+            <input type="text" id="search-input" placeholder="Cari judul lagu karaoke..." autocomplete="off">
+            <button id="search-btn">Cari</button>
+          </div>
+          <div class="results" id="results"></div>
+        </section>
+
+        <section class="tab-pane" id="queue-tab">
+          <div class="now-playing">
+            <div class="label">Sedang Diputar</div>
+            <div class="title" id="np-title">-</div>
+          </div>
+          <div class="queue-list" id="queue-list"></div>
+        </section>
+
+        <section class="tab-pane" id="controls-tab">
+          <div class="now-playing">
+            <div class="label">Sedang Diputar</div>
+            <div class="title" id="np-title2">-</div>
+          </div>
+          <div class="controls-grid">
+            <button class="ctrl-btn" id="btn-play">Play / Pause</button>
+            <button class="ctrl-btn" id="btn-replay">Replay</button>
+            <button class="ctrl-btn" id="btn-next">Skip / Next</button>
+          </div>
+          <div class="seek">
+            <label>Posisi: <span id="pos">0:00</span> / <span id="dur">0:00</span></label>
+            <input type="range" id="seek-bar" min="0" max="100" value="0" step="1">
+          </div>
+          <div class="volume">
+            <label>Volume: <span id="vol-label">80</span></label>
+            <input type="range" id="vol-bar" min="0" max="100" value="80" step="1">
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script src="controller.js"></script>
+</body>
+</html>

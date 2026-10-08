@@ -1,0 +1,104 @@
+{
+  "rooms": {
+    "YESSU3": {
+      "code": "YESSU3",
+      "createdAt": 1791467758827,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
+    },
+    "R8J7XU": {
+      "code": "R8J7XU",
+      "createdAt": 1791468047006,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
+    },
+    "XMT82B": {
+      "code": "XMT82B",
+      "createdAt": 1791468076391,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
+    },
+    "N6QW4R": {
+      "code": "N6QW4R",
+      "createdAt": 1791468141218,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
+    },
+    "A5VHJS": {
+      "code": "A5VHJS",
+      "createdAt": 1791472349504,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
+    },
+    "QRT6WM": {
+      "code": "QRT6WM",
+      "createdAt": 1791472408315,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
+    },
+    "M5RNPU": {
+      "code": "M5RNPU",
+      "createdAt": 1791472549974,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
+    },
+    "EFWJC5": {
+      "code": "EFWJC5",
+      "createdAt": 1791472838735,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
+    },
+    "G7GDJ8": {
+      "code": "G7GDJ8",
+      "createdAt": 1791472865179,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
+    },
+    "TLUYDS": {
+      "code": "TLUYDS",
+      "createdAt": 1791473021683,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
+    }
+  }
+}

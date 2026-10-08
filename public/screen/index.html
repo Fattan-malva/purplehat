@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Purplehat - Screen (Player)</title>
+  <link rel="stylesheet" href="screen.css">
+  <script src="/shared/protocol.js"></script>
+</head>
+<body>
+  <div class="container">
+    <div id="player-wrapper">
+      <div id="player"></div>
+    </div>
+    <div id="overlay">
+      <div class="info">
+        <div id="now-playing">Menunggu lagu pertama...</div>
+        <div id="queue-count">Antrian: 0</div>
+        <div id="status">Status: Menyiapkan...</div>
+        <div id="pairing">
+          <div class="pair-code">Kode: <span id="join-code">-</span></div>
+          <img id="qr-img" alt="QR Pairing" style="width:120px;height:120px;border-radius:12px;margin-top:8px;display:none">
+        </div>
+      </div>
+      <div class="queue">
+        <h3>Antrian Berikutnya</h3>
+        <ul id="queue-list"></ul>
+      </div>
+    </div>
+  </div>
+
+  <script src="screen.js"></script>
+</body>
+</html>
