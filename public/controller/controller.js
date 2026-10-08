@@ -2,7 +2,7 @@
 var ws;
 var roomCode = null;
 var fallbackMode = false;
-var state = { current: null, queue: [], playing: false, position: 0, duration: 0, volume: 80 };
+var state = { current: null, queue: [], playing: false, position: 0, duration: 0, volume: 80, modes: { loop: false, shuffle: false, loopQueue: false } };
 // Default: same origin (via Express proxy /api/search). Override via localStorage jika perlu.
 const API_BASE = localStorage.getItem('ph_api_base') || '';
 
@@ -93,7 +93,8 @@ function pollState() {
         playing: !!data.playing,
         position: data.position || 0,
         duration: data.duration || 0,
-        volume: data.volume ?? 80
+        volume: data.volume ?? 80,
+        modes: state.modes
       };
       render();
     })
@@ -134,11 +135,13 @@ function bindUI() {
     send(PH.MSG.SEEK, { to });
   });
 
-  document.getElementById('vol-bar').addEventListener('input', (e) => {
-    const v = parseInt(e.target.value);
-    document.getElementById('vol-label').textContent = v + '%';
-    send(PH.MSG.VOLUME, { vol: v });
-  });
+  document.getElementById('vol-down').addEventListener('click', () => setVolume((state.volume ?? 80) - 5));
+  document.getElementById('vol-up').addEventListener('click', () => setVolume((state.volume ?? 80) + 5));
+
+  // Toggle playback modes
+  document.getElementById('btn-loop').addEventListener('click', () => toggleMode('btn-loop', PH.MSG.LOOP));
+  document.getElementById('btn-shuffle').addEventListener('click', () => toggleMode('btn-shuffle', PH.MSG.SHUFFLE));
+  document.getElementById('btn-loopq').addEventListener('click', () => toggleMode('btn-loopq', PH.MSG.LOOP_QUEUE));
 
   document.getElementById('pair-connect-btn').addEventListener('click', () => {
     const code = document.getElementById('pair-code-input').value.trim();
@@ -166,9 +169,13 @@ function bindUI() {
     document.getElementById('pair-screen').classList.remove('hidden');
     document.getElementById('pair-status').classList.add('hidden');
     document.getElementById('pair-code-input').value = '';
+    document.getElementById('results').classList.add('hidden');
+    document.getElementById('search-hint').classList.remove('hidden');
     document.getElementById('status').textContent = 'Belum terhubung';
     document.getElementById('queue-badge').textContent = '0';
-    state = { current: null, queue: [], playing: false, position: 0, duration: 0, volume: 80 };
+    state = { current: null, queue: [], playing: false, position: 0, duration: 0, volume: 80, modes: { loop: false, shuffle: false, loopQueue: false } };
+    updateVolUI();
+    syncModeButtons();
   });
 }
 
@@ -190,6 +197,7 @@ function renderResults(items) {
   const el = document.getElementById('results');
   el.innerHTML = '';
   el.classList.remove('hidden');
+  document.getElementById('search-hint').classList.add('hidden');
   if (!items || items.length === 0) {
     el.innerHTML = '<div class="text-gray-400 py-4 text-center">Tidak ada hasil</div>';
     return;
@@ -220,8 +228,8 @@ function render() {
   document.getElementById('pos').textContent = formatTime(pos);
   document.getElementById('dur').textContent = formatTime(dur);
   if (dur > 0) document.getElementById('progress-bar').style.width = Math.min(100, Math.max(0, (pos / dur) * 100)) + '%';
-  document.getElementById('vol-bar').value = state.volume ?? 80;
-  document.getElementById('vol-label').textContent = (state.volume ?? 80) + '%';
+  updateVolUI();
+  syncModeButtons();
   const icon = document.getElementById('play-icon');
   icon.className = state.playing ? 'fas fa-pause' : 'fas fa-play ml-1';
   renderQueue();
@@ -235,14 +243,68 @@ function renderQueue() {
     return;
   }
   state.queue.forEach((s, idx) => {
+    const isCurrent = state.current && idx === state.current.index;
     const div = document.createElement('div');
-    div.className = 'group flex items-center gap-3 p-2 rounded-xl border border-transparent bg-black/20' + (state.current && idx === state.current.index ? ' border-purple-500/50 bg-purple-500/10' : '');
+    div.className = 'queue-item group flex items-center gap-2 p-2 rounded-xl border bg-black/20' + (isCurrent ? ' border-purple-500/50 bg-purple-500/10' : ' border-transparent');
     div.innerHTML = `
       <div class="flex-1 min-w-0">
-        <div class="text-sm font-semibold text-white truncate">${state.current && idx === state.current.index ? '▶ ' : ''}${escapeHtml(s.title)}</div>
+        <div class="text-sm font-semibold text-white truncate">${isCurrent ? '<i class="fas fa-play text-purple-400 mr-2"></i>' : ''}${escapeHtml(s.title)}</div>
+      </div>
+      <div class="flex items-center gap-1 shrink-0 opacity-70 group-hover:opacity-100 transition-opacity">
+        <button class="q-btn w-7 h-7 rounded-lg bg-white/5 hover:bg-white/15 text-gray-300 hover:text-white transition-all active:scale-90 disabled:opacity-30" title="Naikkan" data-act="up" data-idx="${idx}" ${idx === 0 ? 'disabled' : ''}>
+          <i class="fas fa-chevron-up text-xs"></i>
+        </button>
+        <button class="q-btn w-7 h-7 rounded-lg bg-white/5 hover:bg-white/15 text-gray-300 hover:text-white transition-all active:scale-90 disabled:opacity-30" title="Turunkan" data-act="down" data-idx="${idx}" ${idx === state.queue.length - 1 ? 'disabled' : ''}>
+          <i class="fas fa-chevron-down text-xs"></i>
+        </button>
+        <button class="q-btn w-7 h-7 rounded-lg bg-red-500/10 hover:bg-red-500/30 text-red-400 hover:text-red-300 transition-all active:scale-90" title="Hapus" data-act="del" data-idx="${idx}">
+          <i class="fas fa-trash-alt text-xs"></i>
+        </button>
       </div>`;
+    div.querySelectorAll('.q-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = parseInt(btn.dataset.idx);
+        if (btn.dataset.act === 'up') send(PH.MSG.MOVE_SONG, { index: i, dir: -1 });
+        else if (btn.dataset.act === 'down') send(PH.MSG.MOVE_SONG, { index: i, dir: 1 });
+        else send(PH.MSG.REMOVE_SONG, { index: i });
+      });
+    });
     el.appendChild(div);
   });
+}
+
+function updateVolUI() {
+  const v = state.volume ?? 80;
+  const label = document.getElementById('vol-label');
+  const bar = document.getElementById('vol-progress');
+  if (label) label.textContent = v + '%';
+  if (bar) bar.style.width = v + '%';
+}
+
+function setVolume(v) {
+  v = Math.max(0, Math.min(100, v));
+  state.volume = v;
+  updateVolUI();
+  send(PH.MSG.VOLUME, { vol: v });
+}
+
+function syncModeButtons() {
+  const m = state.modes || {};
+  const map = [['btn-loop', m.loop], ['btn-shuffle', m.shuffle], ['btn-loopq', m.loopQueue]];
+  map.forEach(([id, on]) => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('mode-active', !!on);
+  });
+}
+
+function toggleMode(btnId, msgType) {
+  const m = state.modes;
+  let on;
+  if (msgType === PH.MSG.LOOP) m.loop = !m.loop, on = m.loop;
+  else if (msgType === PH.MSG.SHUFFLE) m.shuffle = !m.shuffle, on = m.shuffle;
+  else m.loopQueue = !m.loopQueue, on = m.loopQueue;
+  document.getElementById(btnId).classList.toggle('mode-active', on);
+  send(msgType, { on });
 }
 
 // QR scan

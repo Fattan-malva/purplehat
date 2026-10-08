@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
@@ -78,6 +78,13 @@
         /* Responsive: di HP kolom utama dan sidebar tampil bertumpuk */
         #main-ui { min-height: 0; }
         #queue-badge { transition: all .2s; }
+        .mode-active {
+            background-color: rgba(168, 85, 247, 0.25) !important;
+            border-color: rgba(168, 85, 247, 0.7) !important;
+            color: #e9d5ff !important;
+            box-shadow: 0 0 12px rgba(168, 85, 247, 0.5);
+        }
+        .queue-item button { touch-action: manipulation; }
     </style>
     <script src="/shared/protocol.js"></script>
     <script src="/vendor/jsqr/dist/jsQR.js"></script>
@@ -110,8 +117,36 @@
     <!-- Main Controller UI (hidden until paired) -->
     <div id="main-ui" class="hidden w-full flex-col landscape:flex-row gap-4 landscape:h-[calc(100dvh-2rem)]">
 
-        <!-- Left/Primary Column -->
-        <main class="flex-1 flex flex-col w-full gap-4 sm:gap-6 landscape:overflow-y-auto landscape:h-full">
+        <!-- Paling kiri: Sidebar Up Next -->
+        <aside id="queue-col" class="order-3 landscape:order-1 w-full landscape:w-[300px] shrink-0 flex flex-col gap-4 landscape:h-full">
+            <div class="glass-panel rounded-3xl p-5 flex-1 flex flex-col overflow-hidden min-h-[250px] landscape:min-h-0">
+                <div class="flex items-center justify-between mb-4 shrink-0">
+                    <h3 class="font-semibold text-lg flex items-center gap-2">
+                        <i class="fas fa-list-ul text-purple-500"></i> Up Next
+                    </h3>
+                    <span class="text-xs bg-purple-500/20 text-purple-300 px-3 py-1 rounded-full font-medium border border-purple-500/30"><span id="queue-badge">0</span> Lagu</span>
+                </div>
+                <div class="flex-1 overflow-y-auto pr-2 space-y-2" id="queue-list">
+                    <div class="text-gray-500 text-center py-6">Antrian kosong</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Tengah: Search -->
+        <section id="search-col" class="order-2 landscape:order-2 flex-1 flex flex-col gap-4 min-w-0 landscape:h-full landscape:overflow-y-auto">
+            <div class="relative glass-panel rounded-2xl p-2 shrink-0">
+                <i class="fas fa-search absolute left-6 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                <input type="text" id="search-input" placeholder="Search songs, artists..."
+                    class="w-full bg-black/40 text-white rounded-xl py-3 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-transparent focus:border-purple-500/50 transition-all placeholder-gray-500">
+            </div>
+            <div id="results" class="glass-panel rounded-3xl p-4 overflow-y-auto max-h-[45vh] landscape:max-h-[40vh] hidden shrink-0"></div>
+            <div class="glass-panel rounded-3xl p-6 landscape:flex flex-1 items-center justify-center text-gray-600 text-sm text-center hidden" id="search-hint">
+                Ketik judul lagu lalu tekan Enter untuk mulai mencari.
+            </div>
+        </section>
+
+        <!-- Paling kanan: Controller -->
+        <section id="controller-col" class="order-1 landscape:order-3 w-full landscape:w-[340px] shrink-0 flex flex-col gap-4 landscape:h-full landscape:overflow-y-auto">
 
             <!-- Header -->
             <header class="flex items-center justify-between shrink-0 px-2">
@@ -119,10 +154,10 @@
                     <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-neon">
                         <i class="fas fa-hat-wizard text-xl text-white"></i>
                     </div>
-                    <h1 class="text-2xl font-bold tracking-wider">PURPLE<span class="text-purple-500">HAT</span></h1>
+                    <h1 class="text-xl font-bold tracking-wider">PURPLE<span class="text-purple-500">HAT</span></h1>
                 </div>
                 <div class="flex items-center gap-2">
-                    <div id="status" class="text-xs text-gray-400 glass-panel rounded-full px-3 py-1.5 truncate max-w-[160px]">Belum terhubung</div>
+                    <div id="status" class="text-xs text-gray-400 glass-panel rounded-full px-3 py-1.5 truncate max-w-[120px]">Belum terhubung</div>
                     <button id="btn-logout" title="Logout" class="w-9 h-9 rounded-full glass-panel flex items-center justify-center hover:bg-white/10 transition-colors text-gray-300">
                         <i class="fas fa-sign-out-alt text-sm"></i>
                     </button>
@@ -132,12 +167,12 @@
             <!-- Now Playing -->
             <section class="glass-panel rounded-3xl p-6 flex flex-col sm:flex-row items-center gap-6 shrink-0 relative overflow-hidden">
                 <div class="absolute -top-20 -right-20 w-64 h-64 bg-purple-600/20 rounded-full blur-3xl pointer-events-none"></div>
-                <div class="relative w-32 h-32 sm:w-40 sm:h-40 rounded-2xl overflow-hidden shadow-2xl shrink-0 bg-dark-800 flex items-center justify-center">
+                <div class="relative w-28 h-28 sm:w-36 sm:h-36 rounded-2xl overflow-hidden shadow-2xl shrink-0 bg-dark-800 flex items-center justify-center">
                     <i class="fas fa-music text-4xl text-purple-500/50"></i>
                 </div>
                 <div class="flex-1 w-full flex flex-col justify-center">
                     <div class="text-center sm:text-left mb-6">
-                        <h2 class="text-xl sm:text-2xl font-bold mb-1 truncate text-white" id="np-title">Menunggu lagu...</h2>
+                        <h2 class="text-lg sm:text-xl font-bold mb-1 truncate text-white" id="np-title">Menunggu lagu...</h2>
                         <p class="text-purple-400 font-medium text-sm" id="np-sub">Purplehat Karaoke</p>
                     </div>
                     <div class="w-full mb-2">
@@ -153,114 +188,91 @@
             </section>
 
             <!-- Playback Controls -->
-            <section class="glass-panel rounded-3xl p-6 flex items-center justify-center gap-6 sm:gap-10 shrink-0">
-                <button id="btn-replay" class="text-gray-400 hover:text-white transition-colors p-3" title="Replay">
-                    <i class="fas fa-redo text-lg"></i>
-                </button>
-                <button id="btn-play" class="w-20 h-20 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-neon hover:shadow-neon-intense transition-all active:scale-95 text-white text-2xl border border-purple-400/30">
-                    <i class="fas fa-pause" id="play-icon"></i>
-                </button>
-                <button id="btn-next" class="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors shadow-lg active:scale-95" title="Skip / Next">
-                    <i class="fas fa-step-forward text-white"></i>
-                </button>
+            <section class="glass-panel rounded-3xl p-6 flex flex-col gap-5 shrink-0">
+                <div class="flex items-center justify-center gap-6 sm:gap-8">
+                    <button id="btn-replay" class="text-gray-400 hover:text-white transition-colors p-3" title="Replay">
+                        <i class="fas fa-redo text-lg"></i>
+                    </button>
+                    <button id="btn-play" class="w-20 h-20 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-neon hover:shadow-neon-intense transition-all active:scale-95 text-white text-2xl border border-purple-400/30">
+                        <i class="fas fa-pause" id="play-icon"></i>
+                    </button>
+                    <button id="btn-next" class="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors shadow-lg active:scale-95" title="Skip / Next">
+                        <i class="fas fa-step-forward text-white"></i>
+                    </button>
+                </div>
+                <div class="flex items-center justify-center gap-4">
+                    <button id="btn-loop" title="Loop lagu ini" class="w-11 h-11 rounded-xl bg-white/5 border border-white/10 text-gray-400 hover:text-white transition-all active:scale-95">
+                        <i class="fas fa-repeat"></i>
+                    </button>
+                    <button id="btn-shuffle" title="Acak urutan" class="w-11 h-11 rounded-xl bg-white/5 border border-white/10 text-gray-400 hover:text-white transition-all active:scale-95">
+                        <i class="fas fa-random"></i>
+                    </button>
+                    <button id="btn-loopq" title="Loop semua antrian" class="w-11 h-11 rounded-xl bg-white/5 border border-white/10 text-gray-400 hover:text-white transition-all active:scale-95">
+                        <i class="fas fa-infinity"></i>
+                    </button>
+                </div>
             </section>
 
-            <!-- Controls Grid: Volume & Effects -->
-            <div class="flex flex-col sm:flex-row gap-6">
+            <section class="glass-panel rounded-3xl p-6 flex flex-col gap-6 shrink-0">
+                <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                    <i class="fas fa-sliders-h text-purple-500"></i> Audio Mix
+                </h3>
+                <div class="flex flex-col gap-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-medium flex items-center gap-2"><i class="fas fa-volume-up text-purple-400 w-5"></i> Master</span>
+                        <span class="text-xs text-gray-300 font-mono" id="vol-label">80%</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button id="vol-down" class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 active:scale-95 transition-all" title="Volume turun">
+                            <i class="fas fa-minus"></i>
+                        </button>
+                        <div class="flex-1 h-2 bg-dark-800/80 rounded-full overflow-hidden border border-white/5">
+                            <div id="vol-progress" class="h-full bg-gradient-to-r from-purple-600 to-purple-400 rounded-full w-4/5"></div>
+                        </div>
+                        <button id="vol-up" class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 active:scale-95 transition-all" title="Volume naik">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </div>
+            </section>
 
-                <section class="glass-panel rounded-3xl p-6 flex-1 flex flex-col justify-between">
-                    <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                        <i class="fas fa-sliders-h text-purple-500"></i> Audio Mix
-                    </h3>
-                    <div class="space-y-6 flex flex-col justify-center">
-                        <div class="flex flex-col gap-2">
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm font-medium flex items-center gap-2"><i class="fas fa-volume-up text-purple-400 w-5"></i> Master</span>
-                                <span class="text-xs text-gray-300 font-mono" id="vol-label">80%</span>
-                            </div>
-                            <input type="range" min="0" max="100" value="80" id="vol-bar" class="w-full">
+            <section class="glass-panel rounded-3xl p-6 flex flex-col gap-6 shrink-0">
+                <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                    <i class="fas fa-magic text-purple-500"></i> FX &amp; Tuning
+                </h3>
+                <div class="flex flex-col gap-5">
+                    <div class="flex flex-col gap-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium flex items-center gap-2"><i class="fas fa-wave-square text-purple-400 w-5"></i> Echo Delay</span>
+                            <span class="text-xs text-gray-300 font-mono" id="echo-val">40%</span>
                         </div>
-                        <div class="flex flex-col gap-2">
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm font-medium flex items-center gap-2"><i class="fas fa-music text-purple-400 w-5"></i> Music</span>
-                                <span class="text-xs text-gray-300 font-mono" id="music-val">85%</span>
-                            </div>
-                            <input type="range" min="0" max="100" value="85" class="w-full" oninput="document.getElementById('music-val').innerText = this.value + '%'">
-                        </div>
-                        <div class="flex flex-col gap-2">
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm font-medium flex items-center gap-2"><i class="fas fa-microphone-alt text-purple-400 w-5"></i> Mic</span>
-                                <span class="text-xs text-gray-300 font-mono" id="mic-val">90%</span>
-                            </div>
-                            <input type="range" min="0" max="100" value="90" class="w-full" oninput="document.getElementById('mic-val').innerText = this.value + '%'">
+                        <input type="range" min="0" max="100" value="40" class="w-full" oninput="document.getElementById('echo-val').innerText = this.value + '%'">
+                    </div>
+                    <div class="flex items-center justify-between gap-4">
+                        <span class="text-sm font-medium flex items-center gap-2"><i class="fas fa-sort-numeric-up text-purple-400 w-5"></i> Key Shift</span>
+                        <div class="flex items-center justify-between bg-dark-900/50 rounded-xl p-1 border border-white/10 shrink-0">
+                            <button class="w-9 h-9 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors active:scale-95" onclick="adjustPitch(-1)">
+                                <i class="fas fa-minus text-sm text-gray-300"></i>
+                            </button>
+                            <div class="font-mono text-base font-bold w-10 text-center" id="pitch-display">0</div>
+                            <button class="w-9 h-9 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors active:scale-95" onclick="adjustPitch(1)">
+                                <i class="fas fa-plus text-sm text-gray-300"></i>
+                            </button>
                         </div>
                     </div>
-                </section>
-
-                <section class="glass-panel rounded-3xl p-6 flex-1 flex flex-col justify-between">
-                    <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                        <i class="fas fa-magic text-purple-500"></i> FX &amp; Tuning
-                    </h3>
-                    <div class="space-y-6 flex flex-col justify-center">
-                        <div class="flex flex-col gap-2">
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm font-medium flex items-center gap-2"><i class="fas fa-wave-square text-purple-400 w-5"></i> Echo Delay</span>
-                                <span class="text-xs text-gray-300 font-mono" id="echo-val">40%</span>
-                            </div>
-                            <input type="range" min="0" max="100" value="40" class="w-full" oninput="document.getElementById('echo-val').innerText = this.value + '%'">
+                    <div class="flex items-center justify-between bg-dark-900/40 rounded-xl p-3 border border-white/5">
+                        <div class="flex flex-col">
+                            <span class="text-sm font-medium">Vocal Cancel</span>
+                            <span class="text-xs text-gray-400">Remove original track vocals</span>
                         </div>
-                        <div class="flex items-center justify-between gap-4">
-                            <span class="text-sm font-medium flex items-center gap-2"><i class="fas fa-sort-numeric-up text-purple-400 w-5"></i> Key Shift</span>
-                            <div class="flex items-center justify-between bg-dark-900/50 rounded-xl p-1 border border-white/10 shrink-0">
-                                <button class="w-9 h-9 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors active:scale-95" onclick="adjustPitch(-1)">
-                                    <i class="fas fa-minus text-sm text-gray-300"></i>
-                                </button>
-                                <div class="font-mono text-base font-bold w-10 text-center" id="pitch-display">0</div>
-                                <button class="w-9 h-9 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors active:scale-95" onclick="adjustPitch(1)">
-                                    <i class="fas fa-plus text-sm text-gray-300"></i>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="flex items-center justify-between bg-dark-900/40 rounded-xl p-3 border border-white/5">
-                            <div class="flex flex-col">
-                                <span class="text-sm font-medium">Vocal Cancel</span>
-                                <span class="text-xs text-gray-400">Remove original track vocals</span>
-                            </div>
-                            <div class="relative inline-block w-12 align-middle select-none transition duration-200 ease-in">
-                                <input type="checkbox" id="vocal-toggle" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 border-dark-800 appearance-none cursor-pointer transition-all duration-300 z-10 top-0 left-0"/>
-                                <label for="vocal-toggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-dark-800 border border-white/10 cursor-pointer transition-colors duration-300"></label>
-                            </div>
+                        <div class="relative inline-block w-12 align-middle select-none transition duration-200 ease-in">
+                            <input type="checkbox" id="vocal-toggle" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 border-dark-800 appearance-none cursor-pointer transition-all duration-300 z-10 top-0 left-0"/>
+                            <label for="vocal-toggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-dark-800 border border-white/10 cursor-pointer transition-colors duration-300"></label>
                         </div>
                     </div>
-                </section>
-            </div>
-        </main>
-
-        <!-- Right/Secondary Column: Search & Queue -->
-        <aside class="w-full landscape:w-[320px] xl:w-[400px] flex flex-col gap-4 shrink-0 landscape:h-full landscape:overflow-y-auto pb-6 landscape:pb-0">
-
-            <div class="relative glass-panel rounded-2xl p-2 shrink-0">
-                <i class="fas fa-search absolute left-6 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                <input type="text" id="search-input" placeholder="Search songs, artists..."
-                    class="w-full bg-black/40 text-white rounded-xl py-3 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-transparent focus:border-purple-500/50 transition-all placeholder-gray-500">
-            </div>
-
-            <!-- Hasil pencarian -->
-            <div id="results" class="glass-panel rounded-3xl p-4 overflow-y-auto max-h-48 landscape:max-h-40 hidden shrink-0"></div>
-
-            <div class="glass-panel rounded-3xl p-5 flex-1 flex flex-col overflow-hidden relative min-h-[250px] landscape:min-h-[160px]">
-                <div class="flex items-center justify-between mb-4 shrink-0">
-                    <h3 class="font-semibold text-lg flex items-center gap-2">
-                        <i class="fas fa-list-ul text-purple-500"></i> Up Next
-                    </h3>
-                    <span class="text-xs bg-purple-500/20 text-purple-300 px-3 py-1 rounded-full font-medium border border-purple-500/30"><span id="queue-badge">0</span> Lagu</span>
                 </div>
-
-                <div class="flex-1 overflow-y-auto pr-2 space-y-3" id="queue-list">
-                    <div class="text-gray-500 text-center py-6">Antrian kosong</div>
-                </div>
-            </div>
-        </aside>
+            </section>
+        </section>
     </div>
 
     <script>

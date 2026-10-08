@@ -11,6 +11,10 @@ const MSG = {
   SEEK: 'seek',
   VOLUME: 'volume',
   REQUEST_STATE: 'request_state',
+  SHUFFLE: 'shuffle',
+  LOOP: 'loop',
+  LOOP_QUEUE: 'loop_queue',
+  MOVE_SONG: 'move_song',
   // screen -> controller
   STATE_SYNC: 'state_sync',
   QUEUE_UPDATE: 'queue_update',

@@ -33,6 +33,19 @@ function saveData(data) {
 const rooms = loadData().rooms;
 const sockets = new Map(); // socket -> {role, code, id}
 
+// Bersihkan room sisa (tidak ada layar aktif) lebih dari 24 jam saat server start
+(function cleanupOldRooms() {
+  const day = 24 * 60 * 60 * 1000;
+  let changed = false;
+  Object.keys(rooms).forEach((code) => {
+    if (Date.now() - (rooms[code].createdAt || 0) > day) {
+      delete rooms[code];
+      changed = true;
+    }
+  });
+  if (changed) saveData({ rooms });
+})();
+
 const app = express();
 app.set('trust proxy', true); // penting untuk tunneling (ngrok/cloudflare)
 app.use(cors());
@@ -140,6 +153,16 @@ app.post('/api/room/:code/command', (req, res) => {
       ws.send(JSON.stringify(msg));
     }
   });
+  res.json({ ok: true });
+});
+
+// API: delete room (dipanggil saat player logout, supaya tidak numpuk di file data)
+app.delete('/api/room/:code', (req, res) => {
+  const code = req.params.code.toUpperCase();
+  if (rooms[code]) {
+    delete rooms[code];
+    saveData({ rooms });
+  }
   res.json({ ok: true });
 });
 

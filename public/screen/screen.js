@@ -6,6 +6,9 @@ var queue = [];
 var currentIndex = -1;
 var isPlaying = false;
 var volume = 80;
+var modeLoop = false;       // ulangi lagu yang sedang diputar
+var modeShuffle = false;    // acak urutan
+var modeLoopQueue = false;  // loop semua antrian (lagu tidak dihapus setelah diputar)
 
 function send(type, payload) {
   if (ws && ws.readyState === WebSocket.OPEN) {
@@ -24,7 +27,8 @@ function getState() {
     playing: isPlaying,
     position: player && typeof player.getCurrentTime === 'function' ? Math.floor(player.getCurrentTime()) : 0,
     duration: player && typeof player.getDuration === 'function' ? Math.floor(player.getDuration()) : 0,
-    volume: volume
+    volume: volume,
+    modes: { loop: modeLoop, shuffle: modeShuffle, loopQueue: modeLoopQueue }
   };
 }
 
@@ -69,6 +73,10 @@ function handleMessage(msg) {
     case PH.MSG.SEEK: seekTo(p.to); break;
     case PH.MSG.VOLUME: setVolume(p.vol); break;
     case PH.MSG.REQUEST_STATE: broadcastState(); break;
+    case PH.MSG.LOOP: modeLoop = !!p.on; broadcastState(); break;
+    case PH.MSG.SHUFFLE: modeShuffle = !!p.on; broadcastState(); break;
+    case PH.MSG.LOOP_QUEUE: modeLoopQueue = !!p.on; broadcastState(); break;
+    case PH.MSG.MOVE_SONG: moveSong(p.index, p.dir); break;
     case PH.MSG.CONTROLLER_JOINED:
       break;
     case PH.MSG.CONTROLLER_LEFT:
@@ -91,7 +99,7 @@ function removeSong(index) {
   if (index < 0 || index >= queue.length) return;
   queue.splice(index, 1);
   if (index < currentIndex) currentIndex--;
-  else if (index === currentIndex) { currentIndex--; playNext(); }
+  else if (index === currentIndex) { currentIndex--; playNext(true); }
   updateQueueUI();
   send(PH.MSG.QUEUE_UPDATE, { queue });
   broadcastState();
@@ -122,15 +130,64 @@ function forcePlay() {
   }, 800);
 }
 
-function playNext() {
+// Geser lagu naik/turun dalam antrian
+function moveSong(index, dir) {
+  const to = index + dir;
+  if (index == null || index < 0 || index >= queue.length || to < 0 || to >= queue.length) return;
+  const [song] = queue.splice(index, 1);
+  queue.splice(to, 0, song);
+  if (currentIndex === index) currentIndex = to;
+  else if (currentIndex === to) currentIndex = index;
+  updateQueueUI();
+  send(PH.MSG.QUEUE_UPDATE, { queue });
+  broadcastState();
+}
+
+// Index lagu berikutnya berdasarkan mode
+function nextIndexFrom(oldIndex, len) {
+  if (modeShuffle && len > 1) {
+    let r;
+    do { r = Math.floor(Math.random() * len); } while (r === oldIndex);
+    return r;
+  }
+  let n = oldIndex + 1;
+  if (n >= len) n = modeLoopQueue ? 0 : -1;
+  return n;
+}
+
+function stopPlayback() {
+  currentIndex = -1;
+  isPlaying = false;
+  if (player && player.stopVideo) player.stopVideo();
+  updateUI();
+  send(PH.MSG.QUEUE_UPDATE, { queue });
+  broadcastState();
+}
+
+function playNext(skipRemoveCurrent) {
   if (queue.length === 0) {
-    currentIndex = -1;
-    if (player && player.stopVideo) player.stopVideo();
-    updateUI();
-    broadcastState();
+    stopPlayback();
     return;
   }
-  currentIndex = (currentIndex + 1) % queue.length;
+  const oldIndex = currentIndex;
+  let nextIndex = nextIndexFrom(oldIndex, queue.length);
+
+  if (nextIndex < 0) {
+    // Antrian habis -> buang lagu yang sudah diputar lalu berhenti
+    if (oldIndex >= 0 && oldIndex < queue.length) queue.splice(oldIndex, 1);
+    stopPlayback();
+    return;
+  }
+
+  // Lagu yang sudah diputar langsung dihapus dari playlist,
+  // kecuali mode loop antrian (loop_queue) aktif
+  if (!skipRemoveCurrent && oldIndex >= 0 && oldIndex < queue.length && !modeLoopQueue) {
+    queue.splice(oldIndex, 1);
+    if (nextIndex > oldIndex) nextIndex--;
+    if (nextIndex >= queue.length) nextIndex = queue.length - 1;
+  }
+
+  currentIndex = nextIndex;
   const song = queue[currentIndex];
   if (player && player.loadVideoById) {
     player.loadVideoById({ videoId: song.videoId, suggestedQuality: 'hd720' });
@@ -140,7 +197,7 @@ function playNext() {
     pendingVideoId = song.videoId;
   }
   updateUI();
-  send(PH.MSG.NOW_PLAYING, { song, index: currentIndex });
+  send(PH.MSG.NOW_PLAYING, { song: Object.assign({}, song, { index: currentIndex }), index: currentIndex });
   broadcastState();
 }
 
@@ -172,7 +229,14 @@ function updateUI() {
   const qc = document.getElementById('queue-count');
   np.textContent = currentIndex >= 0 && queue[currentIndex] ? 'Sedang Diputar: ' + queue[currentIndex].title : 'Menunggu lagu pertama...';
   qc.textContent = 'Antrian: ' + queue.length;
+  updateIdle();
   updateQueueUI();
+}
+
+// Tampilan idle: muncul saat tidak ada lagu yang diputar
+function updateIdle() {
+  const idle = document.getElementById('idle-screen');
+  if (idle) idle.classList.toggle('hidden', currentIndex >= 0);
 }
 
 function updateQueueUI() {
@@ -215,7 +279,7 @@ function onYouTubeIframeAPIReady() {
       },
       onStateChange: (e) => {
         isPlaying = e.data === YT.PlayerState.PLAYING;
-        if (e.data === YT.PlayerState.ENDED) playNext();
+        if (e.data === YT.PlayerState.ENDED) { if (modeLoop) replay(); else playNext(); }
         if (e.data === YT.PlayerState.CUED || e.data === YT.PlayerState.UNSTARTED) forcePlay();
         broadcastState();
       },
@@ -242,10 +306,14 @@ document.addEventListener('click', () => {
 init();
 setInterval(broadcastState, 5000);
 
-// Logout player: kembali ke tampilan awal (QR + kode baru)
+// Logout player: hapus room di server + kembali ke tampilan awal (QR + kode baru)
 document.getElementById('screen-logout').addEventListener('click', () => {
   try { if (ws) ws.close(); } catch {}
   try { if (player && player.stopVideo) player.stopVideo(); } catch {}
+  const code = roomCode;
+  if (code) {
+    fetch('/api/room/' + code, { method: 'DELETE' }).catch(() => {});
+  }
   sessionStorage.removeItem('ph_code'); // reset pairing code
   location.href = 'index.html';
 });

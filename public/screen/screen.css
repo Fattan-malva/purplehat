@@ -88,6 +88,29 @@ body {
 
 #player { width: 100%; height: 100%; }
 
+/* Tampilan idle player (belum ada lagu diputar) */
+#player-wrapper { position: relative; }
+#idle-screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: radial-gradient(circle at center, rgba(26, 11, 46, 0.9), rgba(10, 10, 12, 0.98));
+  z-index: 5;
+}
+.idle-logo { width: 84px; height: 84px; border-radius: 24px; font-size: 40px; animation: idle-pulse 2.4s ease-in-out infinite; }
+@keyframes idle-pulse {
+  0%, 100% { box-shadow: 0 0 18px rgba(168, 85, 247, 0.4); transform: scale(1); }
+  50% { box-shadow: 0 0 34px rgba(168, 85, 247, 0.75); transform: scale(1.05); }
+}
+.idle-title { font-size: 34px; font-weight: 700; letter-spacing: 6px; }
+.idle-title span { color: #a855f7; }
+.idle-text { color: #9ca3af; font-size: 15px; letter-spacing: 1px; }
+.idle-text i { color: #c084fc; margin-right: 6px; }
+
 #overlay {
   display: flex;
   gap: 20px;
