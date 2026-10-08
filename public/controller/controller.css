@@ -344,7 +344,12 @@ input:focus-visible {
   max-width: 580px;
   margin: 0 auto;
   height: calc(100dvh - var(--safe-t) - var(--safe-b) - 28px);
+  /* Pemotongan kontainer: fallback lama dulu, lalu clip+margin supaya
+     glow logo header di atas/kiri TIDAK kejepit di tepi (mis. glow 18px
+     tetap terlihat walau logo dekat batas kontainer). Blink mendukung. */
   overflow: hidden;
+  overflow: clip;
+  overflow-clip-margin: 18px;
 }
 
 /* Header di paling atas — tidak ikut scroll */
@@ -366,16 +371,7 @@ input:focus-visible {
   flex-shrink: 0;
 }
 
-#controller-col {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  flex-shrink: 0;
-  min-height: 0;
-  padding-bottom: 4px;
-}
-
-/* Player dock fixed di bawah (panel Now di atas, Controls di bawahnya) */
+/* Player dock fixed di bawah: satu panel kompak (Now + Kontrol digabung) */
 #player-dock {
   position: relative;
   display: flex;
@@ -390,7 +386,9 @@ input:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 0 2px;
+  /* Padding atas/kiri: ruang napas agar glow logo (18px) tidak menempel
+     & terjepit di tepi kontainer saat portrait/landscape. */
+  padding: 6px 6px 0;
 }
 
 .brand {
@@ -464,39 +462,40 @@ input:focus-visible {
   transform: scale(.92);
 }
 
-/* ---------- Now playing ---------- */
-.now {
+/* ---------- Player dock: Now Playing + Kontrol digabung (satu panel kompak) ---------- */
+.dock {
   position: relative;
-  display: flex;
-  align-items: center;
-  gap: 16px;
+  display: grid;
+  grid-template-areas:
+    "now  now"
+    "tools tools"
+    "bar  bar";
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  padding: 14px 16px 12px;
   overflow: hidden;
 }
 
-.now::before {
-  content: "";
-  position: absolute;
-  top: -70px;
-  right: -70px;
-  width: 200px;
-  height: 200px;
-  border-radius: 50%;
-  background: rgba(147, 51, 234, 0.28);
-  filter: blur(60px);
-  pointer-events: none;
+/* Baris info lagu */
+.dock-now {
+  grid-area: now;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
 }
 
 .art {
   position: relative;
-  width: 92px;
-  height: 92px;
-  border-radius: 18px;
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
   overflow: hidden;
   flex-shrink: 0;
   display: grid;
   place-items: center;
   background: #1a1426;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
 }
 
 .art img {
@@ -509,8 +508,8 @@ input:focus-visible {
 
 .art-placeholder {
   color: rgba(192, 132, 252, 0.55);
-  width: 32px;
-  height: 32px;
+  width: 22px;
+  height: 22px;
 }
 
 .now-body {
@@ -519,23 +518,20 @@ input:focus-visible {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 2px;
 }
 
 .now-title {
-  font-size: 17px;
+  font-size: 14.5px;
   font-weight: 700;
-  line-height: 1.25;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  line-height: 1.3;
+  white-space: nowrap;
   overflow: hidden;
-  overflow-wrap: anywhere;
+  text-overflow: ellipsis;
 }
 
 .now-sub {
-  margin-top: 4px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--accent-hi);
   white-space: nowrap;
@@ -543,18 +539,155 @@ input:focus-visible {
   text-overflow: ellipsis;
 }
 
-.time {
+.time-mini {
+  flex-shrink: 0;
   display: flex;
-  justify-content: space-between;
-  font-size: 12px;
+  align-items: center;
+  font-size: 11px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
-  margin-bottom: 8px;
 }
 
+.time-mini span + span::before {
+  content: " / ";
+  color: var(--muted);
+}
+
+/* Baris transport + master */
+.dock-tools {
+  grid-area: tools;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.transport {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  flex: 0 1 auto;
+}
+
+.btn-round {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--line-soft);
+  color: #e5e7eb;
+  transition: transform .15s ease, background .2s;
+}
+
+.btn-round .lucide {
+  width: 17px;
+  height: 17px;
+}
+
+.btn-round:active {
+  transform: scale(.92);
+}
+
+.btn-play {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: #fff;
+  background: linear-gradient(135deg, #a855f7, #7e22ce);
+  border: 1px solid rgba(192, 132, 252, 0.35);
+  box-shadow: 0 0 18px rgba(168, 85, 247, 0.5);
+  transition: transform .15s ease, box-shadow .2s;
+}
+
+.btn-play:active {
+  transform: scale(.94);
+}
+
+#play-icon {
+  display: grid;
+  place-items: center;
+}
+
+.btn-play .lucide {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+}
+
+/* Master (volume + FX) sebaris kanan: bar volume fleksibel, sisanya pas */
+.master-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.master-inline .bar {
+  flex: 1 1 auto;
+  min-width: 40px;
+  max-width: 96px;
+  height: 5px;
+}
+
+.master-inline .btn-step.sm {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.val-mini {
+  font-size: 11px;
+}
+
+/* Layar sempit: transport & master diramping supaya tetap sebaris (tanpa menimpa) */
+@media (max-width: 480px) {
+  .val-mini {
+    display: none;
+  }
+
+  .transport {
+    gap: 12px;
+  }
+
+  .btn-round {
+    width: 40px;
+    height: 40px;
+  }
+
+  .btn-play {
+    width: 52px;
+    height: 52px;
+  }
+
+  .master-inline {
+    gap: 6px;
+  }
+
+  .master-inline .btn-step.sm {
+    width: 32px;
+    height: 32px;
+  }
+
+  .master-inline .bar {
+    min-width: 34px;
+    max-width: 56px;
+  }
+}
+
+/* Progress tipis selebar panel */
 .progress {
+  grid-area: bar;
   position: relative;
-  height: 8px;
+  height: 6px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
   cursor: pointer;
@@ -576,70 +709,6 @@ input:focus-visible {
   border-radius: 999px;
   background: linear-gradient(90deg, #7e22ce, #c084fc);
   box-shadow: 0 0 10px rgba(168, 85, 247, 0.8);
-}
-
-/* ---------- Playback controls (transport + modes + master) ---------- */
-.controls {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 18px 16px;
-}
-
-.transport {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 24px;
-}
-
-.btn-round {
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--line-soft);
-  color: #e5e7eb;
-  transition: transform .15s ease, background .2s;
-}
-
-.btn-round .lucide {
-  width: 20px;
-  height: 20px;
-}
-
-.btn-round:active {
-  transform: scale(.92);
-}
-
-.btn-play {
-  width: 78px;
-  height: 78px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  color: #fff;
-  background: linear-gradient(135deg, #a855f7, #7e22ce);
-  border: 1px solid rgba(192, 132, 252, 0.35);
-  box-shadow: 0 0 22px rgba(168, 85, 247, 0.5);
-  transition: transform .15s ease, box-shadow .2s;
-}
-
-.btn-play:active {
-  transform: scale(.94);
-}
-
-#play-icon {
-  display: grid;
-  place-items: center;
-}
-
-.btn-play .lucide {
-  width: 30px;
-  height: 30px;
-  fill: currentColor;
 }
 
 .modes {
@@ -711,28 +780,7 @@ input:focus-visible {
   pointer-events: none;
 }
 
-/* Master block digabung ke panel Controls */
-.master-block {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding-top: 14px;
-  border-top: 1px solid var(--line-soft);
-}
-
-.mix-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.vol-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
+/* Volume master (bar yang tadinya di dalam .master-block) */
 .bar {
   flex: 1;
   height: 8px;
@@ -1361,12 +1409,11 @@ input[type="range"]::-moz-range-thumb {
   #main-ui.flex {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    grid-template-rows: auto minmax(0, 1fr) auto;
     grid-template-areas:
       "header"
       "search"
-      "dock"
-      "controls";
+      "dock";
     gap: 12px;
     max-width: 760px;
     height: calc(100dvh - var(--safe-t) - var(--safe-b) - 24px);
@@ -1386,51 +1433,60 @@ input[type="range"]::-moz-range-thumb {
     grid-area: dock;
   }
 
-  #controller-col {
-    grid-area: controls;
-    min-height: 0;
-  }
-
   #search-col .results {
     flex: 1;
     min-height: 0;
     max-height: none;
   }
 
-  /* Compact now-playing */
-  .now {
-    padding: 12px;
-    gap: 12px;
+  /* Dock menyusun ulang: info lagu kiri, transport+master kanan (dinamis
+     memanfaatkan lebar layar), progress tipis di bawah selebar panel. */
+  .dock {
+    grid-template-areas:
+      "now  tools"
+      "bar  bar";
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px 16px;
+    padding: 12px 16px;
   }
 
   .art {
-    width: 72px;
-    height: 72px;
-    border-radius: 14px;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
   }
 
   .now-title {
     font-size: 15px;
   }
 
-  .controls {
-    padding: 14px;
+  .dock-tools {
+    justify-content: flex-end;
+  }
+
+  .transport {
     gap: 12px;
   }
 
   .btn-play {
-    width: 64px;
-    height: 64px;
+    width: 50px;
+    height: 50px;
   }
 
   .btn-play .lucide {
-    width: 26px;
-    height: 26px;
+    width: 20px;
+    height: 20px;
   }
 
   .btn-round {
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
+  }
+
+  .master-inline .bar {
+    min-width: 56px;
+    max-width: 110px;
   }
 
   .btn-mode {
@@ -1440,41 +1496,54 @@ input[type="range"]::-moz-range-thumb {
 
 /* Very short landscape phones */
 @media (orientation: landscape) and (max-height: 430px) {
-  #controller-col {
-    gap: 10px;
+  .dock {
+    gap: 6px;
+    padding: 8px 12px;
+  }
+
+  .dock-now {
+    gap: 8px;
   }
 
   .art {
-    width: 60px;
-    height: 60px;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
   }
 
   .now-sub {
-    margin-top: 2px;
+    display: none;
   }
 
-  .time {
-    margin-bottom: 6px;
+  .now-title {
+    font-size: 13px;
   }
 
-  .controls {
+  .time-mini {
+    font-size: 10px;
+  }
+
+  .dock-tools {
     gap: 8px;
-    padding: 10px 14px;
   }
 
-  .now {
-    padding: 8px 12px;
-    gap: 8px;
+  .transport {
+    gap: 10px;
   }
 
   .btn-play {
-    width: 56px;
-    height: 56px;
+    width: 44px;
+    height: 44px;
   }
 
   .btn-round {
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
+  }
+
+  .master-inline .bar {
+    min-width: 40px;
+    max-width: 72px;
   }
 }
 
@@ -1484,27 +1553,28 @@ input[type="range"]::-moz-range-thumb {
     --gutter: 10px;
   }
 
-  .now {
-    gap: 12px;
-    padding: 12px;
-  }
-
-  .art {
-    width: 78px;
-    height: 78px;
+  .dock {
+    gap: 8px;
+    padding: 12px 12px 10px;
   }
 
   .transport {
-    gap: 16px;
+    gap: 10px;
+  }
+
+  .btn-round {
+    width: 36px;
+    height: 36px;
   }
 
   .btn-play {
-    width: 70px;
-    height: 70px;
+    width: 48px;
+    height: 48px;
   }
 
-  .modes {
-    gap: 8px;
+  .master-inline .bar {
+    min-width: 30px;
+    max-width: 48px;
   }
 }
 
@@ -1514,13 +1584,13 @@ input[type="range"]::-moz-range-thumb {
     max-width: 620px;
   }
 
-  .now {
-    padding: 20px;
+  .dock {
+    padding: 16px 20px 14px;
   }
 
   .art {
-    width: 110px;
-    height: 110px;
+    width: 58px;
+    height: 58px;
   }
 }
 

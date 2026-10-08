@@ -21,7 +21,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="controller.css?v=20261009e">
+    <link rel="stylesheet" href="controller.css?v=20261009f">
 
     <script>
         // ==== ATURAN KERAS: controller hanya boleh tampil sebagai aplikasi ====
@@ -127,79 +127,72 @@
             <div id="results" class="results hidden"></div>
         </section>
 
-        <!-- ===== NOW PLAYING + CONTROLS =====
-             Stack di bawah: panel NOW di atas panel CONTROLS.
-             Floating Up Next melayang tepat di atas panel now. -->
+        <!-- ===== PLAYER DOCK: Now Playing + Kontrol digabung (satu panel kompak) =====
+             Layout utama: baris info lagu, baris transport+master, lalu progress tipis.
+             Pada layar lebar/lanskap otomatis menyusun ulang jadi info di kiri,
+             kontrol di kanan (lihat CSS .dock grid-areas). -->
         <section id="player-dock">
 
-            <!-- Floating Up Next: melayang di atas panel now -->
+            <!-- Floating Up Next: melayang tepat di atas dock -->
             <button id="btn-upnext" class="fab-upnext" title="Up Next" aria-label="Up Next">
                 <i data-lucide="list-music"></i>
                 <span class="fab-badge" id="queue-badge">0</span>
             </button>
 
-            <section class="panel now">
-                <div class="art" id="np-art">
-                    <i data-lucide="music" class="art-placeholder"></i>
-                    <img id="np-thumb" class="hidden" alt="">
-                </div>
-                <div class="now-body">
-                    <div>
+            <section class="panel dock">
+
+                <!-- Info lagu + waktu -->
+                <div class="dock-now">
+                    <div class="art" id="np-art">
+                        <i data-lucide="music" class="art-placeholder"></i>
+                        <img id="np-thumb" class="hidden" alt="">
+                    </div>
+                    <div class="now-body">
                         <h2 class="now-title" id="np-title">Menunggu lagu...</h2>
                         <p class="now-sub" id="np-sub">Purplehat Karaoke</p>
                     </div>
-                    <div>
-                        <div class="time">
-                            <span id="pos">0:00</span>
-                            <span id="dur">0:00</span>
-                        </div>
-                        <div class="progress" id="progress-container">
-                            <div class="progress-bar" id="progress-bar"></div>
-                        </div>
+                    <div class="time-mini">
+                        <span id="pos">0:00</span>
+                        <span id="dur">0:00</span>
                     </div>
                 </div>
-            </section>
 
-        </section>
-
-        <!-- ===== KONTROL (dok bawah, di bawah panel now) ===== -->
-        <section id="controller-col">
-
-            <!-- Controls + Master digabung jadi satu panel -->
-            <section class="panel controls">
-                <div class="transport">
-                    <button id="btn-replay" class="btn-round" title="Replay" aria-label="Replay">
-                        <i data-lucide="rotate-ccw"></i>
-                    </button>
-                    <button id="btn-play" class="btn-play" aria-label="Play / Pause">
-                        <span id="play-icon"><i data-lucide="pause"></i></span>
-                    </button>
-                    <button id="btn-next" class="btn-round" title="Skip / Next" aria-label="Next">
-                        <i data-lucide="skip-forward"></i>
-                    </button>
-                </div>
-
-                <!-- Master + tombol FX -->
-                <div class="master-block">
-                    <div class="mix-row">
-                        <span class="label"><i data-lucide="volume-2"></i> Master</span>
-                        <span class="val" id="vol-label">80%</span>
+                <!-- Transport + Master sebaris -->
+                <div class="dock-tools">
+                    <div class="transport">
+                        <button id="btn-replay" class="btn-round" title="Replay" aria-label="Replay">
+                            <i data-lucide="rotate-ccw"></i>
+                        </button>
+                        <button id="btn-play" class="btn-play" aria-label="Play / Pause">
+                            <span id="play-icon"><i data-lucide="pause"></i></span>
+                        </button>
+                        <button id="btn-next" class="btn-round" title="Skip / Next" aria-label="Next">
+                            <i data-lucide="skip-forward"></i>
+                        </button>
                     </div>
-                    <div class="vol-row">
-                        <button id="vol-down" class="btn-step" title="Volume turun" aria-label="Volume turun">
+
+                    <div class="master-inline">
+                        <span class="val val-mini" id="vol-label">80%</span>
+                        <button id="vol-down" class="btn-step sm" title="Volume turun" aria-label="Volume turun">
                             <i data-lucide="minus"></i>
                         </button>
                         <div class="bar">
                             <div id="vol-progress" style="width: 80%"></div>
                         </div>
-                        <button id="vol-up" class="btn-step" title="Volume naik" aria-label="Volume naik">
+                        <button id="vol-up" class="btn-step sm" title="Volume naik" aria-label="Volume naik">
                             <i data-lucide="plus"></i>
                         </button>
-                        <button id="btn-fx" class="btn-step fx-open" title="FX & Tuning" aria-label="FX & Tuning">
+                        <button id="btn-fx" class="btn-step sm fx-open" title="FX & Tuning" aria-label="FX & Tuning">
                             <i data-lucide="wand-sparkles"></i>
                         </button>
                     </div>
                 </div>
+
+                <!-- Progress tipis selebar panel -->
+                <div class="progress" id="progress-container">
+                    <div class="progress-bar" id="progress-bar"></div>
+                </div>
+
             </section>
 
         </section>
