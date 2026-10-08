@@ -21,14 +21,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="controller.css?v=20261009b">
+    <link rel="stylesheet" href="controller.css?v=20261009d">
 
     <script>
         // ==== ATURAN KERAS: controller hanya boleh tampil sebagai aplikasi ====
-        // Script blocking di <head>: HP yang membuka index.html di tab browser
-        // langsung dipantulkan ke gerbang instalasi SEBELUM <body> dirender,
-        // jadi controller tidak pernah (sempat) tampil di browser.
-        // Bendera back=1 memberi tahu gate bahwa upaya membuka aplikasi gagal.
         (function () {
             function phMustBounce() {
                 var standalone = window.matchMedia('(display-mode: standalone)').matches ||
@@ -37,15 +33,12 @@
                 return !standalone && (mobile || localStorage.getItem('ph_gate_pending') === '1');
             }
             function phBounce() {
-                // Sembunyikan dulu supaya controller tidak sempat "berkedip"
-                // di browser selama navigasi ke gerbang berlangsung.
                 document.documentElement.style.visibility = 'hidden';
                 location.replace('gate-install.html' +
                     (location.search ? location.search + '&' : '?') + 'back=1');
             }
             if (phMustBounce()) phBounce();
             else document.documentElement.style.visibility = 'visible';
-            // Halaman dipulihkan dari bfcache (tombol Kembali) -> evaluasi ulang
             window.addEventListener('pageshow', function (e) {
                 if (!e.persisted) return;
                 if (phMustBounce()) phBounce();
@@ -88,36 +81,96 @@
             <canvas id="scan-canvas" class="hidden"></canvas>
             <button id="scan-stop-btn" class="btn-secondary">Tutup Kamera</button>
         </div>
-
-        <!-- Catatan: alur pasang aplikasi (PWA) tidak lagi ada di halaman ini.
-             Link QR dari layar player masuk lewat qr.html -> gate-install.html
-             (wajib pasang sebelum controller), jadi tampilan ini murni controller. -->
     </section>
 
     <!-- Main Controller UI (hidden until paired)
-         Portrait  : stacked  -> Controller, Search, Up Next
-         Landscape : 3 kolom  -> Controller | Search | Up Next -->
+         Search di atas, controller di tengah (scroll), player dock fixed di bawah,
+         Up Next & FX sebagai modal + floating button. -->
     <div id="main-ui" class="hidden">
 
-        <!-- Kolom 1: Controller -->
+        <!-- ===== HEADER (paling atas) ===== -->
+        <header class="topbar">
+            <div class="brand">
+                <div class="logo">
+                    <i class="fas fa-hat-wizard"></i>
+                </div>
+                <div class="brand-text">
+                    <h1 class="brand-name">PURPLE<span>HAT</span></h1>
+                    <p id="status">Belum terhubung</p>
+                </div>
+            </div>
+            <button id="btn-logout" class="icon-btn" title="Logout" aria-label="Logout">
+                <i data-lucide="log-out"></i>
+            </button>
+        </header>
+
+        <!-- ===== SEARCH ===== -->
+        <section id="search-col">
+
+            <div class="panel search">
+                <i data-lucide="search"></i>
+                <input type="text" id="search-input" placeholder="Search songs, artists..." autocomplete="off"
+                    enterkeyhint="search" aria-label="Cari lagu">
+            </div>
+
+            <div class="chips" id="search-tabs">
+                <button class="src-tab mode-active" data-src="youtube">
+                    <i class="fab fa-youtube src-yt" title="Available on YouTube"></i> YouTube
+                </button>
+                <button class="src-tab" data-src="soundcloud">
+                    <i class="fab fa-soundcloud src-sc" title="Available on SoundCloud"></i> SoundCloud
+                </button>
+            </div>
+
+            <!-- Hasil search: tanpa wrapper rounded, full sampai bawah, shadow di bawah -->
+            <div id="results" class="results hidden"></div>
+        </section>
+
+        <!-- ===== KONTROLLER (scroll area) ===== -->
         <section id="controller-col">
 
-            <header class="topbar">
-                <div class="brand">
-                    <div class="logo">
-                        <i class="fas fa-hat-wizard"></i>
+            <!-- Controls + Master digabung jadi satu panel -->
+            <section class="panel controls">
+                <div class="transport">
+                    <button id="btn-replay" class="btn-round" title="Replay" aria-label="Replay">
+                        <i data-lucide="rotate-ccw"></i>
+                    </button>
+                    <button id="btn-play" class="btn-play" aria-label="Play / Pause">
+                        <span id="play-icon"><i data-lucide="pause"></i></span>
+                    </button>
+                    <button id="btn-next" class="btn-round" title="Skip / Next" aria-label="Next">
+                        <i data-lucide="skip-forward"></i>
+                    </button>
+                </div>
+
+                <!-- Master + tombol FX -->
+                <div class="master-block">
+                    <div class="mix-row">
+                        <span class="label"><i data-lucide="volume-2"></i> Master</span>
+                        <span class="val" id="vol-label">80%</span>
                     </div>
-                    <div class="brand-text">
-                        <h1 class="brand-name">PURPLE<span>HAT</span></h1>
-                        <p id="status">Belum terhubung</p>
+                    <div class="vol-row">
+                        <button id="vol-down" class="btn-step" title="Volume turun" aria-label="Volume turun">
+                            <i data-lucide="minus"></i>
+                        </button>
+                        <div class="bar">
+                            <div id="vol-progress" style="width: 80%"></div>
+                        </div>
+                        <button id="vol-up" class="btn-step" title="Volume naik" aria-label="Volume naik">
+                            <i data-lucide="plus"></i>
+                        </button>
+                        <button id="btn-fx" class="btn-step fx-open" title="FX & Tuning" aria-label="FX & Tuning">
+                            <i data-lucide="wand-sparkles"></i>
+                        </button>
                     </div>
                 </div>
-                <button id="btn-logout" class="icon-btn" title="Logout" aria-label="Logout">
-                    <i data-lucide="log-out"></i>
-                </button>
-            </header>
+            </section>
 
-            <!-- Now Playing -->
+        </section>
+
+        <!-- ===== NOW PLAYING + CONTROLS (fixed di bawah) ===== -->
+        <section id="player-dock">
+
             <section class="panel now">
                 <div class="art" id="np-art">
                     <i data-lucide="music" class="art-placeholder"></i>
@@ -140,60 +193,27 @@
                 </div>
             </section>
 
-            <!-- Playback Controls -->
-            <section class="panel controls">
-                <div class="transport">
-                    <button id="btn-replay" class="btn-round" title="Replay" aria-label="Replay">
-                        <i data-lucide="rotate-ccw"></i>
-                    </button>
-                    <button id="btn-play" class="btn-play" aria-label="Play / Pause">
-                        <span id="play-icon"><i data-lucide="pause"></i></span>
-                    </button>
-                    <button id="btn-next" class="btn-round" title="Skip / Next" aria-label="Next">
-                        <i data-lucide="skip-forward"></i>
-                    </button>
-                </div>
-                <div class="modes">
-                    <button id="btn-loop" class="btn-mode" title="Loop lagu ini" aria-label="Loop lagu ini">
-                        <i data-lucide="repeat"></i>
-                    </button>
-                    <button id="btn-shuffle" class="btn-mode" title="Acak urutan" aria-label="Acak urutan">
-                        <i data-lucide="shuffle"></i>
-                    </button>
-                    <button id="btn-loopq" class="btn-mode" title="Loop semua antrian" aria-label="Loop semua antrian">
-                        <i data-lucide="infinity"></i>
-                    </button>
-                </div>
-            </section>
+        </section>
 
-            <!-- Audio Mix -->
-            <section class="panel card">
-                <h3 class="section-title">
-                    <i data-lucide="sliders-horizontal"></i> Audio Mix
-                </h3>
-                <div class="row">
-                    <span class="label"><i data-lucide="volume-2"></i> Master</span>
-                    <span class="val" id="vol-label">80%</span>
-                </div>
-                <div class="vol-row">
-                    <button id="vol-down" class="btn-step" title="Volume turun" aria-label="Volume turun">
-                        <i data-lucide="minus"></i>
-                    </button>
-                    <div class="bar">
-                        <div id="vol-progress" style="width: 80%"></div>
-                    </div>
-                    <button id="vol-up" class="btn-step" title="Volume naik" aria-label="Volume naik">
-                        <i data-lucide="plus"></i>
-                    </button>
-                </div>
-            </section>
+        <!-- ===== FLOATING UP NEXT ===== -->
+        <button id="btn-upnext" class="fab-upnext" title="Up Next" aria-label="Up Next">
+            <i data-lucide="list-music"></i>
+            <span class="fab-badge" id="queue-badge">0</span>
+        </button>
 
-            <!-- FX & Tuning -->
-            <section class="panel card">
-                <h3 class="section-title">
-                    <i data-lucide="wand-sparkles"></i> FX &amp; Tuning
-                </h3>
+    </div>
 
+    <!-- ===== MODAL: FX & TUNING ===== -->
+    <div id="fx-modal" class="modal hidden">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h3 class="section-title"><i data-lucide="wand-sparkles"></i> FX &amp; Tuning</h3>
+                <button class="icon-btn" data-close="fx-modal" aria-label="Tutup">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+
+            <div class="modal-body">
                 <div class="fx-item">
                     <div class="row">
                         <span class="label"><i data-lucide="audio-waveform"></i> Echo Delay</span>
@@ -226,41 +246,32 @@
                         <span class="track"></span>
                     </label>
                 </div>
-            </section>
-        </section>
-
-        <!-- Kolom 2: Search -->
-        <section id="search-col">
-            <div class="panel search">
-                <i data-lucide="search"></i>
-                <input type="text" id="search-input" placeholder="Search songs, artists..." autocomplete="off"
-                    enterkeyhint="search" aria-label="Cari lagu">
             </div>
+        </div>
+    </div>
 
-            <div class="chips" id="search-tabs">
-                <button class="src-tab mode-active" data-src="youtube">
-                    <i class="fab fa-youtube src-yt" title="Available on YouTube"></i> YouTube
+    <!-- ===== MODAL: UP NEXT (loop + shuffle juga di sini) ===== -->
+    <div id="upnext-modal" class="modal hidden">
+        <div class="modal-box modal-box-tall">
+            <div class="modal-head">
+                <h3 class="section-title"><i data-lucide="list-music"></i> Up Next</h3>
+                <div class="queue-modes">
+                    <button id="btn-loop" class="btn-mode" data-mode="off" title="Loop: mati" aria-label="Loop">
+                        <i data-lucide="repeat"></i>
+                        <span id="loop-one-badge" class="loop-one-badge hidden">1</span>
+                    </button>
+                    <button id="btn-shuffle" class="btn-mode" title="Acak urutan" aria-label="Acak urutan">
+                        <i data-lucide="shuffle"></i>
+                    </button>
+                </div>
+                <button class="icon-btn" data-close="upnext-modal" aria-label="Tutup">
+                    <i data-lucide="x"></i>
                 </button>
-                <button class="src-tab" data-src="soundcloud">
-                    <i class="fab fa-soundcloud src-sc" title="Available on SoundCloud"></i> SoundCloud
-                </button>
             </div>
-
-            <div id="results" class="panel results hidden"></div>
-        </section>
-
-        <!-- Kolom 3: Up Next -->
-        <aside id="queue-col" class="panel queue-col">
-            <div class="queue-head">
-                <h3 class="section-title">
-                    <i data-lucide="list-music"></i> Up Next
-                </h3>
-                <span class="pill"><span id="queue-badge">0</span> Lagu</span>
-            </div>
-            <div class="queue-list" id="queue-list">
+            <div class="queue-list modal-body" id="queue-list">
                 <div class="state-msg">Antrian kosong</div>
             </div>
-        </aside>
+        </div>
     </div>
 
     <script>
@@ -276,7 +287,7 @@
             pitchDisplay.classList.toggle('is-on', currentPitch !== 0);
         }
     </script>
-    <script src="controller.js?v=20261009b"></script>
+    <script src="controller.js?v=20261009d"></script>
 </body>
 
 </html>

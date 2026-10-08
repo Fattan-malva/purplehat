@@ -309,6 +309,36 @@
       "volume": 80,
       "position": 0,
       "duration": 0
+    },
+    "2CTDXT": {
+      "code": "2CTDXT",
+      "createdAt": 1791498275111,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
+    },
+    "YCX335": {
+      "code": "YCX335",
+      "createdAt": 1791498729080,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
+    },
+    "Z43UL9": {
+      "code": "Z43UL9",
+      "createdAt": 1791499261950,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 80,
+      "position": 0,
+      "duration": 0
     }
   }
 }

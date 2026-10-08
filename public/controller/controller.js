@@ -6,11 +6,6 @@ const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
     window.navigator.standalone === true;
 
 // ==== Gerbang instalasi ====
-// Bendera cadangan: kalau skrip hard-bounce di <head> index.html gagal jalan,
-// guard ini tetap memantulkan tab browser HP ke gate-install.html.
-// (Catatan lama: flag 'ph_gate_pending' dulunya juga dipakai untuk opsi
-// "Lanjut di browser" — opsi itu sudah dihapus; di HP controller hanya
-// berjalan sebagai aplikasi.)
 var gateRedirected = false;
 if (!isStandalone && (/(Android|iPhone|iPad|iPod|Mobile)/i.test(navigator.userAgent) ||
         localStorage.getItem('ph_gate_pending') === '1')) {
@@ -23,7 +18,6 @@ var ws;
 var roomCode = null;
 var fallbackMode = false;
 var state = { current: null, queue: [], playing: false, position: 0, duration: 0, volume: 80, modes: { loop: false, shuffle: false, loopQueue: false } };
-// Default: same origin (via Express proxy /api/search). Override via localStorage jika perlu.
 const API_BASE = localStorage.getItem('ph_api_base') || '';
 var searchSource = 'youtube'; // 'youtube' | 'soundcloud'
 
@@ -39,13 +33,11 @@ function send(type, payload) {
   }
 }
 
-// Elemen #status sudah dihapus dari header; dipertahankan agar aman jika ada reference
 function setStatus(text) {
   const el = document.getElementById('status');
   if (el) el.textContent = text;
 }
 
-// Render ikon Lucide yang baru ditambahkan ke DOM
 function refreshIcons() {
   if (window.lucide) lucide.createIcons();
 }
@@ -64,8 +56,6 @@ function connect(code) {
     })
     .then(() => {
       statusEl.textContent = 'Menghubungi realtime...';
-      // Simpan kode terakhir: dipakai lagi saat aplikasi dibuka dari
-      // layar utama (standalone), di mana URL tidak lagi membawa ?pair=
       localStorage.setItem('ph_last_code', roomCode);
       openSocket(0);
     })
@@ -157,10 +147,10 @@ function handleMessage(msg) {
 }
 
 function bindUI() {
-  // Search: Enter di input (ikon search tidak ada tombol eksplisit)
+  // Search
   document.getElementById('search-input').addEventListener('keypress', e => { if (e.key === 'Enter') search(); });
 
-  // Tab sumber: YouTube / SoundCloud
+  // Tab sumber
   document.querySelectorAll('#search-tabs .src-tab').forEach(btn => {
     btn.addEventListener('click', () => {
       searchSource = btn.dataset.src;
@@ -184,10 +174,9 @@ function bindUI() {
   document.getElementById('vol-down').addEventListener('click', () => setVolume((state.volume ?? 80) - 2));
   document.getElementById('vol-up').addEventListener('click', () => setVolume((state.volume ?? 80) + 2));
 
-  // Toggle playback modes
-  document.getElementById('btn-loop').addEventListener('click', () => toggleMode('btn-loop', PH.MSG.LOOP));
+  // Toggle playback modes (loop gabungan di modal Up Next + shuffle)
+  document.getElementById('btn-loop').addEventListener('click', cycleLoop);
   document.getElementById('btn-shuffle').addEventListener('click', () => toggleMode('btn-shuffle', PH.MSG.SHUFFLE));
-  document.getElementById('btn-loopq').addEventListener('click', () => toggleMode('btn-loopq', PH.MSG.LOOP_QUEUE));
 
   document.getElementById('pair-connect-btn').addEventListener('click', () => {
     const code = document.getElementById('pair-code-input').value.trim();
@@ -203,7 +192,7 @@ function bindUI() {
   document.getElementById('scan-btn').addEventListener('click', startScan);
   document.getElementById('scan-stop-btn').addEventListener('click', stopScan);
 
-  // Logout controller: kembali ke tampilan awal (form kode / scan QR)
+  // Logout controller
   document.getElementById('btn-logout').addEventListener('click', () => {
     try { if (ws) ws.close(); } catch {}
     try { stopScan(); } catch {}
@@ -221,6 +210,27 @@ function bindUI() {
     state = { current: null, queue: [], playing: false, position: 0, duration: 0, volume: 80, modes: { loop: false, shuffle: false, loopQueue: false } };
     updateVolUI();
     syncModeButtons();
+  });
+
+  // ==== Modal: FX & Up Next ====
+  document.getElementById('btn-fx').addEventListener('click', () => {
+    document.getElementById('fx-modal').classList.remove('hidden');
+    refreshIcons();
+  });
+  document.getElementById('btn-upnext').addEventListener('click', () => {
+    document.getElementById('upnext-modal').classList.remove('hidden');
+    renderQueue();
+    syncModeButtons();
+    refreshIcons();
+  });
+  document.querySelectorAll('[data-close]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.getElementById(btn.dataset.close).classList.add('hidden');
+    });
+  });
+  // Klik backdrop untuk menutup modal
+  document.querySelectorAll('.modal').forEach(m => {
+    m.addEventListener('click', (e) => { if (e.target === m) m.classList.add('hidden'); });
   });
 }
 
@@ -290,7 +300,6 @@ function renderResults(items) {
 function render() {
   const np = state.current ? state.current.title : (state.queue[0] ? state.queue[0].title : 'Menunggu lagu...');
   document.getElementById('np-title').textContent = np;
-  // Thumbnail lagu yang sedang diputar (atau lagu berikutnya)
   const npThumb = document.getElementById('np-thumb');
   const artSrc = (state.current && state.current.thumbnail) || (state.queue[0] && state.queue[0].thumbnail);
   if (npThumb) {
@@ -382,29 +391,56 @@ function updateVolUI() {
 
 function setVolume(v) {
   v = Math.max(0, Math.min(100, v));
-  // Step 2-2 konsisten dengan screen/WinForms (Math.round half-up, bukan
-  // banker's), agar nilai tampil == nilai yang diset ke OS.
   v = Math.round(v / 2) * 2;
   state.volume = v;
   updateVolUI();
   send(PH.MSG.VOLUME, { vol: v });
 }
 
+// Satu tombol loop: mati -> loop semua antrian -> loop lagu ini -> mati.
+// Ikon: repeat (mode aktif); badge "1" hanya muncul saat "loop lagu ini".
+function loopState() {
+  const m = state.modes || {};
+  if (m.loop) return 'one';
+  if (m.loopQueue) return 'queue';
+  return 'off';
+}
+
+function cycleLoop() {
+  const m = state.modes;
+  const cur = loopState();
+  if (cur === 'off') { m.loopQueue = true; m.loop = false; }
+  else if (cur === 'queue') { m.loopQueue = false; m.loop = true; }
+  else { m.loop = false; m.loopQueue = false; }
+  // kirim dua-duanya agar player selalu konsisten (dua mode tidak pernah nyala bareng)
+  send(PH.MSG.LOOP_QUEUE, { on: m.loopQueue });
+  send(PH.MSG.LOOP, { on: m.loop });
+  syncModeButtons();
+}
+
 function syncModeButtons() {
   const m = state.modes || {};
-  const map = [['btn-loop', m.loop], ['btn-shuffle', m.shuffle], ['btn-loopq', m.loopQueue]];
-  map.forEach(([id, on]) => {
-    const el = document.getElementById(id);
-    if (el) el.classList.toggle('mode-active', !!on);
-  });
+  const loopBtn = document.getElementById('btn-loop');
+  if (loopBtn) {
+    const cur = loopState();
+    loopBtn.classList.toggle('mode-active', cur !== 'off');
+    loopBtn.dataset.mode = cur; // 'off' | 'queue' | 'one'
+    loopBtn.title = cur === 'one' ? 'Loop: lagu ini' :
+      cur === 'queue' ? 'Loop: semua antrian' : 'Loop: mati';
+    const badge = document.getElementById('loop-one-badge');
+    if (badge) badge.classList.toggle('hidden', cur !== 'one');
+    const icon = loopBtn.querySelector('.lucide');
+    if (icon) icon.classList.toggle('lucide-loop-one', cur === 'one');
+  }
+  const shuf = document.getElementById('btn-shuffle');
+  if (shuf) shuf.classList.toggle('mode-active', !!m.shuffle);
 }
 
 function toggleMode(btnId, msgType) {
   const m = state.modes;
   let on;
-  if (msgType === PH.MSG.LOOP) m.loop = !m.loop, on = m.loop;
-  else if (msgType === PH.MSG.SHUFFLE) m.shuffle = !m.shuffle, on = m.shuffle;
-  else m.loopQueue = !m.loopQueue, on = m.loopQueue;
+  if (msgType === PH.MSG.SHUFFLE) m.shuffle = !m.shuffle, on = m.shuffle;
+  else return; // satu-satunya mode via toggleMode sekarang: shuffle
   document.getElementById(btnId).classList.toggle('mode-active', on);
   send(msgType, { on });
 }
@@ -431,8 +467,6 @@ function startScan() {
         const code = jsQR(imageData.data, imageData.width, imageData.height);
         if (code) {
           stopScan();
-          // QR berisi URL seperti http://host/controller/qr.html?pair=CODE
-          // (controller sudah terbuka -> langsung sambung; gate sudah dilewati)
           let extracted = '';
           try {
             const u = new URL(code.data);
@@ -470,16 +504,14 @@ function escapeAttr(t) {
 bindUI();
 refreshIcons();
 
-// auto-connect if pair param present
+// auto-connect
 const params = new URLSearchParams(location.search);
 const pair = params.get('pair');
 if (gateRedirected) {
-  // Sedang dialihkan ke gerbang instalasi (gate-install.html) ->
-  // jangan sambung ke room sebelum lolos gerbang.
+  // dialihkan ke gate-install.html
 } else if (pair) {
   connect(pair);
 } else if (isStandalone) {
-  // Dibuka dari ikon layar utama: hubungkan otomatis ke kode terakhir
   const lastCode = localStorage.getItem('ph_last_code');
   if (lastCode) connect(lastCode);
 }

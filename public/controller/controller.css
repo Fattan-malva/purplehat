@@ -1,6 +1,8 @@
 /* ==========================================================================
    Purplehat Controller — v2 stylesheet
-   Mobile-first. Portrait = stacked. Landscape / wide = 3 columns.
+   Mobile-first.
+   Portrait  : Header | Search | Controller (scroll) | Now Playing (fixed bawah)
+   Landscape : Header | Search | Controller (grid) + Now Playing (bawah)
    ========================================================================== */
 
 :root {
@@ -32,8 +34,6 @@
   padding: 0;
 }
 
-/* html carries the dark colour so no white shows at the top (iOS status bar)
-   or at the bottom (iOS toolbar collapse / overscroll). */
 html {
   background: var(--bg);
   height: 100%;
@@ -55,7 +55,6 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Animated backdrop pinned to the viewport (fixed) — never leaves gaps. */
 body::before {
   content: "";
   position: fixed;
@@ -131,7 +130,6 @@ input:focus-visible {
   }
 }
 
-/* Thin scrollbars that match the theme */
 * {
   scrollbar-width: thin;
   scrollbar-color: rgba(168, 85, 247, 0.35) transparent;
@@ -333,7 +331,7 @@ input:focus-visible {
   background: #000;
 }
 
-/* ---------- Main shell (shared) ---------- */
+/* ---------- Main shell ---------- */
 #main-ui {
   display: none;
 }
@@ -341,27 +339,48 @@ input:focus-visible {
 #main-ui.flex {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   width: 100%;
   max-width: 580px;
   margin: 0 auto;
+  height: calc(100dvh - var(--safe-t) - var(--safe-b) - 28px);
+  overflow: hidden;
 }
 
-#controller-col,
-#search-col,
-#queue-col {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  min-width: 0;
-}
-
-#controller-col>*,
-#search-col>* {
+/* Header di paling atas — tidak ikut scroll */
+#main-ui>.topbar {
   flex-shrink: 0;
 }
 
-/* Header */
+/* Search & controller area */
+#search-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+#controller-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+}
+
+/* Player dock fixed di bawah */
+#player-dock {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* ---------- Header ---------- */
 .topbar {
   display: flex;
   align-items: center;
@@ -434,7 +453,7 @@ input:focus-visible {
   transform: scale(.92);
 }
 
-/* Now playing */
+/* ---------- Now playing ---------- */
 .now {
   position: relative;
   display: flex;
@@ -522,7 +541,6 @@ input:focus-visible {
   margin-bottom: 8px;
 }
 
-/* Progress bar — thin visual, large tap area */
 .progress {
   position: relative;
   height: 8px;
@@ -549,11 +567,11 @@ input:focus-visible {
   box-shadow: 0 0 10px rgba(168, 85, 247, 0.8);
 }
 
-/* Playback controls */
+/* ---------- Playback controls (transport + modes + master) ---------- */
 .controls {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 16px;
   padding: 18px 16px;
 }
 
@@ -640,7 +658,6 @@ input:focus-visible {
   transform: scale(.94);
 }
 
-/* Active state shared by playback modes and source chips (toggled by JS) */
 .mode-active {
   background: rgba(168, 85, 247, 0.25) !important;
   border-color: rgba(168, 85, 247, 0.7) !important;
@@ -648,11 +665,55 @@ input:focus-visible {
   box-shadow: 0 0 12px rgba(168, 85, 247, 0.45);
 }
 
-/* Mixer / FX */
-.card {
+/* ---------- Loop & Shuffle di modal Up Next ---------- */
+.queue-modes {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.btn-mode {
+  position: relative;
+}
+
+.queue-modes .btn-mode {
+  width: 46px;
+  height: 38px;
+}
+
+/* Badge "1" = mode loop satu lagu */
+.loop-one-badge {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  min-width: 13px;
+  padding: 1px 3px;
+  border-radius: 6px;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: center;
+  color: #fff;
+  background: linear-gradient(135deg, #a855f7, #7e22ce);
+  box-shadow: 0 0 8px rgba(168, 85, 247, 0.7);
+  pointer-events: none;
+}
+
+/* Master block digabung ke panel Controls */
+.master-block {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.mix-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .vol-row {
@@ -703,6 +764,13 @@ input:focus-visible {
   border-radius: 10px;
 }
 
+.fx-open {
+  color: var(--accent-hi);
+  border-color: rgba(168, 85, 247, 0.45);
+  background: rgba(168, 85, 247, 0.12);
+}
+
+/* ---------- FX items (di dalam modal) ---------- */
 .fx-item {
   display: flex;
   flex-direction: column;
@@ -842,7 +910,7 @@ input[type="range"]::-moz-range-thumb {
   box-shadow: 0 0 10px rgba(168, 85, 247, 0.8);
 }
 
-/* Search */
+/* ---------- Search ---------- */
 .search {
   position: relative;
   padding: 6px;
@@ -868,7 +936,6 @@ input[type="range"]::-moz-range-thumb {
   border: 1px solid var(--line-soft);
   color: var(--text);
   font-size: 16px;
-  /* prevents iOS zoom on focus */
   outline: none;
   transition: border-color .2s, box-shadow .2s;
 }
@@ -918,15 +985,30 @@ input[type="range"]::-moz-range-thumb {
   color: #fb923c;
 }
 
+/* ---------- Results: tanpa wrapper rounded, scrollbar disembunyikan ---------- */
 .results {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px;
-  max-height: 52vh;
+  gap: 6px;
+  padding: 4px 0 12px;
+  max-height: 46vh;
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-mask-image: linear-gradient(to bottom, #000 88%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 88%, transparent 100%);
+}
+
+.results::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .result-row {
@@ -1032,38 +1114,11 @@ input[type="range"]::-moz-range-thumb {
   color: var(--danger);
 }
 
-/* Queue */
-.queue-col {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px;
-}
-
-.queue-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.queue-head .section-title {
-  font-size: 13px;
-  color: #e4e4e7;
-}
-
-.queue-head .section-title .lucide {
-  color: var(--accent);
-}
-
+/* ---------- Up Next list (di dalam modal) ---------- */
 .queue-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 44vh;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
 }
 
 .queue-item {
@@ -1143,17 +1198,136 @@ input[type="range"]::-moz-range-thumb {
   touch-action: manipulation;
 }
 
-/* Icon glow (kept from original design — Purplehat signature) */
+/* ---------- Floating Up Next ---------- */
+.fab-upnext {
+  position: fixed;
+  right: calc(var(--safe-r) + 16px);
+  bottom: calc(var(--safe-b) + 18px);
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(135deg, #a855f7, #7e22ce);
+  border: 1px solid rgba(192, 132, 252, 0.4);
+  box-shadow: 0 8px 24px rgba(147, 51, 234, 0.5);
+  z-index: 40;
+  transition: transform .15s ease;
+}
+
+.fab-upnext:active {
+  transform: scale(.92);
+}
+
+.fab-upnext .lucide {
+  width: 22px;
+  height: 22px;
+}
+
+.fab-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #f5f3ff;
+  color: #4c1d95;
+  font-size: 11px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+/* ---------- Modal (FX & Up Next) ---------- */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(5, 4, 10, 0.78);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 16px;
+}
+
+.modal-box {
+  width: 100%;
+  max-width: 520px;
+  max-height: 82dvh;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 22px;
+  background: var(--panel-solid);
+  border: 1px solid var(--line);
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.55), 0 0 40px rgba(168, 85, 247, 0.18);
+  animation: modalUp .22s ease;
+}
+
+.modal-box-tall {
+  max-height: 88dvh;
+}
+
+@keyframes modalUp {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  min-height: 0;
+}
+
+/* Up Next: tanpa wrapper rounded, full sampai bawah, shadow di bawah */
+#upnext-modal .queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 0 14px;
+  max-height: none;
+  -webkit-mask-image: linear-gradient(to bottom, #000 88%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 88%, transparent 100%);
+}
+
+/* ---------- Icon glow ---------- */
 .icon-glow {
   filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.65));
 }
 
 /* ==========================================================================
-   LANDSCAPE / WIDE — 3 columns: Controller | Search | Up Next
-   Phones turned sideways (min 640px wide) and tablets/desktops (900px+).
+   LANDSCAPE / WIDE
+   Header (baris atas penuh), lalu grid: Search | Controller, dock di bawah.
    ========================================================================== */
 @media (min-width: 900px),
 (orientation: landscape) and (min-width: 640px) {
+
   body {
     height: 100vh;
     height: 100dvh;
@@ -1163,30 +1337,40 @@ input[type="range"]::-moz-range-thumb {
 
   #main-ui.flex {
     display: grid;
-    grid-template-columns: minmax(280px, 1fr) minmax(0, 1.25fr) minmax(240px, 0.9fr);
-    grid-template-rows: minmax(0, 1fr);
+    grid-template-columns: minmax(280px, 1fr) minmax(0, 1.25fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "header  header"
+      "search  controller"
+      "dock    dock";
     gap: 12px;
     max-width: 1280px;
-    height: 100vh;
     height: calc(100dvh - var(--safe-t) - var(--safe-b) - 24px);
   }
 
-  #controller-col,
-  #search-col,
-  #queue-col {
+  #main-ui>.topbar {
+    grid-area: header;
+  }
+
+  #search-col {
+    grid-area: search;
     min-height: 0;
-    height: 100%;
     overflow: hidden;
   }
 
   #controller-col {
-    overflow-y: auto;
-    padding-right: 4px;
-    margin-right: -4px;
+    grid-area: controller;
+    min-height: 0;
   }
 
-  #search-col {
-    gap: 12px;
+  #player-dock {
+    grid-area: dock;
+    flex-direction: row;
+  }
+
+  #player-dock>.now {
+    flex: 1;
+    min-width: 0;
   }
 
   #search-col .results {
@@ -1195,17 +1379,7 @@ input[type="range"]::-moz-range-thumb {
     max-height: none;
   }
 
-  #queue-col {
-    gap: 10px;
-  }
-
-  #queue-col .queue-list {
-    flex: 1;
-    min-height: 0;
-    max-height: none;
-  }
-
-  /* Compact now-playing + controls so the whole controller fits on a phone */
+  /* Compact now-playing */
   .now {
     padding: 12px;
     gap: 12px;
@@ -1222,7 +1396,7 @@ input[type="range"]::-moz-range-thumb {
   }
 
   .controls {
-    padding: 12px;
+    padding: 14px;
     gap: 12px;
   }
 
@@ -1245,17 +1419,12 @@ input[type="range"]::-moz-range-thumb {
     height: 38px;
   }
 
-  .card {
-    gap: 12px;
-    padding: 14px;
-  }
-
-  .topbar {
-    padding-top: 0;
+  .fab-upnext {
+    bottom: calc(var(--safe-b) + 16px);
   }
 }
 
-/* Very short landscape phones: tighten vertical rhythm further */
+/* Very short landscape phones */
 @media (orientation: landscape) and (max-height: 430px) {
   #controller-col {
     gap: 10px;
@@ -1319,7 +1488,7 @@ input[type="range"]::-moz-range-thumb {
   }
 }
 
-/* Larger portrait tablets: give the stack a bit more air */
+/* Larger portrait tablets */
 @media (min-width: 600px) and (orientation: portrait) {
   #main-ui.flex {
     max-width: 620px;
@@ -1333,15 +1502,8 @@ input[type="range"]::-moz-range-thumb {
     width: 110px;
     height: 110px;
   }
-
-  .queue-list {
-    max-height: 40vh;
-  }
-
-  .results {
-    max-height: 48vh;
-  }
 }
+
 /* ==== Banner pasang aplikasi (PWA) ==== */
 .install-banner {
   margin-top: 16px;
@@ -1384,7 +1546,7 @@ input[type="range"]::-moz-range-thumb {
   padding: 8px 18px;
 }
 
-/* ==== Modal pasang aplikasi (Android, tidak ada tombol close) ==== */
+/* ==== Modal pasang aplikasi ==== */
 .install-modal {
   position: fixed;
   inset: 0;
@@ -1461,7 +1623,6 @@ input[type="range"]::-moz-range-thumb {
   text-align: center;
 }
 
-/* Daftar langkah pasang (dipakai gate-install.html & fallback manual) */
 .gate-steps {
   margin: 0 0 14px;
   padding: 12px 12px 12px 34px;
@@ -1480,10 +1641,7 @@ input[type="range"]::-moz-range-thumb {
 }
 
 /* ==========================================================================
-   qr.html (pendaratan scan QR) & gate-install.html (gerbang instalasi)
-   Keduanya adalah halaman penuh yang dipusatkan di tengah layar.
-   Class specificity (0,1,0) mengalahkan rule `body` biasa,
-   termasuk di media query landscape yang memaksa overflow: hidden.
+   qr.html & gate-install.html
    ========================================================================== */
 .splash-body,
 .gate-body {
@@ -1533,12 +1691,6 @@ input[type="range"]::-moz-range-thumb {
   animation: spin 0.8s linear infinite;
 }
 
-/* ==========================================================================
-   Progress instalasi gate-install.html
-   Bar hanya berpindah tahap saat kejadian NYATA terjadi
-   (beforeinstallprompt -> prompt/userChoice -> appinstalled).
-   Tidak ada timer tebakan.
-   ========================================================================== */
 .gate-progress {
   width: 100%;
   margin-bottom: 16px;
@@ -1561,14 +1713,18 @@ input[type="range"]::-moz-range-thumb {
   transition: width 0.4s ease;
 }
 
-/* Tahap berjalan (menunggu Chrome / prompt terbuka / membuka aplikasi) */
 .gate-progress.is-indeterminate .gate-progress-bar {
   animation: gateProgressSlide 1.4s ease-in-out infinite;
 }
 
 @keyframes gateProgressSlide {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(250%); }
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(250%);
+  }
 }
 
 .gate-progress-label {
@@ -1579,7 +1735,6 @@ input[type="range"]::-moz-range-thumb {
   text-align: center;
 }
 
-/* Tautan teks kecil (bypass langkah manual -> TIDAK membuka controller) */
 .link-btn {
   display: block;
   width: 100%;
@@ -1593,8 +1748,6 @@ input[type="range"]::-moz-range-thumb {
   cursor: pointer;
 }
 
-/* <a class="btn-primary"> di kartu gate -> tampil seperti tombol utama.
-   Anchor inline butuh display:flex agar aturan lebar/padding ikut berlaku. */
 .gate-link {
   display: flex;
   align-items: center;
