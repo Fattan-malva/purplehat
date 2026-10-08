@@ -29,26 +29,16 @@ function getState() {
 }
 
 async function init() {
-  // create / get room
-  try {
-    const res = await fetch('/api/room/create', { method: 'POST' });
-    const data = await res.json();
-    roomCode = data.code;
-    document.getElementById('join-code').textContent = roomCode;
-    const qr = await fetch('/api/qr?text=' + encodeURIComponent(location.origin + '/?pair=' + roomCode));
-    const qrd = await qr.json();
-    const img = document.getElementById('qr-img');
-    img.src = qrd.dataUrl;
-    img.style.display = 'block';
-  } catch (e) {
-    document.getElementById('status').textContent = 'Status: Gagal membuat room';
+  roomCode = sessionStorage.getItem('ph_code');
+  if (!roomCode) {
+    // Belum ada pairing, kembali ke menu awal
+    location.href = 'index.html';
     return;
   }
 
   ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/?role=screen&code=' + roomCode);
   // ws uses same server; express static + ws both on http server; ws path is just host root
   ws.onopen = () => {
-    document.getElementById('status').textContent = 'Status: Terhubung - scan QR / masukkan kode di HP';
     broadcastState();
   };
   ws.onerror = () => {
@@ -80,21 +70,12 @@ function handleMessage(msg) {
     case PH.MSG.VOLUME: setVolume(p.vol); break;
     case PH.MSG.REQUEST_STATE: broadcastState(); break;
     case PH.MSG.CONTROLLER_JOINED:
-      setOverlayVisible(false);
       break;
     case PH.MSG.CONTROLLER_LEFT:
-      setOverlayVisible(true);
+      // Controller putus -> kembali ke menu awal
+      location.href = 'index.html';
       break;
   }
-}
-
-// Saat ada controller terhubung, layar hanya menampilkan player.
-// Antrian & QR kembali muncul kalau semua controller putus / logout.
-function setOverlayVisible(visible) {
-  document.getElementById('overlay').style.display = visible ? '' : 'none';
-  document.body.classList.toggle('immersive', !visible);
-  const logoutBtn = document.getElementById('screen-logout');
-  if (logoutBtn) logoutBtn.classList.toggle('hidden', visible);
 }
 
 function addSong(videoId, title) {
@@ -118,6 +99,29 @@ function removeSong(index) {
 
 var pendingVideoId = null;
 
+// Putar video; kalau autoplay diblokir browser, coba mute dulu lalu unmute setelah jalan
+function forcePlay() {
+  if (!player || !player.playVideo) return;
+  try { player.playVideo(); } catch {}
+  setTimeout(() => {
+    try {
+      const s = player.getPlayerState ? player.getPlayerState() : -1;
+      if (s !== YT.PlayerState.PLAYING) {
+        player.mute();
+        player.playVideo();
+        const unmute = setInterval(() => {
+          try {
+            if (player.getPlayerState && player.getPlayerState() === YT.PlayerState.PLAYING) {
+              clearInterval(unmute);
+              player.unMute();
+            }
+          } catch { clearInterval(unmute); }
+        }, 300);
+      }
+    } catch {}
+  }, 800);
+}
+
 function playNext() {
   if (queue.length === 0) {
     currentIndex = -1;
@@ -130,6 +134,7 @@ function playNext() {
   const song = queue[currentIndex];
   if (player && player.loadVideoById) {
     player.loadVideoById({ videoId: song.videoId, suggestedQuality: 'hd720' });
+    setTimeout(forcePlay, 500);
   } else {
     // Player belum siap (YouTube IFrame API belum selesai load)
     pendingVideoId = song.videoId;
@@ -186,7 +191,7 @@ function onYouTubeIframeAPIReady() {
   player = new YT.Player('player', {
     height: '100%', width: '100%',
     playerVars: {
-      autoplay: 0,
+      autoplay: 1,
       controls: 0,
       modestbranding: 1,
       rel: 0,
@@ -196,16 +201,22 @@ function onYouTubeIframeAPIReady() {
     },
     events: {
       onReady: () => {
-        document.getElementById('status').textContent += ' | Player siap';
+        // Izinkan autoplay pada iframe YouTube (penting untuk WebView)
+        try {
+          const iframe = document.querySelector('#player iframe');
+          if (iframe) iframe.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture; fullscreen');
+        } catch {}
         // Load lagu yang ditambahkan sebelum player siap
         if (pendingVideoId) {
           player.loadVideoById({ videoId: pendingVideoId, suggestedQuality: 'hd720' });
           pendingVideoId = null;
+          setTimeout(forcePlay, 500);
         }
       },
       onStateChange: (e) => {
         isPlaying = e.data === YT.PlayerState.PLAYING;
         if (e.data === YT.PlayerState.ENDED) playNext();
+        if (e.data === YT.PlayerState.CUED || e.data === YT.PlayerState.UNSTARTED) forcePlay();
         broadcastState();
       },
       onError: (e) => {
@@ -235,5 +246,6 @@ setInterval(broadcastState, 5000);
 document.getElementById('screen-logout').addEventListener('click', () => {
   try { if (ws) ws.close(); } catch {}
   try { if (player && player.stopVideo) player.stopVideo(); } catch {}
-  location.reload();
+  sessionStorage.removeItem('ph_code'); // reset pairing code
+  location.href = 'index.html';
 });

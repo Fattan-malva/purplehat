@@ -3,39 +3,43 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Purplehat - Screen (Player)</title>
+  <title>Purplehat - Connect Screen</title>
   <link rel="stylesheet" href="screen.css">
-  <script src="/shared/protocol.js"></script></head>
+  <script src="/shared/protocol.js"></script>
+</head>
 <body>
-  <div class="container">
+  <div class="container menu-container">
     <header class="brand">
       <div class="brand-logo"><i class="fas fa-hat-wizard"></i></div>
       <h1>PURPLE<span>HAT</span></h1>
-      <button id="screen-logout" class="hidden logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</button>
     </header>
 
-    <div id="player-wrapper">
-      <div id="player"></div>
+    <div class="pair-banner glass-panel">
+      <div class="pair-code">Kode Pairing: <span id="join-code">-</span></div>
+      <img id="qr-img" alt="QR Pairing">
+      <div id="status">Status: Menyiapkan...</div>
     </div>
 
-    <div id="overlay">
-      <div class="info glass-panel">
-        <div id="now-playing">Menunggu lagu pertama...</div>
-        <div id="queue-count">Antrian: 0</div>
-        <div id="status">Status: Menyiapkan...</div>
-        <div id="pairing">
-          <div class="pair-code">Kode: <span id="join-code">-</span></div>
-          <img id="qr-img" alt="QR Pairing">
+    <div class="promo-slider">
+      <div class="slides" id="slides">
+        <div class="slide slide-1">
+          <h2>🎤 Karaoke Bareng</h2>
+          <p>Hubungkan HP kamu & mulai nyanyi sekarang.</p>
+        </div>
+        <div class="slide slide-2">
+          <h2>🎶 Antrian Pintar</h2>
+          <p>Pilih lagu, atur urutan, tanpa rebutan mic.</p>
+        </div>
+        <div class="slide slide-3">
+          <h2>🔥 Malam Karaoke</h2>
+          <p>Ajak teman & keluarga, party jadi makin seru!</p>
         </div>
       </div>
-      <div class="queue glass-panel">
-        <h3>Antrian Berikutnya</h3>
-        <ul id="queue-list"></ul>
-      </div>
+      <div class="dots" id="dots"></div>
     </div>
   </div>
 
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <script src="screen.js"></script>
+  <script src="menu.js"></script>
 </body>
 </html>
