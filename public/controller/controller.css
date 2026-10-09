@@ -380,6 +380,32 @@ input:focus-visible {
   flex-shrink: 0;
 }
 
+/* Kolom Up Next: hanya tampil saat landscape (portrait tetap pakai modal) */
+#upnext-col {
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+#upnext-col .col-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+#upnext-col #queue-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  gap: 6px;
+  padding: 2px 0 12px;
+}
+
 /* ---------- Header ---------- */
 .topbar {
   display: flex;
@@ -1416,8 +1442,8 @@ input[type="range"]::-moz-range-thumb {
 }
 
 /* ==========================================================================
-   LANDSCAPE / WIDE
-   Header (baris atas penuh), lalu grid: Search | Controller, dock di bawah.
+   LANDSCAPE / WIDE — 3 kolom berjajar: Up Next | Search | Controller
+   Mengisi penuh layar (tanpa sisa kosong kiri/kanan).
    ========================================================================== */
 @media (min-width: 900px),
 (orientation: landscape) and (min-width: 640px) {
@@ -1425,35 +1451,46 @@ input[type="range"]::-moz-range-thumb {
   body {
     height: 100vh;
     height: 100dvh;
-    padding: calc(var(--safe-t) + 12px) calc(var(--safe-r) + 14px) calc(var(--safe-b) + 12px) calc(var(--safe-l) + 14px);
+    padding: calc(var(--safe-t) + 10px) calc(var(--safe-r) + 12px) calc(var(--safe-b) + 10px) calc(var(--safe-l) + 12px);
     overflow: hidden;
   }
 
   #main-ui.flex {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 1.15fr);
+    grid-template-rows: auto minmax(0, 1fr);
     grid-template-areas:
-      "header"
-      "search"
-      "dock";
+      "header header header"
+      "upnext search control";
     gap: 12px;
-    max-width: 760px;
-    height: calc(100dvh - var(--safe-t) - var(--safe-b) - 24px);
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    height: calc(100dvh - var(--safe-t) - var(--safe-b) - 20px);
   }
 
   #main-ui>.topbar {
     grid-area: header;
   }
 
+  /* Kolom kiri: Up Next */
+  #upnext-col {
+    grid-area: upnext;
+    display: flex;
+  }
+
+  /* Kolom tengah: hasil pencarian */
   #search-col {
     grid-area: search;
     min-height: 0;
     overflow: hidden;
-  }
-
-  #player-dock {
-    grid-area: dock;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 22px;
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+    padding: 14px;
   }
 
   #search-col .results {
@@ -1462,44 +1499,46 @@ input[type="range"]::-moz-range-thumb {
     max-height: none;
   }
 
-  /* Dock menyusun ulang: info lagu kiri, transport+master kanan (dinamis
-     memanfaatkan lebar layar), progress tipis di bawah selebar panel. */
-  .dock {
-    grid-template-areas:
-      "now  tools"
-      "bar  bar";
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 8px 16px;
-    padding: 12px 16px;
+  /* Kolom kanan: controller (Now + transport + volume) mengisi penuh kolom */
+  #player-dock {
+    grid-area: control;
+    display: flex;
+    min-height: 0;
   }
 
-  .art {
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
+  /* Di landscape Up Next sudah jadi kolom -> FAB tidak diperlukan */
+  #player-dock>.fab-upnext {
+    display: none;
   }
 
-  .now-title {
-    font-size: 15px;
+  #player-dock .dock {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 18px;
   }
 
   .dock-tools {
-    justify-content: flex-end;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
   }
 
   .transport {
+    justify-content: center;
     gap: 12px;
   }
 
   .btn-play {
-    width: 50px;
-    height: 50px;
+    width: 54px;
+    height: 54px;
   }
 
   .btn-play .lucide {
-    width: 20px;
-    height: 20px;
+    width: 22px;
+    height: 22px;
   }
 
   .btn-round {
@@ -1507,9 +1546,34 @@ input[type="range"]::-moz-range-thumb {
     height: 40px;
   }
 
+  .master-inline {
+    justify-content: center;
+    gap: 6px;
+  }
+
+  /* Hemat ruang di kolom sempit: indikator cukup dari bar volume */
+  .master-inline .val-mini {
+    display: none;
+  }
+
+  .master-inline .btn-step.sm {
+    width: 34px;
+    height: 34px;
+  }
+
   .master-inline .bar {
-    min-width: 56px;
-    max-width: 110px;
+    min-width: 24px;
+    max-width: none;
+  }
+
+  .art {
+    width: 50px;
+    height: 50px;
+    border-radius: 12px;
+  }
+
+  .now-title {
+    font-size: 15px;
   }
 
   .btn-mode {
@@ -1519,9 +1583,13 @@ input[type="range"]::-moz-range-thumb {
 
 /* Very short landscape phones */
 @media (orientation: landscape) and (max-height: 430px) {
-  .dock {
-    gap: 6px;
-    padding: 8px 12px;
+  #main-ui.flex {
+    gap: 8px;
+  }
+
+  #player-dock .dock {
+    gap: 8px;
+    padding: 12px;
   }
 
   .dock-now {
@@ -1529,8 +1597,8 @@ input[type="range"]::-moz-range-thumb {
   }
 
   .art {
-    width: 36px;
-    height: 36px;
+    width: 40px;
+    height: 40px;
     border-radius: 10px;
   }
 
@@ -1547,7 +1615,7 @@ input[type="range"]::-moz-range-thumb {
   }
 
   .dock-tools {
-    gap: 8px;
+    gap: 10px;
   }
 
   .transport {
@@ -1555,8 +1623,8 @@ input[type="range"]::-moz-range-thumb {
   }
 
   .btn-play {
-    width: 44px;
-    height: 44px;
+    width: 46px;
+    height: 46px;
   }
 
   .btn-round {
@@ -1564,9 +1632,52 @@ input[type="range"]::-moz-range-thumb {
     height: 36px;
   }
 
+  .master-inline .btn-step.sm {
+    width: 32px;
+    height: 32px;
+  }
+
   .master-inline .bar {
-    min-width: 40px;
-    max-width: 72px;
+    min-width: 20px;
+    max-width: none;
+  }
+
+  /* Up Next ringkas: perkecil item, sembunyikan reorder agar judul tetap
+     terbaca dan tidak ada overflow di kolom sempit. Hapus tetap ada. */
+  #upnext-col #queue-list {
+    gap: 6px;
+  }
+
+  .queue-item {
+    gap: 6px;
+    padding: 6px;
+    border-radius: 12px;
+  }
+
+  .queue-item .thumb.sm {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+  }
+
+  .queue-actions {
+    gap: 3px;
+  }
+
+  .q-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+  }
+
+  .q-btn .lucide {
+    width: 14px;
+    height: 14px;
+  }
+
+  .queue-item .q-btn[data-act="up"],
+  .queue-item .q-btn[data-act="down"] {
+    display: none;
   }
 }
 

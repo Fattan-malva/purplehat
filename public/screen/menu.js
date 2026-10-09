@@ -38,7 +38,13 @@ async function init() {
   ws.onmessage = (e) => {
     let msg;
     try { msg = JSON.parse(e.data); } catch { return; }
-    if (msg.type === PH.MSG.CONTROLLER_JOINED) {
+    // Pindah ke player begitu ada controller. Selain controller_joined dari
+    // server, balasan JOIN/REQUEST_STATE dari controller juga dipakai sebagai
+    // jaring pengaman kalau event controller_joined sempat hilang (race saat
+    // layar baru terhubung setelah controller).
+    if (msg.type === PH.MSG.CONTROLLER_JOINED ||
+        msg.type === PH.MSG.JOIN ||
+        msg.type === PH.MSG.REQUEST_STATE) {
       location.href = 'player.html';
     }
   };

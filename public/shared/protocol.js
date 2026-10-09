@@ -21,7 +21,12 @@ const MSG = {
   NOW_PLAYING: 'now_playing',
   ERROR: 'error',
   CONTROLLER_JOINED: 'controller_joined',
-  CONTROLLER_LEFT: 'controller_left'
+  CONTROLLER_LEFT: 'controller_left',
+  // Logout sengaja dari controller (bukan sekadar koneksi putus):
+  // layar akan menghapus room + regenerate kode baru.
+  CONTROLLER_LOGOUT: 'controller_logout',
+  // Room dihapus di server -> controller kembali ke layar pairing.
+  ROOM_CLOSED: 'room_closed'
 };
 
 function createMsg(type, payload = {}) {

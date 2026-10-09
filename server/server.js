@@ -128,7 +128,7 @@ function makeCode() {
 
 function getRoom(code) {
   if (!rooms[code]) {
-    rooms[code] = { code, createdAt: Date.now(), queue: [], currentIndex: -1, playing: false, volume: 80, position: 0, duration: 0 };
+    rooms[code] = { code, createdAt: Date.now(), queue: [], currentIndex: -1, playing: false, volume: 30, position: 0, duration: 0 };
     saveData({ rooms });
   }
   return rooms[code];
@@ -206,6 +206,20 @@ app.delete('/api/room/:code', (req, res) => {
     delete rooms[code];
     saveData({ rooms });
   }
+  // Beri tahu controller di room ini lalu tutup socket-nya, supaya tidak
+  // menggantung di room yang sudah dihapus (mis. layar logout saat HP masih
+  // terhubung). Controller akan kembali ke layar pairing.
+  sockets.forEach((meta, sock) => {
+    if (meta.code !== code) return;
+    if (meta.role === 'controller') {
+      try {
+        if (sock.readyState === WebSocket.OPEN) {
+          sock.send(JSON.stringify({ type: 'room_closed', payload: {}, ts: Date.now() }));
+        }
+      } catch (e) {}
+    }
+    try { sock.close(); } catch (e) {}
+  });
   res.json({ ok: true });
 });
 
@@ -235,6 +249,18 @@ wss.on('connection', (ws, req) => {
 
   if (role === 'controller') {
     broadcastToRoom(code, { type: 'controller_joined', payload: {}, ts: Date.now() }, 'controller');
+  } else if (role === 'screen') {
+    // Kalau sudah ada controller di room ini (mis. controller connect lebih
+    // dulu daripada socket layar), beri tahu layar yang baru terhubung supaya
+    // ia langsung pindah ke player.html. Menutup celah race yang membuat layar
+    // macet di halaman QR.
+    let hasController = false;
+    sockets.forEach((meta) => {
+      if (meta !== ws && meta.code === code && meta.role === 'controller') hasController = true;
+    });
+    if (hasController) {
+      try { ws.send(JSON.stringify({ type: 'controller_joined', payload: {}, ts: Date.now() })); } catch (e) {}
+    }
   }
 
   ws.on('message', (raw) => {

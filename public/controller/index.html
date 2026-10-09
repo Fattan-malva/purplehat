@@ -21,7 +21,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="controller.css?v=20261009g">
+    <link rel="stylesheet" href="controller.css?v=20261009i">
 
     <script>
         // ==== ATURAN KERAS: controller hanya boleh tampil sebagai aplikasi ====
@@ -48,7 +48,7 @@
     </script>
 
     <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
-    <script src="/shared/protocol.js"></script>
+    <script src="/shared/protocol.js?v=20261009a"></script>
     <script src="/vendor/jsqr/dist/jsQR.js"></script>
 </head>
 
@@ -104,6 +104,17 @@
                 <i data-lucide="log-out"></i>
             </button>
         </header>
+
+        <!-- ===== UP NEXT ===== 
+             Portrait : tetap modal (dibuka lewat FAB) — #queue-modes & #queue-list
+                        berada di dalam #upnext-modal.
+             Landscape: JS memindahkan #queue-modes & #queue-list ke sini supaya
+                        jadi kolom kiri (3 kolom berjajar). -->
+        <section id="upnext-col" class="panel" aria-label="Up Next">
+            <div class="col-head">
+                <h3 class="section-title"><i data-lucide="list-music"></i> Up Next</h3>
+            </div>
+        </section>
 
         <!-- ===== SEARCH ===== -->
         <section id="search-col">
@@ -251,7 +262,7 @@
         <div class="modal-box modal-box-tall">
             <div class="modal-head">
                 <h3 class="section-title"><i data-lucide="list-music"></i> Up Next</h3>
-                <div class="queue-modes">
+                <div class="queue-modes" id="queue-modes">
                     <button id="btn-loop" class="btn-mode" data-mode="off" title="Loop: mati" aria-label="Loop">
                         <i data-lucide="repeat"></i>
                         <span id="loop-one-badge" class="loop-one-badge hidden">1</span>
@@ -283,7 +294,7 @@
             pitchDisplay.classList.toggle('is-on', currentPitch !== 0);
         }
     </script>
-    <script src="controller.js?v=20261009f"></script>
+    <script src="controller.js?v=20261009h"></script>
 </body>
 
 </html>

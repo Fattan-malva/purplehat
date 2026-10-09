@@ -17,6 +17,9 @@ if (!isStandalone && (/(Android|iPhone|iPad|iPod|Mobile)/i.test(navigator.userAg
 var ws;
 var roomCode = null;
 var fallbackMode = false;
+var reconnectAttempts = 0;
+var suppressReconnect = false;
+var reconnectTimer = null;
 var state = { current: null, queue: [], playing: false, position: 0, duration: 0, volume: 30, modes: { loop: false, shuffle: false, loopQueue: false } };
 const API_BASE = localStorage.getItem('ph_api_base') || '';
 var searchSource = 'youtube'; // 'youtube' | 'soundcloud'
@@ -62,6 +65,11 @@ function connect(code) {
     .catch((e) => {
       statusEl.style.color = '#f87171';
       statusEl.textContent = e.message || 'Kode tidak valid';
+      // Kode basi (room sudah dihapus/regenerate) -> buang supaya tidak
+      // dipakai auto-connect lagi.
+      if (/tidak ditemukan/i.test(e.message || '')) {
+        localStorage.removeItem('ph_last_code');
+      }
     });
 }
 
@@ -72,12 +80,32 @@ function showMainUI() {
   document.getElementById('pair-screen').classList.add('hidden');
 }
 
+// Kembali ke layar pairing + reset state lokal.
+function showPairScreen() {
+  fallbackMode = false;
+  roomCode = null;
+  const main = document.getElementById('main-ui');
+  main.classList.add('hidden');
+  main.classList.remove('flex');
+  document.getElementById('pair-screen').classList.remove('hidden');
+  document.getElementById('pair-status').classList.add('hidden');
+  document.getElementById('pair-code-input').value = '';
+  document.getElementById('results').classList.add('hidden');
+  setStatus('Belum terhubung');
+  document.getElementById('queue-badge').textContent = '0';
+  state = { current: null, queue: [], playing: false, position: 0, duration: 0, volume: 30, modes: { loop: false, shuffle: false, loopQueue: false } };
+  updateVolUI();
+  syncModeButtons();
+}
+
 function openSocket(attempt) {
   const statusEl = document.getElementById('pair-status');
   const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
   ws = new WebSocket(proto + location.host + '/?role=controller&code=' + roomCode);
 
   ws.onopen = () => {
+    reconnectAttempts = 0;
+    suppressReconnect = false;
     setStatus('Terhubung ke <b class="status-code">' + roomCode + '</b>');
     showMainUI();
     send(PH.MSG.JOIN, {});
@@ -91,8 +119,12 @@ function openSocket(attempt) {
     statusEl.textContent = 'Realtime gagal. Coba lagi...';
   };
   ws.onclose = () => {
+    if (suppressReconnect) return;
     if (ws._opened) {
-      setStatus('Terputus');
+      // Sudah pernah tersambung lalu putus (HP tidur / sinyal) -> sambung
+      // ulang otomatis supaya layar tidak ikut kehilangan controller.
+      setStatus('Terputus. Menyambung ulang...');
+      scheduleReconnect();
     } else if (attempt < 3) {
       statusEl.textContent = 'Hubungan realtime gagal (percobaan ' + (attempt + 1) + '). Mencoba lagi...';
       setTimeout(() => openSocket(attempt + 1), 1000);
@@ -106,6 +138,20 @@ function openSocket(attempt) {
     }
   };
   ws.addEventListener('open', () => { ws._opened = true; });
+}
+
+// Coba sambung ulang beberapa kali setelah koneksi yang sudah terbuka putus.
+function scheduleReconnect() {
+  if (suppressReconnect || !roomCode) return;
+  if (reconnectAttempts >= 5) {
+    showPairScreen();
+    return;
+  }
+  reconnectAttempts++;
+  clearTimeout(reconnectTimer);
+  reconnectTimer = setTimeout(() => {
+    if (!suppressReconnect && roomCode) openSocket(0);
+  }, 1500);
 }
 
 function pollState() {
@@ -142,6 +188,12 @@ function handleMessage(msg) {
       break;
     case PH.MSG.ERROR:
       console.error(p);
+      break;
+    case PH.MSG.ROOM_CLOSED:
+      // Room dihapus (mis. layar logout) -> kembali ke layar pairing.
+      suppressReconnect = true;
+      localStorage.removeItem('ph_last_code');
+      showPairScreen();
       break;
   }
 }
@@ -192,24 +244,16 @@ function bindUI() {
   document.getElementById('scan-btn').addEventListener('click', startScan);
   document.getElementById('scan-stop-btn').addEventListener('click', stopScan);
 
-  // Logout controller
+  // Logout controller: beri tahu layar supaya room dihapus + kode di-regenerate
   document.getElementById('btn-logout').addEventListener('click', () => {
-    try { if (ws) ws.close(); } catch {}
+    suppressReconnect = true;
+    clearTimeout(reconnectTimer);
+    // Kirim sinyal logout sengaja SEBELUM menutup socket (layar akan reset).
+    try { send(PH.MSG.CONTROLLER_LOGOUT, {}); } catch (e) {}
+    localStorage.removeItem('ph_last_code');
     try { stopScan(); } catch {}
-    fallbackMode = false;
-    roomCode = null;
-    const main = document.getElementById('main-ui');
-    main.classList.add('hidden');
-    main.classList.remove('flex');
-    document.getElementById('pair-screen').classList.remove('hidden');
-    document.getElementById('pair-status').classList.add('hidden');
-    document.getElementById('pair-code-input').value = '';
-    document.getElementById('results').classList.add('hidden');
-    setStatus('Belum terhubung');
-    document.getElementById('queue-badge').textContent = '0';
-    state = { current: null, queue: [], playing: false, position: 0, duration: 0, volume: 30, modes: { loop: false, shuffle: false, loopQueue: false } };
-    updateVolUI();
-    syncModeButtons();
+    setTimeout(() => { try { if (ws) ws.close(); } catch {} }, 60);
+    showPairScreen();
   });
 
   // ==== Modal: FX & Up Next ====
@@ -581,6 +625,35 @@ function extractPairFromQr(data) {
 
 bindUI();
 refreshIcons();
+
+// ==== Susunan Up Next: modal (portrait) atau kolom kiri (landscape) ====
+// #queue-modes & #queue-list adalah elemen yang sama, dipindahkan (reparent)
+// sesuai orientasi supaya tidak ada duplikasi logika/render.
+var mqWide = window.matchMedia('(min-width: 900px), (orientation: landscape) and (min-width: 640px)');
+
+function layoutUpNext() {
+  var col = document.getElementById('upnext-col');
+  var modes = document.getElementById('queue-modes');
+  var list = document.getElementById('queue-list');
+  var modalBox = document.querySelector('#upnext-modal .modal-box');
+  if (!col || !modes || !list || !modalBox) return;
+  var modalHead = modalBox.querySelector('.modal-head');
+  var colHead = col.querySelector('.col-head');
+  if (!modalHead || !colHead) return;
+  if (mqWide.matches) {
+    colHead.appendChild(modes);
+    col.appendChild(list);
+  } else {
+    var closeBtn = modalHead.querySelector('[data-close]');
+    modalHead.insertBefore(modes, closeBtn);
+    modalBox.appendChild(list);
+  }
+}
+
+layoutUpNext();
+window.addEventListener('resize', layoutUpNext);
+if (mqWide.addEventListener) mqWide.addEventListener('change', layoutUpNext);
+else if (mqWide.addListener) mqWide.addListener(layoutUpNext);
 
 // auto-connect
 const params = new URLSearchParams(location.search);

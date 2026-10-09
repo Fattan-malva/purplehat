@@ -176,11 +176,39 @@ function handleMessage(msg) {
     case PH.MSG.LOOP_QUEUE: modeLoopQueue = !!p.on; broadcastState(); break;
     case PH.MSG.MOVE_SONG: moveSong(p.index, p.dir); break;
     case PH.MSG.CONTROLLER_JOINED:
+      document.getElementById('status').textContent = 'Status: Controller terhubung';
       break;
     case PH.MSG.CONTROLLER_LEFT:
-      // Controller putus -> kembali ke menu awal
-      location.href = 'index.html';
+      // Controller putus mendadak (HP mati / sinyal hilang) BUKAN logout
+      // sengaja. Jangan hentikan apa pun: biarkan playlist yang sedang
+      // berjalan diselesaikan dulu sampai habis, baru idle. Layar tetap
+      // hidup dan menunggu controller tersambung lagi.
+      document.getElementById('status').textContent = 'Status: Controller terputus - menunggu sambungan ulang...';
       break;
+    case PH.MSG.CONTROLLER_LOGOUT:
+      // Logout sengaja dari controller: reset total + regenerate kode.
+      fullLogout();
+      break;
+  }
+}
+
+// Logout penuh (dipakai saat controller logout sengaja atau tombol logout
+// layar): matikan pemutar, hapus room, buang kode, lalu kembali ke menu QR
+// yang akan otomatis membuat kode room BARU.
+function fullLogout() {
+  closeFrame();
+  try { if (ws) ws.close(); } catch (e) {}
+  const code = roomCode;
+  sessionStorage.removeItem('ph_code');
+  let done = false;
+  const go = () => { if (!done) { done = true; location.href = 'index.html'; } };
+  if (code) {
+    // Best-effort hapus room; tetap lanjut walau gagal (kode tetap regenerate
+    // karena ph_code sudah dibuang).
+    fetch('/api/room/' + code, { method: 'DELETE' }).catch(() => {}).finally(go);
+    setTimeout(go, 700);
+  } else {
+    go();
   }
 }
 
@@ -376,14 +404,7 @@ setVolume(volume);
 init();
 setInterval(broadcastState, 5000);
 
-// Logout player: berhentikan frame, hapus room di server + kembali ke tampilan awal
+// Logout player: pakai fullLogout (matikan frame, hapus room, regenerate kode)
 document.getElementById('screen-logout').addEventListener('click', () => {
-  try { if (ws) ws.close(); } catch {}
-  sendFrame({ cmd: 'stop' });
-  const code = roomCode;
-  if (code) {
-    fetch('/api/room/' + code, { method: 'DELETE' }).catch(() => {});
-  }
-  sessionStorage.removeItem('ph_code'); // reset pairing code
-  location.href = 'index.html';
+  fullLogout();
 });
