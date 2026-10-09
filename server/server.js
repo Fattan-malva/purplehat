@@ -134,6 +134,32 @@ function getRoom(code) {
   return rooms[code];
 }
 
+// ==== Presence long-poll =====================================================
+// Halaman QR layar "menunggu controller" TANPA koneksi idle yang bisa mati:
+// ia memanggil GET /api/room/:code/presence. Request ditahan di sini sampai ada
+// controller connect (dibalas seketika) atau timeout (~25 detik, lalu dicoba
+// lagi). Karena setiap request punya umur terbatas, koneksi mati = request gagal
+// = otomatis retry, sehingga event pairing tidak pernah kelewat.
+const presenceWaiters = new Map(); // code -> Set<{ res, timer }>
+
+function roomHasController(code) {
+  let found = false;
+  sockets.forEach((meta) => {
+    if (meta.code === code && meta.role === 'controller') found = true;
+  });
+  return found;
+}
+
+function flushPresence(code) {
+  const set = presenceWaiters.get(code);
+  if (!set) return;
+  presenceWaiters.delete(code);
+  set.forEach((w) => {
+    clearTimeout(w.timer);
+    try { w.res.json({ hasController: true }); } catch (e) {}
+  });
+}
+
 var saveTimer = null;
 
 function persistRoom(code) {
@@ -166,6 +192,31 @@ app.post('/api/room/create', (req, res) => {
     ? process.env.PUBLIC_URL.replace(/\/$/, '')
     : (req.protocol + '://' + (forwardedHost || req.get('host'))).replace(/\/$/, '');
   res.json({ code, qr: finalBase + '/controller/qr.html?pair=' + code, baseUrl: finalBase });
+});
+
+// API: presence long-poll (dipakai halaman QR layar untuk menunggu controller).
+// Balas segera bila controller sudah ada; kalau belum, tahan sampai ~25 detik.
+app.get('/api/room/:code/presence', (req, res) => {
+  const code = req.params.code.toUpperCase();
+  res.setHeader('Cache-Control', 'no-store');
+  if (roomHasController(code)) return res.json({ hasController: true });
+
+  const waiter = { res, timer: null };
+  waiter.timer = setTimeout(() => {
+    const s = presenceWaiters.get(code);
+    if (s) { s.delete(waiter); if (!s.size) presenceWaiters.delete(code); }
+    try { res.json({ hasController: false }); } catch (e) {}
+  }, 25000);
+
+  let set = presenceWaiters.get(code);
+  if (!set) { set = new Set(); presenceWaiters.set(code, set); }
+  set.add(waiter);
+
+  req.on('close', () => {
+    clearTimeout(waiter.timer);
+    const s = presenceWaiters.get(code);
+    if (s) { s.delete(waiter); if (!s.size) presenceWaiters.delete(code); }
+  });
 });
 
 // API: check room (full state for polling fallback)
@@ -249,6 +300,8 @@ wss.on('connection', (ws, req) => {
 
   if (role === 'controller') {
     broadcastToRoom(code, { type: 'controller_joined', payload: {}, ts: Date.now() }, 'controller');
+    // Bangunkan halaman QR yang sedang long-poll presence untuk room ini.
+    flushPresence(code);
   } else if (role === 'screen') {
     // Kalau sudah ada controller di room ini (mis. controller connect lebih
     // dulu daripada socket layar), beri tahu layar yang baru terhubung supaya

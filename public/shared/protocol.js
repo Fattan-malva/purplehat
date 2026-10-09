@@ -22,8 +22,8 @@ const MSG = {
   ERROR: 'error',
   CONTROLLER_JOINED: 'controller_joined',
   CONTROLLER_LEFT: 'controller_left',
-  // Logout sengaja dari controller (bukan sekadar koneksi putus):
-  // layar akan menghapus room + regenerate kode baru.
+  // Logout sengaja dari controller. Layar TIDAK me-reset: room tetap hidup
+  // agar controller bisa menyambung lagi dengan kode yang sama.
   CONTROLLER_LOGOUT: 'controller_logout',
   // Room dihapus di server -> controller kembali ke layar pairing.
   ROOM_CLOSED: 'room_closed'

@@ -186,8 +186,11 @@ function handleMessage(msg) {
       document.getElementById('status').textContent = 'Status: Controller terputus - menunggu sambungan ulang...';
       break;
     case PH.MSG.CONTROLLER_LOGOUT:
-      // Logout sengaja dari controller: reset total + regenerate kode.
-      fullLogout();
+      // Logout sengaja dari controller TIDAK lagi me-reset layar. Sesi/room
+      // tetap hidup supaya controller bisa menyambung lagi dengan kode yang
+      // sama; layar hanya menandai bahwa controller pergi (seperti putus
+      // mendadak). Room baru dihapus saat player logout / form ditutup.
+      document.getElementById('status').textContent = 'Status: Controller logout - menunggu sambungan ulang...';
       break;
   }
 }

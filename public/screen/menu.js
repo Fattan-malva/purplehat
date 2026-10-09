@@ -1,12 +1,12 @@
 // Purplehat Screen Menu - tampilan awal (QR pairing + slider promo)
-var ws;
+//
+// Menunggu controller memakai LONG-POLL presence, bukan WebSocket idle:
+// layar memanggil GET /api/room/:code/presence; server menahan request itu
+// sampai ada controller yang connect (langsung dibalas) atau timeout, lalu
+// layar langsung minta lagi. Tidak ada koneksi diam yang bisa mati diam-diam,
+// jadi event pairing tidak pernah kelewat walau layar didiamkan lama.
 var roomCode = sessionStorage.getItem('ph_code');
-
-function send(type, payload) {
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify(PH.createMsg(type, payload)));
-  }
-}
+var navigating = false;
 
 async function init() {
   try {
@@ -23,34 +23,39 @@ async function init() {
     const img = document.getElementById('qr-img');
     img.src = qrd.dataUrl;
     img.style.display = 'block';
+    document.getElementById('status').textContent = 'Status: Menunggu controller...';
   } catch (e) {
     document.getElementById('status').textContent = 'Status: Gagal membuat room';
     return;
   }
+  waitForController();
+}
 
-  ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/?role=screen&code=' + roomCode);
-  ws.onopen = () => {
-    document.getElementById('status').textContent = 'Status: Menunggu controller...';
-  };
-  ws.onerror = () => {
-    document.getElementById('status').textContent = 'Status: Realtime gagal';
-  };
-  ws.onmessage = (e) => {
-    let msg;
-    try { msg = JSON.parse(e.data); } catch { return; }
-    // Pindah ke player begitu ada controller. Selain controller_joined dari
-    // server, balasan JOIN/REQUEST_STATE dari controller juga dipakai sebagai
-    // jaring pengaman kalau event controller_joined sempat hilang (race saat
-    // layar baru terhubung setelah controller).
-    if (msg.type === PH.MSG.CONTROLLER_JOINED ||
-        msg.type === PH.MSG.JOIN ||
-        msg.type === PH.MSG.REQUEST_STATE) {
-      location.href = 'player.html';
-    }
-  };
-  ws.onclose = () => {
-    document.getElementById('status').textContent = 'Status: Terputus - refresh halaman';
-  };
+function goToPlayer() {
+  if (navigating) return;
+  navigating = true;
+  document.getElementById('status').textContent = 'Status: Controller terhubung!';
+  location.href = 'player.html';
+}
+
+// Satu putaran long-poll. Timeout client (32s) sengaja lebih panjang dari
+// hold server (25s) supaya request yang menggantung karena koneksi mati pasti
+// gagal lalu di-retry.
+function waitForController() {
+  if (navigating || !roomCode) return;
+  const ctrl = new AbortController();
+  const to = setTimeout(function () { ctrl.abort(); }, 32000);
+  fetch('/api/room/' + roomCode + '/presence', { signal: ctrl.signal, cache: 'no-store' })
+    .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+    .then(function (d) {
+      clearTimeout(to);
+      if (d && d.hasController) { goToPlayer(); return; }
+      setTimeout(waitForController, 300);
+    })
+    .catch(function () {
+      clearTimeout(to);
+      setTimeout(waitForController, 1500);
+    });
 }
 
 init();

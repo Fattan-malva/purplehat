@@ -761,6 +761,32 @@ input:focus-visible {
   box-shadow: 0 0 10px rgba(168, 85, 247, 0.8);
 }
 
+/* Knob penanda posisi: muncul saat hover / sedang diseret */
+.progress-bar::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin-right: -7px;
+  border-radius: 50%;
+  background: #e9d5ff;
+  box-shadow: 0 0 10px rgba(192, 132, 252, 0.9);
+  transform: translateY(-50%) scale(0);
+  transition: transform .15s ease;
+  pointer-events: none;
+}
+
+.progress:hover .progress-bar::after,
+.progress.scrubbing .progress-bar::after {
+  transform: translateY(-50%) scale(1);
+}
+
+.progress.scrubbing .progress-bar {
+  box-shadow: 0 0 14px rgba(192, 132, 252, 1);
+}
+
 .modes {
   display: flex;
   justify-content: center;

@@ -21,6 +21,9 @@ var reconnectAttempts = 0;
 var suppressReconnect = false;
 var reconnectTimer = null;
 var state = { current: null, queue: [], playing: false, position: 0, duration: 0, volume: 30, modes: { loop: false, shuffle: false, loopQueue: false } };
+// Sedang menyeret progress bar (scrub). Selama true, render() tidak menimpa
+// posisi bar supaya tidak goyang saat STATE_SYNC masuk.
+var isScrubbing = false;
 const API_BASE = localStorage.getItem('ph_api_base') || '';
 var searchSource = 'youtube'; // 'youtube' | 'soundcloud'
 
@@ -216,12 +219,8 @@ function bindUI() {
   document.getElementById('btn-replay').addEventListener('click', () => send(PH.MSG.REPLAY, {}));
   document.getElementById('btn-next').addEventListener('click', () => send(PH.MSG.NEXT, {}));
 
-  document.getElementById('progress-container').addEventListener('click', (e) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const percentage = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
-    const to = Math.floor((state.duration || 0) * (percentage / 100));
-    send(PH.MSG.SEEK, { to });
-  });
+  // Progress: bisa diklik DAN diseret (mouse + layar sentuh).
+  bindScrub();
 
   document.getElementById('vol-down').addEventListener('click', () => setVolume((state.volume ?? 30) - 2));
   document.getElementById('vol-up').addEventListener('click', () => setVolume((state.volume ?? 30) + 2));
@@ -276,6 +275,58 @@ function bindUI() {
   document.querySelectorAll('.modal').forEach(m => {
     m.addEventListener('click', (e) => { if (e.target === m) m.classList.add('hidden'); });
   });
+}
+
+// ===== Progress bar: bisa diklik & diseret (scrub) =====
+// Menggunakan Pointer Events supaya mouse, sentuh, dan stylus sama-sama jalan.
+// Saat menyeret, bar & label waktu di- preview lokal; perintah SEEK baru
+// dikirim sekali saat jari/mouse dilepas.
+function bindScrub() {
+  const track = document.getElementById('progress-container');
+  const bar = document.getElementById('progress-bar');
+  if (!track || !bar) return;
+
+  function pctFromX(clientX) {
+    const rect = track.getBoundingClientRect();
+    if (!rect.width) return 0;
+    return Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+  }
+
+  function preview(pct) {
+    bar.style.width = pct + '%';
+    const posEl = document.getElementById('pos');
+    if (posEl && (state.duration || 0) > 0) {
+      posEl.textContent = formatTime(state.duration * (pct / 100));
+    }
+  }
+
+  function endScrub(e, commit) {
+    if (!isScrubbing) return;
+    isScrubbing = false;
+    track.classList.remove('scrubbing');
+    try { track.releasePointerCapture(e.pointerId); } catch (err) {}
+    if (!commit) return;
+    const to = Math.floor((state.duration || 0) * (pctFromX(e.clientX) / 100));
+    send(PH.MSG.SEEK, { to });
+  }
+
+  track.addEventListener('pointerdown', (e) => {
+    if ((state.duration || 0) <= 0) return; // durasi belum diketahui
+    isScrubbing = true;
+    track.classList.add('scrubbing');
+    try { track.setPointerCapture(e.pointerId); } catch (err) {}
+    preview(pctFromX(e.clientX));
+    e.preventDefault();
+  });
+
+  track.addEventListener('pointermove', (e) => {
+    if (!isScrubbing) return;
+    preview(pctFromX(e.clientX));
+    e.preventDefault();
+  });
+
+  track.addEventListener('pointerup', (e) => endScrub(e, true));
+  track.addEventListener('pointercancel', (e) => endScrub(e, false));
 }
 
 // ===== Pencarian + pagination tak berujung (terpicu saat scroll ke bawah) =====
@@ -429,9 +480,12 @@ function render() {
   setStatus(state.playing ? 'Sedang Memutar • <b class="status-code">' + roomCode + '</b>' : 'Terhubung ke <b class="status-code">' + roomCode + '</b>');
   document.getElementById('queue-badge').textContent = state.queue.length;
   const pos = state.position || 0, dur = state.duration || 0;
-  document.getElementById('pos').textContent = formatTime(pos);
+  // Saat scrub, jangan timpa preview bar/label posisi milik pengguna.
+  if (!isScrubbing) {
+    document.getElementById('pos').textContent = formatTime(pos);
+    if (dur > 0) document.getElementById('progress-bar').style.width = Math.min(100, Math.max(0, (pos / dur) * 100)) + '%';
+  }
   document.getElementById('dur').textContent = formatTime(dur);
-  if (dur > 0) document.getElementById('progress-bar').style.width = Math.min(100, Math.max(0, (pos / dur) * 100)) + '%';
   updateVolUI();
   syncModeButtons();
   const icon = document.getElementById('play-icon');
