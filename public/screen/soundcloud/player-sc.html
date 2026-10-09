@@ -334,6 +334,8 @@
       var lastPos = 0;   // detik
       var lastDur = 0;   // detik
       var lastProgressSec = -1;
+      var playRetryTimer = null;
+      var playRetryCount = 0;
 
       // ==== Protokol dengan halaman induk (player.html) ====
       function post(m) {
@@ -370,6 +372,8 @@
 
       // Bersihkan konten track sebelumnya (saat ganti lagu)
       function clearContent() {
+        stopPlayRetry();
+        widget = null;
         var content = document.getElementById('content');
         content.querySelectorAll('.track-el').forEach(function (el) { el.remove(); });
         document.getElementById('loadingWrap').style.display = 'flex';
@@ -428,8 +432,10 @@
         iframe.setAttribute('allow', 'autoplay');
         iframe.setAttribute('scrolling', 'no');
         iframe.setAttribute('frameborder', '0');
+        // Pakai permalink track bila ada (lebih andal daripada api.soundcloud.com).
+        var widgetUrl = track.link || ('https://api.soundcloud.com/tracks/' + track.trackId);
         iframe.src = 'https://w.soundcloud.com/player/?url=' +
-          encodeURIComponent('https://api.soundcloud.com/tracks/' + track.trackId) +
+          encodeURIComponent(widgetUrl) +
           '&auto_play=true&visual=false&show_artwork=false&show_comments=false' +
           '&show_user=false&show_playcount=false&buying=false&sharing=false' +
           '&download=false&hide_related=true&color=%23ff5500';
@@ -438,17 +444,47 @@
         initWidget();
       }
 
-      function playSound() {
-        if (widget) widget.play();
+      // ==== Force play (konsep sama seperti player YouTube) ====
+      // Widget SoundCloud sering belum benar-benar siap saat event READY,
+      // sehingga satu kali play() bisa diabaikan. Kita panggil play()
+      // berulang sampai benar-benar mulai berbunyi (event PLAY/PROGRESS).
+      function forcePlay() {
+        if (!widget) return;
+        try { widget.setVolume(startVolume); } catch (e) {}
+        try { widget.play(); } catch (e) {}
       }
+
+      function stopPlayRetry() {
+        if (playRetryTimer) {
+          clearInterval(playRetryTimer);
+          playRetryTimer = null;
+        }
+      }
+
+      function startForcePlay() {
+        stopPlayRetry();
+        playRetryCount = 0;
+        forcePlay();
+        playRetryTimer = setInterval(function () {
+          playRetryCount++;
+          if (playingFlag || playRetryCount >= 15) { stopPlayRetry(); return; }
+          forcePlay();
+        }, 500);
+      }
+
+      function playSound() {
+        startForcePlay();
+      }
+
       function pauseSound() {
+        stopPlayRetry();
         if (widget) widget.pause();
       }
 
       function replaySound() {
         if (widget) {
           widget.seekTo(0);
-          widget.play();
+          startForcePlay();
         }
       }
 
@@ -472,16 +508,20 @@
 
           widget.bind(E.PLAY, function () {
             playingFlag = true;
+            stopPlayRetry();
             reportState();
           });
 
           widget.bind(E.PAUSE, function () {
             playingFlag = false;
+            stopPlayRetry();
             reportState();
           });
 
           widget.bind(E.PLAY_PROGRESS, function (d) {
             if (d && typeof d.currentPosition === 'number') lastPos = d.currentPosition / 1000;
+            // Progress = benar-benar berbunyi; hentikan retry play.
+            if (!playingFlag) { playingFlag = true; stopPlayRetry(); }
             var sec = Math.floor(lastPos);
             if (sec !== lastProgressSec) {
               lastProgressSec = sec;
@@ -491,19 +531,20 @@
 
           widget.bind(E.FINISH, function () {
             playingFlag = false;
+            stopPlayRetry();
             reportState();
             post({ type: 'ended' });
           });
 
           widget.bind(E.ERROR, function (err) {
             console.error('[SC] ERROR:', err);
+            stopPlayRetry();
             post({ type: 'error' });
           });
 
-          // Autoplay: widget sudah dipanggil play() saat READY; tidak ada
-          // tombol "Click to play" lagi. Gesture klik pertama di layar
-          // induk diteruskan lewat cmd 'play'.
-          try { widget.play(); } catch (e) {}
+          // Autoplay seperti YouTube: paksa play() berulang sampai widget
+          // benar-benar siap & berbunyi (tanpa tombol "Click to play").
+          startForcePlay();
         });
       }
 
@@ -515,14 +556,15 @@
           case 'load':
             if (d.volume != null) startVolume = d.volume;
             if (d.trackId) loadTrack(d.trackId);
-            else if (widget) widget.play();
+            else startForcePlay();
             break;
           case 'play':
           case 'gesture':
-            // Klik pertama di layar induk -> gesture autoplay
-            if (widget) widget.play();
+            // Klik pertama di layar induk -> gesture autoplay (dengan retry)
+            startForcePlay();
             break;
           case 'pause':
+            stopPlayRetry();
             if (widget) widget.pause();
             break;
           case 'seek':
@@ -536,6 +578,7 @@
             replaySound();
             break;
           case 'stop':
+            stopPlayRetry();
             if (widget) { try { widget.pause(); widget.seekTo(0); } catch (err) {} }
             break;
         }

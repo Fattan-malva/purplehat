@@ -49,20 +49,10 @@ async function init() {
 
 init();
 
-// Slider promo otomatis
+// Promo: scroll vertikal ke atas terus-menerus (looping, tanpa dot).
+// Isi digandakan agar animasi translateY(-50%) mulus tanpa jeda.
 (function () {
   const slidesEl = document.getElementById('slides');
-  const dotsEl = document.getElementById('dots');
-  const count = slidesEl.children.length;
-  let i = 0;
-  for (let d = 0; d < count; d++) {
-    const dot = document.createElement('span');
-    if (d === 0) dot.classList.add('active');
-    dotsEl.appendChild(dot);
-  }
-  setInterval(() => {
-    i = (i + 1) % count;
-    slidesEl.style.transform = 'translateX(-' + (i * 100) + '%)';
-    Array.from(dotsEl.children).forEach((d, idx) => d.classList.toggle('active', idx === i));
-  }, 3500);
+  if (!slidesEl) return;
+  slidesEl.innerHTML += slidesEl.innerHTML;
 })();

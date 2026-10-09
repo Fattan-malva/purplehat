@@ -11,7 +11,7 @@ var roomCode = null;
 var queue = [];
 var currentIndex = -1;
 var isPlaying = false;
-var volume = 80;
+var volume = 30;
 var modeLoop = false;       // ulangi lagu yang sedang diputar
 var modeShuffle = false;    // acak urutan
 var modeLoopQueue = false;  // loop semua antrian (lagu tidak dihapus setelah diputar)
@@ -135,6 +135,10 @@ async function init() {
     return;
   }
 
+  // Tampilkan kode room di pojok kiri atas layar player
+  const codeEl = document.getElementById('room-code-badge');
+  if (codeEl) codeEl.textContent = roomCode;
+
   ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/?role=screen&code=' + roomCode);
   ws.onopen = () => {
     broadcastState();
@@ -239,10 +243,27 @@ function stopPlayback() {
   isPlaying = false;
   mediaPosition = 0;
   mediaDuration = 0;
+  // Tutup TOTAL pemutar (YouTube & SoundCloud), bukan sekadar pause.
+  // 1) kirim perintah stop (agar pemutar berhenti rapi), lalu
+  // 2) lepaskan dokumen iframe (about:blank) sehingga suara benar-benar mati
+  //    dan tinggal idle screen.
   sendFrame({ cmd: 'stop' });
+  closeFrame();
   updateUI();
   send(PH.MSG.QUEUE_UPDATE, { queue });
   broadcastState();
+}
+
+// Lepaskan dokumen pemutar supaya tidak ada audio yang tertinggal.
+function closeFrame() {
+  const f = document.getElementById('player-frame');
+  frameReady = false;
+  frameSrc = null;
+  pendingSong = null;
+  if (f) {
+    try { f.src = 'about:blank'; } catch (e) {}
+    f.classList.add('hidden');
+  }
 }
 
 function playNext(skipRemoveCurrent) {
@@ -346,6 +367,11 @@ function updateQueueUI() {
 document.addEventListener('click', () => {
   if (currentIndex >= 0) sendFrame({ cmd: 'gesture' });
 }, { once: true });
+
+// Terapkan volume default ke host (OS Windows) sejak halaman dimuat, supaya
+// volume OS langsung sinkron dengan angka yang ditampilkan di controller
+// (tanpa harus menunggu user menggeser volume dulu).
+setVolume(volume);
 
 init();
 setInterval(broadcastState, 5000);

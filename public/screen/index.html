@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Purplehat - Connect Screen</title>
-  <link rel="stylesheet" href="screen.css">
+  <link rel="stylesheet" href="screen.css?v=20261009d">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="/shared/protocol.js"></script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
@@ -22,32 +22,33 @@
       <h1>PURPLE<span>HAT</span></h1>
     </header>
 
-    <div class="pair-banner glass-panel">
-      <div class="pair-code">Kode Pairing: <span id="join-code">-</span></div>
-      <img id="qr-img" alt="QR Pairing">
-      <div id="status">Status: Menyiapkan...</div>
-    </div>
+    <div class="menu-row">
+      <div class="pair-banner">
+        <div class="pair-code">Kode Pairing: <span id="join-code">-</span></div>
+        <img id="qr-img" alt="QR Pairing">
+        <div id="status">Status: Menyiapkan...</div>
+      </div>
 
-    <div class="promo-slider">
-      <div class="slides" id="slides">
-        <div class="slide slide-1">
-          <h2><i data-lucide="mic" class="icon-glow"></i> Karaoke Bareng</h2>
-          <p>Hubungkan HP kamu & mulai nyanyi sekarang.</p>
-        </div>
-        <div class="slide slide-2">
-          <h2><i data-lucide="list-music" class="icon-glow"></i> Antrian Pintar</h2>
-          <p>Pilih lagu, atur urutan, tanpa rebutan mic.</p>
-        </div>
-        <div class="slide slide-3">
-          <h2><i data-lucide="flame" class="icon-glow"></i> Malam Karaoke</h2>
-          <p>Ajak teman & keluarga, party jadi makin seru!</p>
+      <div class="promo-slider">
+        <div class="slides" id="slides">
+          <div class="slide slide-1">
+            <h2><i data-lucide="mic" class="icon-glow"></i> Karaoke Bareng</h2>
+            <p>Hubungkan HP kamu & mulai nyanyi sekarang.</p>
+          </div>
+          <div class="slide slide-2">
+            <h2><i data-lucide="list-music" class="icon-glow"></i> Antrian Pintar</h2>
+            <p>Pilih lagu, atur urutan, tanpa rebutan mic.</p>
+          </div>
+          <div class="slide slide-3">
+            <h2><i data-lucide="flame" class="icon-glow"></i> Malam Karaoke</h2>
+            <p>Ajak teman & keluarga, party jadi makin seru!</p>
+          </div>
         </div>
       </div>
-      <div class="dots" id="dots"></div>
     </div>
   </div>
 
-  <script src="menu.js"></script>
+  <script src="menu.js?v=20261009c"></script>
   <script>if (window.lucide) lucide.createIcons();</script>
 </body>
 </html>

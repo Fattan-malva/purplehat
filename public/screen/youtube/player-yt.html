@@ -15,6 +15,7 @@
   <script>
     var player = null;
     var volume = 80;
+    var allowForcePlay = false; // false saat stop/pause: cegah UNSTARTED memicu play lagi
 
     function post(m) {
       try { parent.postMessage(Object.assign({ ph: 1 }, m), '*'); } catch (e) {}
@@ -38,6 +39,7 @@
     // autoplay diblokir, gesture klik pertama di layar player (diteruskan
     // induk lewat cmd 'gesture') langsung memutar video.
     function forcePlay() {
+      if (!allowForcePlay) return;
       if (!player || !player.playVideo) return;
       try { player.unMute(); } catch (e) {}
       try { player.playVideo(); } catch (e) {}
@@ -49,6 +51,7 @@
       if (!d || !d.ph) return;
       switch (d.cmd) {
         case 'load':
+          allowForcePlay = true;
           if (d.volume != null) {
             volume = d.volume;
             try { if (player) player.setVolume(volume); } catch (err) {}
@@ -59,13 +62,16 @@
           }
           break;
         case 'play':
+          allowForcePlay = true;
           forcePlay();
           break;
         case 'gesture':
           // Klik user di layar induk -> play langsung
+          allowForcePlay = true;
           forcePlay();
           break;
         case 'pause':
+          allowForcePlay = false;
           try { player.pauseVideo(); } catch (e) {}
           break;
         case 'seek':
@@ -76,10 +82,12 @@
           try { player.setVolume(volume); } catch (e) {}
           break;
         case 'replay':
+          allowForcePlay = true;
           try { player.seekTo(0); } catch (e) {}
           forcePlay();
           break;
         case 'stop':
+          allowForcePlay = false;
           try { player.stopVideo(); } catch (e) {}
           break;
       }

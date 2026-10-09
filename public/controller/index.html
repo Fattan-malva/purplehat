@@ -21,7 +21,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="controller.css?v=20261009f">
+    <link rel="stylesheet" href="controller.css?v=20261009g">
 
     <script>
         // ==== ATURAN KERAS: controller hanya boleh tampil sebagai aplikasi ====
@@ -95,12 +95,12 @@
                 <div class="logo">
                     <i class="fas fa-hat-wizard"></i>
                 </div>
-                <div class="brand-text">
+                <div class="brand-info">
                     <h1 class="brand-name">PURPLE<span>HAT</span></h1>
                     <p id="status">Belum terhubung</p>
                 </div>
             </div>
-            <button id="btn-logout" class="icon-btn" title="Logout" aria-label="Logout">
+            <button id="btn-logout" class="icon-btn btn-danger-ghost" title="Logout" aria-label="Logout">
                 <i data-lucide="log-out"></i>
             </button>
         </header>
@@ -108,7 +108,7 @@
         <!-- ===== SEARCH ===== -->
         <section id="search-col">
 
-            <div class="panel search">
+            <div class="search">
                 <i data-lucide="search"></i>
                 <input type="text" id="search-input" placeholder="Search songs, artists..." autocomplete="off"
                     enterkeyhint="search" aria-label="Cari lagu">
@@ -172,12 +172,12 @@
                     </div>
 
                     <div class="master-inline">
-                        <span class="val val-mini" id="vol-label">80%</span>
+                        <span class="val val-mini" id="vol-label">30%</span>
                         <button id="vol-down" class="btn-step sm" title="Volume turun" aria-label="Volume turun">
                             <i data-lucide="minus"></i>
                         </button>
                         <div class="bar">
-                            <div id="vol-progress" style="width: 80%"></div>
+                            <div id="vol-progress" style="width: 30%"></div>
                         </div>
                         <button id="vol-up" class="btn-step sm" title="Volume naik" aria-label="Volume naik">
                             <i data-lucide="plus"></i>
@@ -283,7 +283,7 @@
             pitchDisplay.classList.toggle('is-on', currentPitch !== 0);
         }
     </script>
-    <script src="controller.js?v=20261009e"></script>
+    <script src="controller.js?v=20261009f"></script>
 </body>
 
 </html>

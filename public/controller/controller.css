@@ -345,11 +345,11 @@ input:focus-visible {
   margin: 0 auto;
   height: calc(100dvh - var(--safe-t) - var(--safe-b) - 28px);
   /* Pemotongan kontainer: fallback lama dulu, lalu clip+margin supaya
-     glow logo header di atas/kiri TIDAK kejepit di tepi (mis. glow 18px
+     glow logo header di atas/kiri TIDAK kejepit di tepi (mis. glow 22px
      tetap terlihat walau logo dekat batas kontainer). Blink mendukung. */
   overflow: hidden;
   overflow: clip;
-  overflow-clip-margin: 18px;
+  overflow-clip-margin: 22px;
 }
 
 /* Header di paling atas — tidak ikut scroll */
@@ -366,7 +366,7 @@ input:focus-visible {
   min-height: 0;
 }
 
-#search-col>.panel.search,
+#search-col>.search,
 #search-col>.chips {
   flex-shrink: 0;
 }
@@ -385,39 +385,46 @@ input:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  /* Padding atas/kiri: ruang napas agar glow logo (18px) tidak menempel
+  gap: 10px;
+  /* Padding atas/kiri: ruang napas agar glow logo (14px) tidak menempel
      & terjepit di tepi kontainer saat portrait/landscape. */
-  padding: 6px 6px 0;
+  padding: 10px 4px 2px;
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  min-width: 0;
+}
+
+.brand-info {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   min-width: 0;
 }
 
 .logo {
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
   display: grid;
   place-items: center;
   flex-shrink: 0;
   background: linear-gradient(135deg, #a855f7, #7e22ce);
-  box-shadow: 0 0 18px rgba(168, 85, 247, 0.55);
+  box-shadow: 0 0 14px rgba(168, 85, 247, 0.6);
 }
 
 .logo .fa-hat-wizard {
-  font-size: 20px;
+  font-size: 17px;
   color: #fff;
 }
 
 .brand-name {
-  font-size: 19px;
+  font-size: 16px;
   font-weight: 700;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   line-height: 1.1;
 }
 
@@ -426,12 +433,14 @@ input:focus-visible {
 }
 
 #status {
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 220px;
+  max-width: 46vw;
+  padding-left: 8px;
+  border-left: 1px solid var(--line-soft);
 }
 
 /* Room code di header: tebal + ungu */
@@ -460,6 +469,21 @@ input:focus-visible {
 
 .icon-btn:active {
   transform: scale(.92);
+}
+
+/* Logout: ikon merah */
+.btn-danger-ghost {
+  color: var(--danger);
+  background: rgba(248, 113, 113, 0.10);
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
+.btn-danger-ghost:hover {
+  background: rgba(248, 113, 113, 0.20);
+}
+
+.btn-danger-ghost .lucide {
+  color: var(--danger);
 }
 
 /* ---------- Player dock: Now Playing + Kontrol digabung (satu panel kompak) ---------- */
@@ -972,29 +996,28 @@ input[type="range"]::-moz-range-thumb {
 /* ---------- Search ---------- */
 .search {
   position: relative;
-  padding: 6px;
 }
 
 .search>.lucide {
   position: absolute;
-  left: 24px;
+  left: 14px;
   top: 50%;
   transform: translateY(-50%);
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   color: var(--muted);
   pointer-events: none;
 }
 
 #search-input {
   width: 100%;
-  height: 50px;
-  padding: 0 16px 0 46px;
-  border-radius: 14px;
-  background: rgba(0, 0, 0, 0.4);
+  height: 42px;
+  padding: 0 14px 0 38px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.45);
   border: 1px solid var(--line-soft);
   color: var(--text);
-  font-size: 16px;
+  font-size: 14px;
   outline: none;
   transition: border-color .2s, box-shadow .2s;
 }
@@ -1005,25 +1028,25 @@ input[type="range"]::-moz-range-thumb {
 
 #search-input:focus {
   border-color: rgba(168, 85, 247, 0.7);
-  box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.18);
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.16);
 }
 
 .chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .src-tab {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  height: 40px;
-  padding: 0 16px;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--line-soft);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   transition: background .2s, transform .15s;
 }
@@ -1033,7 +1056,7 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .src-tab .fab {
-  font-size: 15px;
+  font-size: 13px;
 }
 
 .src-yt {
@@ -1273,9 +1296,9 @@ input[type="range"]::-moz-range-thumb {
   position: absolute;
   right: calc(var(--safe-r) + 14px);
   bottom: 100%;
-  margin-bottom: 12px;
-  width: 52px;
-  height: 52px;
+  margin-bottom: 10px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -1292,21 +1315,21 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .fab-upnext .lucide {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
 }
 
 .fab-badge {
   position: absolute;
-  top: -4px;
-  right: -4px;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 5px;
+  top: -3px;
+  right: -3px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
   border-radius: 999px;
   background: #f5f3ff;
   color: #4c1d95;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 700;
   display: grid;
   place-items: center;
@@ -1551,6 +1574,35 @@ input[type="range"]::-moz-range-thumb {
 @media (max-width: 360px) {
   :root {
     --gutter: 10px;
+  }
+
+  .topbar {
+    padding-top: 8px;
+  }
+
+  .logo {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    box-shadow: 0 0 12px rgba(168, 85, 247, 0.6);
+  }
+
+  .logo .fa-hat-wizard {
+    font-size: 15px;
+  }
+
+  .brand-name {
+    font-size: 14px;
+    letter-spacing: 0.1em;
+  }
+
+  #status {
+    display: none;
+  }
+
+  .icon-btn {
+    width: 36px;
+    height: 36px;
   }
 
   .dock {

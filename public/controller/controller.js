@@ -17,7 +17,7 @@ if (!isStandalone && (/(Android|iPhone|iPad|iPod|Mobile)/i.test(navigator.userAg
 var ws;
 var roomCode = null;
 var fallbackMode = false;
-var state = { current: null, queue: [], playing: false, position: 0, duration: 0, volume: 80, modes: { loop: false, shuffle: false, loopQueue: false } };
+var state = { current: null, queue: [], playing: false, position: 0, duration: 0, volume: 30, modes: { loop: false, shuffle: false, loopQueue: false } };
 const API_BASE = localStorage.getItem('ph_api_base') || '';
 var searchSource = 'youtube'; // 'youtube' | 'soundcloud'
 
@@ -119,7 +119,7 @@ function pollState() {
         playing: !!data.playing,
         position: data.position || 0,
         duration: data.duration || 0,
-        volume: data.volume ?? 80,
+        volume: data.volume ?? 30,
         modes: state.modes
       };
       render();
@@ -171,8 +171,8 @@ function bindUI() {
     send(PH.MSG.SEEK, { to });
   });
 
-  document.getElementById('vol-down').addEventListener('click', () => setVolume((state.volume ?? 80) - 2));
-  document.getElementById('vol-up').addEventListener('click', () => setVolume((state.volume ?? 80) + 2));
+  document.getElementById('vol-down').addEventListener('click', () => setVolume((state.volume ?? 30) - 2));
+  document.getElementById('vol-up').addEventListener('click', () => setVolume((state.volume ?? 30) + 2));
 
   // Toggle playback modes (loop gabungan di modal Up Next + shuffle)
   document.getElementById('btn-loop').addEventListener('click', cycleLoop);
@@ -207,7 +207,7 @@ function bindUI() {
     document.getElementById('results').classList.add('hidden');
     setStatus('Belum terhubung');
     document.getElementById('queue-badge').textContent = '0';
-    state = { current: null, queue: [], playing: false, position: 0, duration: 0, volume: 80, modes: { loop: false, shuffle: false, loopQueue: false } };
+    state = { current: null, queue: [], playing: false, position: 0, duration: 0, volume: 30, modes: { loop: false, shuffle: false, loopQueue: false } };
     updateVolUI();
     syncModeButtons();
   });
@@ -445,7 +445,7 @@ function renderQueue() {
 }
 
 function updateVolUI() {
-  const v = state.volume ?? 80;
+  const v = state.volume ?? 30;
   const label = document.getElementById('vol-label');
   const bar = document.getElementById('vol-progress');
   if (label) label.textContent = v + '%';
