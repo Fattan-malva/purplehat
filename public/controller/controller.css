@@ -344,9 +344,8 @@ input:focus-visible {
   max-width: 580px;
   margin: 0 auto;
   height: calc(100dvh - var(--safe-t) - var(--safe-b) - 28px);
-  /* Pemotongan kontainer: fallback lama dulu, lalu clip+margin supaya
-     glow logo header di atas/kiri TIDAK kejepit di tepi (mis. glow 22px
-     tetap terlihat walau logo dekat batas kontainer). Blink mendukung. */
+  /* Pemotongan kontainer: fallback lama dulu, lalu clip+margin supaya glow
+     logo header di atas/kiri TIDAK kejepit di tepi saat dekat batas. */
   overflow: hidden;
   overflow: clip;
   overflow-clip-margin: 22px;
@@ -412,9 +411,9 @@ input:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  /* Padding atas/kiri: ruang napas agar glow logo (14px) tidak menempel
-     & terjepit di tepi kontainer saat portrait/landscape. */
-  padding: 10px 4px 2px;
+  /* Ruang napas di semua sisi supaya logo (dan wilayah sekitarnya) tidak
+     terjepit/terpotong oleh tepi kontainer, baik portrait maupun landscape. */
+  padding: 12px 12px 6px;
 }
 
 .brand {
@@ -431,6 +430,7 @@ input:focus-visible {
   min-width: 0;
 }
 
+/* Logo merek: PNG transparan apa adanya, TANPA glow/latar tambahan. */
 .logo {
   width: 38px;
   height: 38px;
@@ -438,8 +438,6 @@ input:focus-visible {
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  /* Latar kotak ungu dihilangkan: ikon PNG sudah transparan */
-  filter: drop-shadow(0 0 10px rgba(168, 85, 247, 0.6));
 }
 
 .logo .fa-hat-wizard {

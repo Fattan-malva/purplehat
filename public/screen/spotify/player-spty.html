@@ -443,6 +443,17 @@
       // playback_started). Begitu pesan pertama masuk, sampling DOM tidak
       // dipakai lagi untuk menentukan isPlaying.
       var gotEmbedMsg = false;
+      // Jendela embed yang sedang sah + nomor urut embed-nya. Dipakai untuk
+      // membuang pesan yang terlambat datang dari embed lama.
+      var embedWin = null;
+      var embedSeq = 0;
+      // Penanda jaring pengaman "lagu habis" (posisi macet di dekat akhir).
+      var lastEndWatchPos = -1;
+      var endWatchStalls = 0;
+      // Embed sendiri melapor "sedang berjalan". Dipakai untuk mengenali kasus
+      // autoplay=1 yang menghidupkan lagu sendiri (supaya kita tidak malah
+      // mengirim 'toggle' dan menjeda lagu yang sudah jalan).
+      var embedReportsPlaying = false;
 
       var loadingWrap = document.getElementById('loadingWrap');
       var bgEl = document.getElementById('bg');
@@ -691,6 +702,9 @@
       }
 
       function isActuallyPlaying() {
+        // Embed sendiri melapor masih berjalan ->anggap berjalan walau DOM-nya
+        // tidak bisa diperiksa (embed Spotify memang tanpa elemen media).
+        if (embedReportsPlaying) return true;
         try {
           var doc = getEmbedDoc();
           if (!doc) return false;
@@ -711,6 +725,34 @@
         try { m.volume = Math.max(0, Math.min(1, startVolume / 100)); } catch (e) {}
       }
 
+      // ===== AUTOPLAY WATCHDOG (konsep spty-web) =====
+      // Autoplay diatur "satu aksi per lagu": cukup SATU klik tombol play milik
+      // embed, sisanya cukup dipantau sampai benar-benar berjalan. Tidak pernah
+      // mengulang klik/play, karena tombol embed itu TOGGLE - klik kedua
+      // justru menjeda lagu yang baru mulai.
+      var autoPlaySeq = 0;
+
+      function autoPlayWatchdog(seq) {
+        var tries = 0;
+        var clicked = false;
+        var timer = setInterval(function () {
+          if (seq !== autoPlaySeq) { clearInterval(timer); return; }
+          if (!embedReady) { clearInterval(timer); return; }
+          // Sudah berjalan (mis. embed autoplay=1 hidup sendiri) -> selesai.
+          if (isActuallyPlaying()) {
+            clearInterval(timer);
+            isPlaying = true;
+            return;
+          }
+          // User menjeda -> jangan pernah sentuh tombol play lagi.
+          if (!isPlaying) { clearInterval(timer); return; }
+          if (!clicked && tries > 0) {
+            if (clickEmbedPlayButton()) clicked = true;
+          }
+          if (++tries > 40) { clearInterval(timer); }   // ~16 detik
+        }, 400);
+      }
+
       // ===== PLAY / PAUSE =====
       // Konsep spty-web: JANGAN kirim { command: 'play' } ke embed - perintah
       // itu mengulang lagu DARI AWAL (inilah bug "jeda di tengah -> play lagi
@@ -720,6 +762,18 @@
       function playSound() {
         if (!embedReady) return;
         endedSent = false;
+        // Batalkan watchdog lama, mulai yang baru untuk lagu/percobaan ini.
+        var seq = ++autoPlaySeq;
+
+        // PENTING: kalau embed SUDAH berjalan (mis. autoplay=1 menghidupkannya
+        // sendiri), jangan kirim apa pun - 'toggle' justru akan MENJEDAKAN
+        // lagu yang sudah jalan. Ini sumber autoplay "macet".
+        if (isActuallyPlaying()) {
+          isPlaying = true;
+          reportState();
+          return;
+        }
+
         var wasPlaying = isPlaying;
         isPlaying = true;
         applyVolume();
@@ -727,21 +781,25 @@
         if (clickEmbedPlayButton()) {
           // Tombol "play" milik embed sudah diklik -> pemutaran dilanjutkan
           // dari posisi saat ini.
+          autoPlayWatchdog(seq);
           reportState();
           return;
         }
-        if (wasPlaying) return; // sudah berjalan -> jangan kirim apa pun
+        if (wasPlaying) { reportState(); return; } // sudah berjalan -> jangan kirim apa pun
         // Tombol belum ada di DOM: pakai 'toggle' (mengikuti status embed),
         // bukan 'play' yang mengulang dari awal.
         var iframe = getIframe();
         if (iframe) {
           try { iframe.contentWindow.postMessage({ command: 'toggle' }, '*'); } catch (e) {}
         }
+        autoPlayWatchdog(seq);
         reportState();
       }
 
       function pauseSound() {
         isPlaying = false;
+        embedReportsPlaying = false;   // kita perintahkan jeda
+        autoPlaySeq++;                 // hentikan watchdog autoplay
         var iframe = getIframe();
         // Satu jalur saja: perintah 'pause' resmi. JANGAN sekaligus mengklik
         // tombol "jeda" di DOM - pesan postMessage itu async, sehingga urutan
@@ -885,7 +943,6 @@
       function stopMonitoring() {
         if (checkInterval) { clearInterval(checkInterval); checkInterval = null; }
       }
-
       function hookEmbedGestures() {
         // Klik/tap di dalam embed = gestur asli di dokumen same-origin itu.
         // Cukup buka izin media (prime); JANGAN mengklik tombol play lagi,
@@ -929,6 +986,24 @@
 
           hookEmbedGestures();
 
+          // ---- JARING PENGAMAN AUTO-NEXT ----
+          // Kalau embed tidak pernah melapor "berhenti di akhir lagu" (banyak
+          // embed diam saja saat lagu habis), posisi yang berhenti/bergera di
+          // dekat akhir lagu tetap diperlakukan sebagai selesai supaya lagu
+          // berikutnya langsung diputar.
+          if (currentDuration > 0 && currentPosition >= currentDuration * 0.9) {
+            if (Math.abs(currentPosition - lastEndWatchPos) < 400) {
+              endWatchStalls++;
+              if (endWatchStalls >= 2) { endWatchStalls = 0; notifyEnded(); }
+            } else {
+              endWatchStalls = 0;
+            }
+            lastEndWatchPos = currentPosition;
+          } else {
+            lastEndWatchPos = -1;
+            endWatchStalls = 0;
+          }
+
           // Deteksi selesai (jaring pengaman selain event 'ended')
           try {
             var doc = getEmbedDoc();
@@ -950,13 +1025,19 @@
 
       function clearContent() {
         stopMonitoring();
+        autoPlaySeq++;      // batalkan watchdog autoplay lagu sebelumnya
+        embedSeq++;
+        embedWin = null;    // pesan dari embed lama tidak lagi dipakai
         embedReady = false;
         embedWaitRunning = false;
         isPlaying = false;
+        embedReportsPlaying = false;
         endedSent = false;
         lastMedia = null;
         currentPosition = 0;
         currentDuration = 0;
+        lastEndWatchPos = -1;
+        endWatchStalls = 0;
         // Cari dari dokumen, bukan hanya #content: saat mode lirik aktif embed
         // tinggal di #miniHost, jadi harus ikut dibuang saat ganti lagu.
         document.querySelectorAll('.track-el, .error').forEach(function (el) { el.remove(); });
@@ -1038,6 +1119,22 @@
         currentArtist = track.artist || '';
         if (loadingWrap) loadingWrap.style.display = 'none';
 
+        // Durasi dari metadata lagu. Ini penting untuk deteksi "lagu habis"
+        // (auto-next): beberapa embed tidak pernah mengirim durasinya sendiri,
+        // sehingga tanpa angka ini lagu berikutnya tidak akan pernah jalan.
+        if (typeof track.durationMs === 'number' && track.durationMs > 0) {
+          currentDuration = track.durationMs;
+        } else if (track.duration) {
+          var parts = String(track.duration).split(':');
+          if (parts.length >= 2) {
+            var secs = 0;
+            for (var pi = 0; pi < parts.length; pi++) {
+              secs = secs * 60 + (parseFloat(parts[pi]) || 0);
+            }
+            if (secs > 0) currentDuration = Math.round(secs * 1000);
+          }
+        }
+
         if (track.thumbnail) {
           bgEl.style.backgroundImage = "url('" + String(track.thumbnail).replace(/'/g, "\\'") + "')";
         }
@@ -1083,6 +1180,12 @@
         // lagu ikut terputus. Posisi pojok kanan-bawah saat mode lirik cukup
         // diatur lewat CSS (body.lyrics-active .player).
         content.appendChild(player);
+
+        // Ingat jendela embed yang SAH. Pesan dari embed LAMA (dokumennya sudah
+        // dibuang saat ganti lagu) sering terlambat datang dan bisa menimpa
+        // posisi lagu baru, bahkan memicu 'ended' palsu -> auto-next mandek.
+        try { embedWin = iframe.contentWindow; } catch (e) { embedWin = null; }
+        embedSeq++;
 
         // Kalau overlay lirik sedang terbuka (ganti lagu), kirim config baru.
         if (isLyricsActive) sendLyricConfig();
@@ -1188,6 +1291,11 @@
         var data = e.data;
         if (!data || typeof data !== 'object' || data.ph) return;
 
+        // Abaikan pesan dari embed lama: dokumennya sudah dibuang, tapi
+        // postMessage yang sudah terlanjur terkirim masih bisa datang dan
+        // merusak status lagu yang baru.
+        if (embedWin && e.source && e.source !== embedWin) return;
+
         var type = data.type;
         var payload = data.payload || data.data || {};
 
@@ -1200,15 +1308,22 @@
         if (type === 'playback_started' || type === 'playback_resumed') {
           gotEmbedMsg = true;
           isPlaying = true;
+          embedReportsPlaying = true;
         }
         if (type === 'playback_paused') {
           gotEmbedMsg = true;
           isPlaying = false;
+          embedReportsPlaying = false;
         }
         if (type === 'playback_update' || type === 'playhead') {
           gotEmbedMsg = true;
-          if (typeof payload.isPaused === 'boolean') isPlaying = !payload.isPaused;
-          else if (type === 'playhead' && typeof pos === 'number') isPlaying = true;
+          if (typeof payload.isPaused === 'boolean') {
+            isPlaying = !payload.isPaused;
+            embedReportsPlaying = !payload.isPaused;
+          } else if (type === 'playhead' && typeof pos === 'number') {
+            isPlaying = true;
+            embedReportsPlaying = true;
+          }
         }
 
         // Posisi (ms) diteruskan ke overlay lirik supaya tetap sinkron.
@@ -1223,11 +1338,15 @@
         if (typeof dur !== 'number') dur = payload.totalDuration;
         if (typeof dur === 'number' && dur > 0) currentDuration = dur > 1000 ? dur : dur * 1000;
 
+        // ---- LAGU SELESAI (pemicu auto-next) ----
+        // Sama seperti spty-web: lagu dianggap habis kalau embed MELAPOR
+        // berhenti dan posisinya sudah >= 90% durasi. Lebih andal dibanding
+        // menunggu 1 detik terakhir atau event 'ended' yang sering tidak
+        // dikirim embed.
         if (type === 'ended' || type === 'track_ended') {
           notifyEnded();
-        } else if (typeof pos === 'number' && currentDuration > 0 &&
-                   payload.isPaused === true && currentDuration - pos <= 1000) {
-          // Embed melapor berhenti tepat di akhir lagu -> anggap selesai.
+        } else if (payload.isPaused === true && currentDuration > 0 &&
+                   typeof pos === 'number' && pos >= currentDuration * 0.9) {
           notifyEnded();
         }
       });

@@ -82,7 +82,7 @@ function getState() {
 // ==== Komunikasi dengan frame pemutar ====
 function frameURL(src) {
   if (src === 'soundcloud') return '/screen/soundcloud/player-sc.html';
-  if (src === 'spotify') return '/screen/spotify/player-spty.html?v=20261010k';
+  if (src === 'spotify') return '/screen/spotify/player-spty.html?v=20261010n';
   return '/screen/youtube/player-yt.html';
 }
 

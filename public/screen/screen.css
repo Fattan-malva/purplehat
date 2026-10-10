@@ -40,8 +40,7 @@ body {
   gap: 12px;
 }
 
-/* Logo merek: memakai PNG transparan (tanpa latar kotak membulat). Cahaya
-   ungu dibuat dengan drop-shadow supaya mengikuti bentuk ikon, bukan kotak. */
+/* Logo merek: PNG transparan apa adanya, TANPA glow/latar tambahan. */
 .brand-logo {
   width: 42px;
   height: 42px;
@@ -50,7 +49,6 @@ body {
   align-items: center;
   justify-content: center;
   font-size: 20px;
-  filter: drop-shadow(0 0 12px rgba(168, 85, 247, 0.55));
 }
 
 /* Logo merek memakai gambar (ikon baru, background sudah dihapus). */
@@ -132,10 +130,11 @@ body {
   background: radial-gradient(circle at center, rgba(26, 11, 46, 0.9), rgba(10, 10, 12, 0.98));
   z-index: 5;
 }
+/* Logo idle: PNG transparan apa adanya, tanpa glow. */
 .idle-logo { width: 84px; height: 84px; border-radius: 24px; font-size: 40px; animation: idle-pulse 2.4s ease-in-out infinite; }
 @keyframes idle-pulse {
-  0%, 100% { filter: drop-shadow(0 0 12px rgba(168, 85, 247, 0.4)); transform: scale(1); }
-  50% { filter: drop-shadow(0 0 26px rgba(168, 85, 247, 0.8)); transform: scale(1.05); }
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
 }
 .idle-title { font-size: 34px; font-weight: 700; letter-spacing: 6px; }
 .idle-title span { color: #a855f7; }
