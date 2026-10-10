@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Spotify Lyrics</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%
+    }
+
+    body {
+      background: transparent;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      color: #fff;
+      overflow: hidden;
+    }
+
+    #btnCloseLyrics {
+      position: absolute;
+      top: 18px;
+      left: 18px;
+      right: auto;
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      color: #fff;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      font-size: 24px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s, transform 0.2s;
+      z-index: 12;
+    }
+
+    #btnCloseLyrics:hover {
+      background: rgba(255, 255, 255, 0.3);
+      transform: scale(1.1);
+    }
+
+    #trackInfo {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 12;
+      max-width: 55%;
+      text-align: center;
+      pointer-events: none;
+    }
+
+    #trackInfo h1 {
+      font-size: clamp(16px, 2vw, 22px);
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #trackInfo h2 {
+      font-size: clamp(12px, 1.4vw, 15px);
+      font-weight: 500;
+      color: rgba(255, 255, 255, .55);
+      margin-top: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .lyrics-viewport {
+      width: 100%;
+      height: 100vh;
+      overflow-y: auto;
+      padding: 0 5vw;
+      mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
+      -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      scroll-behavior: smooth;
+      z-index: 11;
+    }
+
+    .lyrics-viewport::-webkit-scrollbar {
+      display: none;
+    }
+
+    /* Lirik TIDAK di-align kiri: setiap baris dibuat rata tengah. Kolom lirik
+       diletakkan di sisi kiri layar (bukan di tengah) sehingga tidak menabrak
+       pemutar di pojok kanan-bawah. */
+    #lyricsContainer {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      padding: 45vh 0;
+      max-width: 680px;
+      margin: 0;
+      text-align: center;
+    }
+
+    .lyric-line {
+      font-size: clamp(28px, 4.5vw, 48px);
+      font-weight: 700;
+      line-height: 1.25;
+      letter-spacing: -0.03em;
+      color: rgba(255, 255, 255, 0.45);
+      transition: color 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
+      cursor: pointer;
+      transform-origin: center center;
+    }
+
+    .lyric-line:hover {
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .lyric-line.active {
+      color: #ffffff;
+      transform: scale(1.02);
+      text-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .lyric-line.dim {
+      color: rgba(255, 255, 255, 0.45);
+    }
+
+    .lyric-line.unsynced {
+      font-size: clamp(20px, 3.5vw, 36px);
+      margin-bottom: 16px;
+    }
+
+    #lyricState {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(255, 255, 255, .55);
+      font-size: 15px;
+      letter-spacing: .05em;
+      z-index: 5;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* Embed kecil duduk di pojok KANAN-bawah, jadi ruang kanan-bawah lirik
+       dipesan agar teks tidak tertutup pemutar. Sisa area tetap di tengah. */
+    body.corner .lyrics-viewport {
+      padding-left: 5vw;
+      padding-right: calc(min(340px, calc(100vw - 48px)) + 60px);
+    }
+
+    body.corner #lyricsContainer {
+      max-width: 680px;
+      margin: 0;
+    }
+
+    /* Layar sempit: embed jadi selebar layar, jadi cukup beri ruang bawah. */
+    @media (max-width:760px) {
+      body.corner .lyrics-viewport {
+        padding-left: 5vw;
+        padding-right: 5vw;
+        padding-bottom: 190px;
+      }
+
+      body.corner #lyricsContainer {
+        max-width: 100%;
+      }
+
+      #btnCloseLyrics {
+        bottom: 190px;
+        right: 16px;
+      }
+
+      #trackInfo {
+        max-width: 82%;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="trackInfo" class="hidden">
+    <h1 id="tiTitle"></h1>
+    <h2 id="tiArtist"></h2>
+  </div>
+
+  <button id="btnCloseLyrics" title="Close Lyrics">×</button>
+
+  <div id="lyricState">Menunggu lirik…</div>
+
+  <div class="lyrics-viewport" id="lyricsViewport">
+    <div id="lyricsContainer"></div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      var trackId = null;
+      var spDc = '';
+      var lyricsData = null;
+      var lyricsFetchedFor = null;
+      var activeLineIndex = -1;
+      var currentPosition = 0; // ms
+
+      var lyricsContainer = document.getElementById('lyricsContainer');
+      var lyricsViewport = document.getElementById('lyricsViewport');
+      var lyricState = document.getElementById('lyricState');
+      var trackInfo = document.getElementById('trackInfo');
+
+      function post(m) {
+        try { parent.postMessage(Object.assign({ ph: 1 }, m), '*'); } catch (e) {}
+      }
+
+      function setState(text) {
+        if (!lyricState) return;
+        if (text) { lyricState.textContent = text; lyricState.classList.remove('hidden'); }
+        else { lyricState.classList.add('hidden'); }
+      }
+
+      function fetchLyrics() {
+        if (!trackId) return;
+        if (lyricsFetchedFor === trackId + '|' + spDc) return;
+        lyricsFetchedFor = trackId + '|' + spDc;
+        lyricsData = null;
+        lyricsContainer.innerHTML = '';
+        activeLineIndex = -1;
+        setState('Memuat lirik…');
+
+        fetch('/api/spotify/lyrics?trackId=' + encodeURIComponent(trackId) +
+          (spDc ? '&sp_dc=' + encodeURIComponent(spDc) : ''))
+          .then(function (res) {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.json();
+          })
+          .then(function (data) {
+            if (data && data.lines && data.lines.length > 0) {
+              lyricsData = data;
+              renderLyrics();
+              setState(data.hasSync ? '' : 'Lirik tidak tersinkron');
+            } else {
+              setState('Lirik tidak tersedia');
+            }
+          })
+          .catch(function () {
+            setState('Lirik tidak tersedia');
+          });
+      }
+
+      function renderLyrics() {
+        lyricsContainer.innerHTML = '';
+        var isSynced = !!lyricsData.hasSync;
+        lyricsData.lines.forEach(function (line, index) {
+          var el = document.createElement('div');
+          el.className = 'lyric-line' + (isSynced ? '' : ' unsynced');
+          el.textContent = line.text || '\u00A0';
+          el.dataset.index = index;
+          if (isSynced && typeof line.startMs === 'number') {
+            el.addEventListener('click', function () {
+              post({ type: 'lyric-seek', ms: line.startMs });
+            });
+          }
+          lyricsContainer.appendChild(el);
+        });
+        updateActive(true);
+      }
+
+      function updateActive(forceScroll) {
+        if (!lyricsData || !lyricsData.hasSync) return;
+        var lines = lyricsData.lines;
+        var newIndex = -1;
+        for (var i = 0; i < lines.length; i++) {
+          if (currentPosition >= lines[i].startMs &&
+            (i === lines.length - 1 || currentPosition < lines[i + 1].startMs)) {
+            newIndex = i;
+            break;
+          }
+        }
+        if (newIndex === activeLineIndex && !forceScroll) return;
+
+        var els = lyricsContainer.getElementsByClassName('lyric-line');
+        // Posisi biasa saja: teks yang sedang dinyanyikan putih & diperbesar,
+        // sisanya diredupkan (sama seperti tampilan lirik spty-web).
+        for (var j = 0; j < els.length; j++) {
+          els[j].classList.toggle('active', j === newIndex);
+          els[j].classList.toggle('dim', j !== newIndex);
+        }
+        activeLineIndex = newIndex;
+        if (newIndex >= 0 && newIndex < els.length) {
+          var activeEl = els[newIndex];
+          var vh = lyricsViewport.clientHeight;
+          lyricsViewport.scrollTo({
+            top: activeEl.offsetTop - (vh / 2) + (activeEl.clientHeight / 2),
+            behavior: 'smooth'
+          });
+        }
+      }
+
+      function applyConfig(d) {
+        var changed = (d.trackId !== trackId) || ((d.sp_dc || '') !== spDc);
+        trackId = d.trackId || null;
+        spDc = d.sp_dc || '';
+        if (d.title) {
+          document.getElementById('tiTitle').textContent = d.title;
+          trackInfo.classList.remove('hidden');
+        }
+        if (d.artist) document.getElementById('tiArtist').textContent = d.artist;
+        document.body.classList.toggle('corner', !!d.corner);
+        if (changed) fetchLyrics();
+        else if (lyricsData) updateActive(true);
+      }
+
+      window.addEventListener('message', function (e) {
+        var d = e.data;
+        if (!d || !d.ph) return;
+        if (d.type === 'lyric-config') { applyConfig(d); return; }
+        if (d.type === 'lyric-pos') {
+          currentPosition = d.position || 0;
+          updateActive();
+          return;
+        }
+      });
+
+      document.getElementById('btnCloseLyrics').addEventListener('click', function () {
+        post({ type: 'lyric-close' });
+      });
+
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') post({ type: 'lyric-close' });
+      });
+
+      // Umumkan siap supaya induk mengirim config bila overlay sudah terbuka.
+      post({ type: 'lyric-ready' });
+
+      // Kembalikan posisi terakhir yang sudah diterima: lirik tetap bergerak
+      // mulus walaupun belum ada pesan baru dari pemutar.
+      setInterval(function () {
+        if (lyricsData) updateActive();
+      }, 250);
+    })();
+  </script>
+</body>
+
+</html>

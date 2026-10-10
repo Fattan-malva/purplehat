@@ -17,6 +17,10 @@ const MSG = {
   LOOP: 'loop',
   LOOP_QUEUE: 'loop_queue',
   MOVE_SONG: 'move_song',
+  // Spotify: kirim/perbarui sp_dc (cookie login) milik room.
+  SET_SPDC: 'set_sp_dc',
+  // Spotify: buka/tutup tampilan lirik di frame player (dipakai tombol FX).
+  LYRICS: 'lyrics',
   // screen -> controller
   STATE_SYNC: 'state_sync',
   QUEUE_UPDATE: 'queue_update',
@@ -28,7 +32,14 @@ const MSG = {
   // agar controller bisa menyambung lagi dengan kode yang sama.
   CONTROLLER_LOGOUT: 'controller_logout',
   // Room dihapus di server -> controller kembali ke layar pairing.
-  ROOM_CLOSED: 'room_closed'
+  ROOM_CLOSED: 'room_closed',
+  // Server -> screen: sp_dc tersimpan (kirim saat connect / setelah diubah).
+  SPDC: 'sp_dc',
+  // Screen -> controller: sp_dc hilang/kedaluwarsa -> controller buka modal input.
+  SPDC_INVALID: 'sp_dc_invalid',
+  // Screen -> controller: lagu Spotify aktif punya lirik tersinkron (true)
+  // atau tidak (false). null = belum diketahui.
+  LYRICS_AVAIL: 'lyrics_available'
 };
 
 function createMsg(type, payload = {}) {

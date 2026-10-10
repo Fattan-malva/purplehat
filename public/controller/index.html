@@ -21,7 +21,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="controller.css?v=20261010d">
+    <link rel="stylesheet" href="controller.css?v=20261010i">
 
     <script>
         // ==== ATURAN KERAS: controller hanya boleh tampil sebagai aplikasi ====
@@ -48,7 +48,7 @@
     </script>
 
     <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
-    <script src="/shared/protocol.js?v=20261010a"></script>
+    <script src="/shared/protocol.js?v=20261010c"></script>
     <script src="/vendor/jsqr/dist/jsQR.js"></script>
 </head>
 
@@ -131,6 +131,9 @@
                 </button>
                 <button class="src-tab" data-src="soundcloud">
                     <i class="fab fa-soundcloud src-sc" title="Available on SoundCloud"></i> SoundCloud
+                </button>
+                <button class="src-tab" data-src="spotify">
+                    <i class="fab fa-spotify src-sp" title="Available on Spotify"></i> Spotify
                 </button>
             </div>
 
@@ -288,9 +291,32 @@
         </div>
     </div>
 
+    <!-- ===== MODAL: sp_dc Spotify (login per room) ===== -->
+    <div id="spdc-modal" class="modal hidden">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h3 class="section-title"><i class="fab fa-spotify src-sp"></i> Login Spotify</h3>
+                <button class="icon-btn" data-close="spdc-modal" aria-label="Tutup">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p class="hint spdc-hint" id="spdc-hint">
+                    Tempelkan cookie <strong>sp_dc</strong> dari akun Spotify. Buka
+                    <em>open.spotify.com</em> &rarr; DevTools &rarr; Application &rarr; Cookies &rarr; salin nilai
+                    <strong>sp_dc</strong>.
+                </p>
+                <textarea id="spdc-input" class="spdc-input" rows="4" placeholder="Tempel nilai sp_dc di sini..."
+                    autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
+                    aria-label="Nilai sp_dc Spotify"></textarea>
+                <div class="spdc-error hidden" id="spdc-error"></div>
+                <button id="spdc-save" class="btn-primary spdc-save">Simpan &amp; Lanjut</button>
+            </div>
+        </div>
+    </div>
+
     <!-- ===== MODAL: UP NEXT (loop + shuffle juga di sini) ===== -->
-    <div id="upnext-modal" class="modal hidden">
-        <div class="modal-box modal-box-tall">
+    <div id="upnext-modal" class="modal hidden">        <div class="modal-box modal-box-tall">
             <div class="modal-head">
                 <h3 class="section-title"><i data-lucide="list-music"></i> Up Next</h3>
                 <div class="queue-modes" id="queue-modes">
@@ -325,7 +351,7 @@
             pitchDisplay.classList.toggle('is-on', currentPitch !== 0);
         }
     </script>
-    <script src="controller.js?v=20261010d"></script>
+    <script src="controller.js?v=20261010i"></script>
 </body>
 
 </html>

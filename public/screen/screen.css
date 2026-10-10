@@ -236,21 +236,42 @@ body.immersive #player-wrapper {
   border-radius: 0;
   border: none;
 }
-body.immersive #screen-logout {
+/* Kode room + logout berdampingan di pojok kanan atas layar player
+   (bukan terpisah ke pojok kiri). */
+.screen-top-right {
   position: fixed;
   top: 16px;
   right: 16px;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+body.immersive #screen-logout {
+  position: static;
+  top: auto;
+  left: auto;
+  right: auto;
+  margin-left: 0;
+  /* Icon-only: kotak bulat, tanpa teks */
+  padding: 0;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
   z-index: 50;
   background: rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
-/* Badge kode room di pojok kiri atas layar player */
+/* Badge kode room di pojok kanan atas layar player */
 .room-badge {
-  position: fixed;
-  top: 16px;
-  left: 16px;
-  z-index: 50;
+  position: static;
+  top: auto;
+  left: auto;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -430,4 +451,43 @@ html.ph-android body.immersive #screen-logout,
 html.ph-android .room-badge {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
+}
+
+/* ==========================================================================
+   Mobile: matikan seleksi teks & menu long-press (lihat controller.css)
+   Tidak ada `pointer-events: none` / `touch-action: none` global supaya
+   interaksi tombol & frame tetap jalan normal.
+   ========================================================================== */
+
+* {
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  user-select: none !important;
+  -webkit-touch-callout: none;
+}
+
+input,
+textarea,
+[contenteditable="true"] {
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+  user-select: text !important;
+  -webkit-touch-callout: default;
+}
+
+button,
+a,
+input,
+textarea,
+select,
+label,
+[role="button"],
+input[type="range"] {
+  touch-action: manipulation;
+}
+
+input[type="range"] {
+  touch-action: pan-x;
 }

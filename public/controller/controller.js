@@ -20,12 +20,12 @@ var fallbackMode = false;
 var reconnectAttempts = 0;
 var suppressReconnect = false;
 var reconnectTimer = null;
-var state = { current: null, queue: [], playing: false, position: 0, duration: 0, volume: 30, modes: { loop: false, shuffle: false, loopQueue: false } };
+var state = { current: null, queue: [], playing: false, position: 0, duration: 0, volume: 30, lyricsAvailable: null, modes: { loop: false, shuffle: false, loopQueue: false } };
 // Sedang menyeret progress bar (scrub). Selama true, render() tidak menimpa
 // posisi bar supaya tidak goyang saat STATE_SYNC masuk.
 var isScrubbing = false;
 const API_BASE = localStorage.getItem('ph_api_base') || '';
-var searchSource = 'youtube'; // 'youtube' | 'soundcloud'
+var searchSource = 'youtube'; // 'youtube' | 'soundcloud' | 'spotify'
 
 function send(type, payload) {
   if (ws && ws.readyState === WebSocket.OPEN) {
@@ -119,7 +119,7 @@ function showPairScreen() {
   connState = 'off';
   renderStatus();
   document.getElementById('queue-badge').textContent = '0';
-  state = { current: null, queue: [], playing: false, position: 0, duration: 0, volume: 30, modes: { loop: false, shuffle: false, loopQueue: false } };
+  state = { current: null, queue: [], playing: false, position: 0, duration: 0, volume: 30, lyricsAvailable: null, modes: { loop: false, shuffle: false, loopQueue: false } };
   updateVolUI();
   syncModeButtons();
 }
@@ -218,6 +218,15 @@ function handleMessage(msg) {
     case PH.MSG.ERROR:
       console.error(p);
       break;
+    case PH.MSG.SPDC_INVALID:
+      // Layar melaporkan sp_dc Spotify hilang/kedaluwarsa -> buka modal input.
+      openSpdcModal('sp_dc Spotify tidak valid / kedaluwarsa. Tempel nilai baru.');
+      break;
+    case PH.MSG.LYRICS_AVAIL:
+      // Layar melaporkan ketersediaan lirik tersinkron lagu Spotify aktif.
+      state.lyricsAvailable = (p.available === undefined) ? null : !!p.available;
+      render();
+      break;
     case PH.MSG.ROOM_CLOSED:
       // Room dihapus (mis. layar logout) -> kembali ke layar pairing.
       suppressReconnect = true;
@@ -234,9 +243,9 @@ function bindUI() {
   // Tab sumber
   document.querySelectorAll('#search-tabs .src-tab').forEach(btn => {
     btn.addEventListener('click', () => {
-      searchSource = btn.dataset.src;
-      document.querySelectorAll('#search-tabs .src-tab').forEach(b => b.classList.toggle('mode-active', b === btn));
-      document.getElementById('results').classList.add('hidden');
+      const src = btn.dataset.src;
+      if (src === 'spotify') { onSpotifyTabClick(btn); return; }
+      setSearchSource(src);
       if (document.getElementById('search-input').value.trim()) search();
     });
   });
@@ -286,15 +295,37 @@ function bindUI() {
   });
 
   // ==== Modal: FX & Up Next ====
+  // Saat lagu Spotify sedang diputar, tombol ini BERUBAH FUNGSI menjadi
+  // pengirim perintah lirik (bukan membuka modal FX).
+  //
+  // Kalau lagu Spotify TIDAK punya lirik, tombol dinonaktifkan penuh:
+  // diklik/ditekan sebanyak apa pun TIDAK mengirim perintah LYRICS supaya
+  // layar lirik tidak pernah terbuka untuk lagu tanpa lirik.
   document.getElementById('btn-fx').addEventListener('click', () => {
+    if (currentIsSpotify()) {
+      if (state.lyricsAvailable !== true) { shakeLyricsBlocked(); return; }
+      send(PH.MSG.LYRICS, {});
+      return;
+    }
     document.getElementById('fx-modal').classList.remove('hidden');
     refreshIcons();
+  });
+  // Tombol disabled tidak memicu 'click', jadi pakai pointerdown supaya tetap
+  // ada umpan balik (getar) ketika user nekat menekannya.
+  document.getElementById('btn-fx').addEventListener('pointerdown', () => {
+    if (currentIsSpotify() && state.lyricsAvailable !== true) shakeLyricsBlocked();
   });
   // Ikon volume di sebelah FX: buka modal master volume.
   document.getElementById('btn-volume').addEventListener('click', () => {
     document.getElementById('volume-modal').classList.remove('hidden');
     updateVolUI();
     refreshIcons();
+  });
+
+  // sp_dc Spotify: simpan lalu lanjut cari di Spotify.
+  document.getElementById('spdc-save').addEventListener('click', saveSpdc);
+  document.getElementById('spdc-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); saveSpdc(); }
   });
   document.getElementById('btn-upnext').addEventListener('click', () => {
     document.getElementById('upnext-modal').classList.remove('hidden');
@@ -365,6 +396,132 @@ function bindScrub() {
   track.addEventListener('pointercancel', (e) => endScrub(e, false));
 }
 
+// ===== Sumber pencarian: YouTube / SoundCloud / Spotify =====
+function setSearchSource(src) {
+  searchSource = src;
+  document.querySelectorAll('#search-tabs .src-tab').forEach(b => {
+    b.classList.toggle('mode-active', b.dataset.src === src);
+  });
+  document.getElementById('results').classList.add('hidden');
+}
+
+// Klik chip Spotify: cek & validasi sp_dc dulu. Kalau belum ada / kedaluwarsa
+// -> buka modal input; kalau valid -> langsung cari.
+async function onSpotifyTabClick(btn) {
+  if (!roomCode) return;
+  let has = false;
+  try {
+    const r = await fetch('/api/room/' + roomCode + '/spdc', { cache: 'no-store' });
+    if (r.ok) has = !!(await r.json()).has;
+  } catch (e) {}
+  if (!has) { openSpdcModal('Masukkan sp_dc Spotify untuk room ini.'); return; }
+  // Validasi nilai tersimpan (server yang memeriksa, controller tak perlu tahu isinya).
+  try {
+    const v = await fetch('/api/room/' + roomCode + '/spdc/validate', { cache: 'no-store' });
+    if (!v.ok) {
+      openSpdcModal('sp_dc tersimpan sudah tidak valid / kedaluwarsa. Masukkan yang baru.');
+      return;
+    }
+  } catch (e) {
+    // Backend sedang tak bisa dihubungi: biarkan user mencoba.
+  }
+  setSearchSource('spotify');
+  if (document.getElementById('search-input').value.trim()) search();
+}
+
+function openSpdcModal(msg) {
+  const hint = document.getElementById('spdc-hint');
+  if (hint && msg) hint.textContent = msg;
+  const err = document.getElementById('spdc-error');
+  if (err) { err.classList.add('hidden'); err.textContent = ''; }
+  const input = document.getElementById('spdc-input');
+  if (input) input.value = '';
+  document.getElementById('spdc-modal').classList.remove('hidden');
+  refreshIcons();
+  if (input) setTimeout(() => { try { input.focus(); } catch (e) {} }, 50);
+}
+
+function showSpdcError(msg) {
+  const err = document.getElementById('spdc-error');
+  if (err) { err.textContent = msg; err.classList.remove('hidden'); }
+}
+
+// sp_dc boleh ditempel sebagai nilai mentah atau "sp_dc=xxxx; ...".
+function parseSpdc(raw) {
+  const s = String(raw || '').trim();
+  const m = s.match(/sp_dc=([^;,\s]+)/);
+  return m ? m[1].trim() : s;
+}
+
+async function saveSpdc() {
+  if (!roomCode) return;
+  const input = document.getElementById('spdc-input');
+  const btn = document.getElementById('spdc-save');
+  const value = parseSpdc(input ? input.value : '');
+  if (!value || value.length < 20) { showSpdcError('sp_dc terlalu pendek / tidak valid.'); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Memeriksa...'; }
+  try {
+    const v = await fetch('/api/spotify/validate?sp_dc=' + encodeURIComponent(value), { cache: 'no-store' });
+    if (!v.ok) { showSpdcError('sp_dc tidak valid atau kedaluwarsa. Coba salin ulang.'); return; }
+    const r = await fetch('/api/room/' + roomCode + '/spdc', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sp_dc: value })
+    });
+    if (!r.ok) { showSpdcError('Gagal menyimpan sp_dc. Coba lagi.'); return; }
+    document.getElementById('spdc-modal').classList.add('hidden');
+    setSearchSource('spotify');
+    search();
+  } catch (e) {
+    showSpdcError('Gagal menghubungi server. Coba lagi.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Simpan & Lanjut'; }
+  }
+}
+
+// Tombol FX berubah fungsi jadi pengirim perintah lirik saat lagu Spotify aktif.
+function currentIsSpotify() {
+  return !!(state.current && state.current.source === 'spotify');
+}
+
+// Umpan balik saat tombol lirik ditekan padahal lagu tidak punya lirik.
+function shakeLyricsBlocked() {
+  const btn = document.getElementById('btn-fx');
+  if (!btn) return;
+  btn.classList.remove('lyrics-blocked-shake');
+  // Paksa reflow supaya animasi bisa dijalankan ulang saat ditekan lagi.
+  void btn.offsetWidth;
+  btn.classList.add('lyrics-blocked-shake');
+  setTimeout(() => btn.classList.remove('lyrics-blocked-shake'), 500);
+}
+
+function syncFxButton() {
+  const btn = document.getElementById('btn-fx');
+  if (!btn) return;
+  const isSp = currentIsSpotify();
+  // Ketersediaan lirik: true=hijau, false=merah+coret, null=netral (belum tahu).
+  const avail = (state.lyricsAvailable === true) ? 'on'
+    : (state.lyricsAvailable === false ? 'off' : 'unknown');
+  const key = isSp ? ('lyrics-' + avail) : 'fx';
+  if (btn.dataset.fxmode === key) return;
+  btn.dataset.fxmode = key;
+  btn.classList.toggle('fx-open', !isSp);
+  btn.classList.toggle('fx-lyrics', isSp);
+  btn.classList.toggle('fx-lyrics-on', isSp && avail === 'on');
+  btn.classList.toggle('fx-lyrics-off', isSp && avail === 'off');
+  // Spotify tanpa lirik: tombol benar-benar non-aktif (tidak bisa diklik).
+  const disabled = isSp && avail !== 'on';
+  btn.disabled = disabled;
+  btn.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+  const title = !isSp ? 'FX & Tuning'
+    : (avail === 'on' ? 'Lirik tersedia' : avail === 'off' ? 'Lirik tidak tersedia' : 'Belum tahu lirik tersedia');
+  btn.title = title;
+  btn.setAttribute('aria-label', title);
+  const iconName = !isSp ? 'wand-sparkles' : (avail === 'off' ? 'captions-off' : 'captions');
+  btn.innerHTML = '<i data-lucide="' + iconName + '"></i>';
+  refreshIcons();
+}
+
 // ===== Pencarian + pagination tak berujung (terpicu saat scroll ke bawah) =====
 var resultsState = { query: '', src: null, page: 1, offset: 0, hasMore: false, loading: false, limit: 20 };
 
@@ -374,7 +531,8 @@ async function search() {
   const el = document.getElementById('results');
   el.classList.remove('hidden');
   resultsState = { query: q, src: searchSource, page: 1, offset: 0, hasMore: true, loading: true, limit: 20 };
-  el.innerHTML = '<div class="state-msg"><i data-lucide="loader-circle" class="spin"></i> Mencari di ' + (searchSource === 'soundcloud' ? 'SoundCloud' : 'YouTube') + '...</div>';
+  const srcName = searchSource === 'soundcloud' ? 'SoundCloud' : (searchSource === 'spotify' ? 'Spotify' : 'YouTube');
+  el.innerHTML = '<div class="state-msg"><i data-lucide="loader-circle" class="spin"></i> Mencari di ' + srcName + '...</div>';
   refreshIcons();
   try {
     const r = await fetchPage(false);
@@ -393,13 +551,15 @@ async function fetchPage(append) {
   let url;
   if (resultsState.src === 'soundcloud') {
     url = `${API_BASE}/api/search-soundcloud?q=${encodeURIComponent(q)}&limit=${resultsState.limit}&page=${append ? resultsState.page : 1}`;
+  } else if (resultsState.src === 'spotify') {
+    url = `${API_BASE}/api/search-spotify?q=${encodeURIComponent(q)}&limit=${resultsState.limit}&page=${append ? resultsState.page : 1}`;
   } else {
     url = `${API_BASE}/api/search?q=${encodeURIComponent(q)}&limit=${resultsState.limit}&offset=${append ? resultsState.offset : 0}`;
   }
   const res = await fetch(url);
   if (!res.ok) throw new Error('HTTP ' + res.status);
   const data = await res.json();
-  if (resultsState.src === 'soundcloud') {
+  if (resultsState.src === 'soundcloud' || resultsState.src === 'spotify') {
     const items = data.data || [];
     return { items, hasMore: !!(data.hasNext && items.length === resultsState.limit) };
   }
@@ -408,7 +568,7 @@ async function fetchPage(append) {
 }
 
 function advanceState(loaded, hasMore) {
-  if (resultsState.src === 'soundcloud') resultsState.page += 1;
+  if (resultsState.src === 'soundcloud' || resultsState.src === 'spotify') resultsState.page += 1;
   else resultsState.offset += loaded;
   resultsState.hasMore = hasMore;
   resultsState.loading = false;
@@ -443,13 +603,13 @@ async function loadMore() {
 }
 
 function sourceIcon(src) {
-  return src === 'soundcloud'
-    ? '<i class="fab fa-soundcloud src-sc" title="Available on SoundCloud"></i>'
-    : '<i class="fab fa-youtube src-yt" title="Available on YouTube"></i>';
+  if (src === 'soundcloud') return '<i class="fab fa-soundcloud src-sc" title="Available on SoundCloud"></i>';
+  if (src === 'spotify') return '<i class="fab fa-spotify src-sp" title="Available on Spotify"></i>';
+  return '<i class="fab fa-youtube src-yt" title="Available on YouTube"></i>';
 }
 
 function buildResultRow(item) {
-  const isSC = item.source === 'soundcloud' || !!item.trackId;
+  const src = item.source || resultsState.src || 'youtube';
   const sub = [item.artist || item.channelName || '', item.duration || ''].filter(Boolean).join(' • ');
   const thumb = item.thumbnail
     ? `<img class="thumb" src="${item.thumbnail}" alt="${escapeHtml(item.title || '')}">`
@@ -462,11 +622,13 @@ function buildResultRow(item) {
       ${thumb}
       <div class="row-main">
         <div class="row-title">${escapeHtml(item.title || '')}</div>
-        <div class="row-sub">${sourceIcon(isSC ? 'soundcloud' : 'youtube')} <span class="truncate">${escapeHtml(sub)}</span></div>
+        <div class="row-sub">${sourceIcon(src)} <span class="truncate">${escapeHtml(sub)}</span></div>
       </div>
       <i data-lucide="plus" class="row-add"></i>`;
   div.addEventListener('click', () => {
-    if (isSC) {
+    if (src === 'spotify') {
+      send(PH.MSG.ADD_SONG, { source: 'spotify', trackId: item.trackId, title: item.title, artist: item.artist, thumbnail: item.thumbnail });
+    } else if (src === 'soundcloud') {
       send(PH.MSG.ADD_SONG, { source: 'soundcloud', trackId: item.trackId, title: item.title, artist: item.artist, thumbnail: item.thumbnail });
     } else {
       send(PH.MSG.ADD_SONG, { source: 'youtube', videoId: item.videoId, title: item.title, artist: item.channelName, thumbnail: item.thumbnail });
@@ -534,15 +696,17 @@ function render() {
   }
   const subEl = document.getElementById('np-sub');
   if (state.current) {
-    const src = state.current.source === 'soundcloud' ? 'soundcloud' : 'youtube';
+    const src = state.current.source === 'soundcloud' ? 'soundcloud'
+      : (state.current.source === 'spotify' ? 'spotify' : 'youtube');
     const artist = state.current.artist || '';
-    const label = src === 'soundcloud' ? 'SoundCloud' : 'YouTube';
+    const label = src === 'soundcloud' ? 'SoundCloud' : (src === 'spotify' ? 'Spotify' : 'YouTube');
     const subHtml = `${artist ? escapeHtml(artist) + ' &bull; ' : ''}${sourceIcon(src)} ${label}`;
     setMarquee(subEl, subHtml, 1.2);
   } else {
     setMarquee(subEl, 'Purplehat Karaoke', 1.2);
   }
   renderStatus();
+  syncFxButton();
   document.getElementById('queue-badge').textContent = state.queue.length;
   const pos = state.position || 0, dur = state.duration || 0;
   // Saat scrub, jangan timpa preview bar/label posisi milik pengguna.

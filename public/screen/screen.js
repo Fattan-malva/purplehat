@@ -21,13 +21,26 @@ var stoppedSong = null;
 
 // ==== Frame playback ====
 var currentSource = 'youtube'; // sumber lagu aktif
-var frameSrc = null;            // dokumen yang sedang dimuat di iframe ('youtube'|'soundcloud')
+var frameSrc = null;            // dokumen yang sedang dimuat di iframe ('youtube'|'soundcloud'|'spotify')
 var frameReady = false;         // frame sudah kirim pesan 'ready'
 var pendingSong = null;         // lagu yang menunggu frame siap
 var mediaPosition = 0;          // detik, dari frame
 var mediaDuration = 0;          // detik, dari frame
+var sp_dc = null;               // cookie login Spotify (per room, dari server)
+var lyricsAvailable = null;     // true/false/null: lirik tersinkron untuk lagu Spotify aktif
 
 function isSC() { return currentSource === 'soundcloud'; }
+
+// Sumber normal ('youtube'|'soundcloud'|'spotify')
+function songSource(song) {
+  const s = song && song.source;
+  return (s === 'soundcloud' || s === 'spotify') ? s : 'youtube';
+}
+
+// ID lagu: SoundCloud & Spotify pakai trackId, YouTube pakai videoId
+function songId(song) {
+  return songSource(song) === 'youtube' ? song.videoId : song.trackId;
+}
 
 // ==== Mode desktop: dijalankan di dalam wrapper WinForms WebView2 ====
 // window.chrome.webview ada hanya saat halaman dimuat di WebView2.
@@ -61,15 +74,16 @@ function getState() {
     position: Math.floor(mediaPosition),
     duration: Math.floor(mediaDuration),
     volume: volume,
+    lyricsAvailable: lyricsAvailable,
     modes: { loop: modeLoop, shuffle: modeShuffle, loopQueue: modeLoopQueue }
   };
 }
 
 // ==== Komunikasi dengan frame pemutar ====
 function frameURL(src) {
-  return src === 'soundcloud'
-    ? '/screen/soundcloud/player-sc.html'
-    : '/screen/youtube/player-yt.html';
+  if (src === 'soundcloud') return '/screen/soundcloud/player-sc.html';
+  if (src === 'spotify') return '/screen/spotify/player-spty.html?v=20261010k';
+  return '/screen/youtube/player-yt.html';
 }
 
 function sendFrame(m) {
@@ -78,17 +92,23 @@ function sendFrame(m) {
 }
 
 function sendLoad(song) {
-  sendFrame(song.source === 'soundcloud'
-    ? { cmd: 'load', trackId: song.trackId, volume: frameVolume() }
-    : { cmd: 'load', videoId: song.videoId, volume: frameVolume() });
+  const src = songSource(song);
+  if (src === 'soundcloud') {
+    sendFrame({ cmd: 'load', trackId: song.trackId, volume: frameVolume() });
+  } else if (src === 'spotify') {
+    sendFrame({ cmd: 'load', trackId: song.trackId, sp_dc: sp_dc, volume: frameVolume() });
+  } else {
+    sendFrame({ cmd: 'load', videoId: song.videoId, volume: frameVolume() });
+  }
 }
 
 // Muat lagu ke frame; ganti dokumen frame jika sumber berbeda
 function startSong(song) {
-  const src = song.source === 'soundcloud' ? 'soundcloud' : 'youtube';
+  const src = songSource(song);
   const f = document.getElementById('player-frame');
   stoppedSong = null; // lagu mulai lagi -> memori "lagu yang di-Stop" tidak relevan
   currentSource = src;
+  lyricsAvailable = null; // status lirik di-reset; frame Spotify akan melaporkan ulang
   if (f) f.classList.remove('hidden');
   if (frameSrc !== src) {
     // Ganti dokumen frame -> pemutar lama dimatikan total
@@ -123,7 +143,29 @@ window.addEventListener('message', (e) => {
     isPlaying = false;
     if (modeLoop) sendFrame({ cmd: 'replay' });
     else playNext();
+  } else if (d.type === 'sp_dc_invalid') {
+    // Spotify: sp_dc hilang/kedaluwarsa -> minta controller buka modal input.
+    const st = document.getElementById('status');
+    if (st) st.textContent = 'Status: sp_dc Spotify tidak valid - masukkan ulang dari controller';
+    isPlaying = false;
+    send(PH.MSG.SPDC_INVALID, { sp_dc: sp_dc });
+    broadcastState();
+  } else if (d.type === 'lyrics_available') {
+    // Frame Spotify melaporkan apakah lagu punya lirik tersinkron.
+    lyricsAvailable = (d.available === undefined) ? null : !!d.available;
+    send(PH.MSG.LYRICS_AVAIL, { available: lyricsAvailable, trackId: d.trackId || null });
+    broadcastState();
   } else if (d.type === 'error') {
+    if (currentSource === 'spotify') {
+      // Sumber Spotify gagal (biasanya sp_dc) -> jangan lewati lagu,
+      // beri tahu controller agar sp_dc diperbarui.
+      const st2 = document.getElementById('status');
+      if (st2) st2.textContent = 'Status: Spotify tidak bisa diputar - cek sp_dc';
+      isPlaying = false;
+      send(PH.MSG.SPDC_INVALID, { sp_dc: sp_dc });
+      broadcastState();
+      return;
+    }
     const st = document.getElementById('status');
     if (st) st.textContent = 'Status: Video tidak bisa diputar, lanjut ke berikutnya...';
     isPlaying = false;
@@ -139,7 +181,7 @@ async function init() {
     return;
   }
 
-  // Tampilkan kode room di pojok kiri atas layar player
+  // Tampilkan kode room di pojok kanan atas layar player
   const codeEl = document.getElementById('room-code-badge');
   if (codeEl) codeEl.textContent = roomCode;
 
@@ -184,6 +226,18 @@ function handleMessage(msg) {
     case PH.MSG.SHUFFLE: modeShuffle = !!p.on; broadcastState(); break;
     case PH.MSG.LOOP_QUEUE: modeLoopQueue = !!p.on; broadcastState(); break;
     case PH.MSG.MOVE_SONG: moveSong(p.index, p.dir); break;
+    case PH.MSG.LYRICS:
+      // Command lirik dari controller (tombol FX saat lagu Spotify aktif).
+      sendFrame({ cmd: 'lyrics' });
+      break;
+    case PH.MSG.SPDC:
+      // sp_dc tersimpan dari server (saat connect atau setelah diubah).
+      sp_dc = p.sp_dc || null;
+      // Kalau lagu Spotify sedang diputar, teruskan nilai baru ke frame.
+      if (sp_dc && currentIndex >= 0 && queue[currentIndex] && songSource(queue[currentIndex]) === 'spotify') {
+        sendLoad(queue[currentIndex]);
+      }
+      break;
     case PH.MSG.CONTROLLER_JOINED:
       document.getElementById('status').textContent = 'Status: Controller terhubung';
       break;
@@ -227,13 +281,15 @@ function fullLogout() {
 function addSong(p) {
   const payload = p || {};
   const videoId = payload.videoId;
-  const isSoundCloud = payload.source === 'soundcloud';
-  if (!videoId && !isSoundCloud) return;
+  const src = payload.source === 'soundcloud' || payload.source === 'spotify' ? payload.source : 'youtube';
+  const trackId = payload.trackId;
+  if (src === 'youtube' && !videoId) return;
+  if (src !== 'youtube' && !trackId) return;
   queue.push({
     videoId: videoId || null,
-    trackId: payload.trackId || null,
-    source: isSoundCloud ? 'soundcloud' : 'youtube',
-    title: payload.title || videoId || String(payload.trackId || ''),
+    trackId: trackId || null,
+    source: src,
+    title: payload.title || videoId || String(trackId || ''),
     artist: payload.artist || '',
     thumbnail: payload.thumbnail || (videoId ? 'https://img.youtube.com/vi/' + videoId + '/hqdefault.jpg' : '')
   });
@@ -331,7 +387,7 @@ function playNext(skipRemoveCurrent) {
 
   currentIndex = nextIndex;
   const song = queue[currentIndex];
-  if (!(song.source === 'soundcloud' ? song.trackId : song.videoId)) {
+  if (!songId(song)) {
     // ID tidak valid -> lewati
     setTimeout(playNext, 300);
     return;
@@ -351,7 +407,7 @@ function replay() {
 function playAt(index) {
   if (index < 0 || index >= queue.length) return;
   const song = queue[index];
-  if (!(song.source === 'soundcloud' ? song.trackId : song.videoId)) return;
+  if (!songId(song)) return;
   currentIndex = index;
   startSong(song);
   updateUI();

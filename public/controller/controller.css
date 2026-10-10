@@ -1219,6 +1219,10 @@ input[type="range"]::-moz-range-thumb {
   color: #fb923c;
 }
 
+.src-sp {
+  color: #1db954;
+}
+
 /* ---------- Results: isi area tengah, scrollbar disembunyikan ---------- */
 .results {
   display: flex;
@@ -1554,6 +1558,97 @@ input[type="range"]::-moz-range-thumb {
 /* ---------- Modal: Master Volume ---------- */
 .modal-box-vol {
   max-width: 440px;
+}
+
+/* ---------- Modal: sp_dc Spotify ---------- */
+.spdc-hint {
+  line-height: 1.55;
+}
+
+.spdc-input {
+  width: 100%;
+  min-height: 96px;
+  resize: vertical;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--line-soft);
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: break-all;
+  outline: none;
+}
+
+.spdc-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.18);
+}
+
+.spdc-error {
+  color: #fca5a5;
+  font-size: 12px;
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+
+.spdc-save {
+  width: 100%;
+  height: 44px;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.spdc-save:disabled {
+  opacity: 0.6;
+}
+
+/* Tombol FX saat berubah jadi pengirim perintah lirik (lagu Spotify). */
+.fx-lyrics {
+  color: #1db954;
+  border-color: rgba(29, 185, 84, 0.5);
+  background: rgba(29, 185, 84, 0.12);
+}
+
+/* Lirik tersinkron tersedia -> tombol hijau terang. */
+.fx-lyrics-on {
+  color: #1ed760;
+  border-color: rgba(30, 215, 96, 0.85);
+  background: rgba(30, 215, 96, 0.18);
+  box-shadow: 0 0 0 1px rgba(30, 215, 96, 0.25), 0 0 14px rgba(30, 215, 96, 0.25);
+}
+
+/* Lirik tidak tersedia -> merah + ikon dicoret (garis diagonal). */
+.fx-lyrics-off {
+  color: #ff5b5b;
+  border-color: rgba(255, 91, 91, 0.7);
+  background: rgba(255, 91, 91, 0.14);
+  position: relative;
+}
+
+/* Tombol lirik yang tidak tersedia jadi benar-benar non-aktif: pointer jadi
+   "tidak boleh" dan tombol tidak terlihat bisa ditekan. */
+.fx-lyrics-off:disabled {
+  cursor: not-allowed;
+  opacity: 0.75;
+}
+
+.fx-lyrics-off::after {
+  content: "";
+  position: absolute;
+  left: 22%;
+  right: 22%;
+  top: 50%;
+  height: 2px;
+  margin-top: -1px;
+  background: #ff5b5b;
+  border-radius: 2px;
+  transform: rotate(-45deg);
+  pointer-events: none;
 }
 
 /* Volume: nilai punya glow -> jangan dipotong overflow .modal-body */
@@ -2195,4 +2290,77 @@ input[type="range"]::-moz-range-thumb {
   box-sizing: border-box;
   cursor: pointer;
   white-space: normal;
+}
+/* ==========================================================================
+   Mobile: matikan seleksi teks & menu long-press
+   --------------------------------------------------------------------------
+   Di layar sentuh / Android WebView, menahan tombol terlalu lama memunculkan
+   seleksi teks atau menu pop-up (Copy / Share / Text selection). Itu membuat
+   tombol yang ditahan (mis. volume tahan-untuk-ubah) terasa macet.
+
+   Aturan di bawah mematikan seleksi teks di seluruh halaman, tetapi:
+     - input / textarea / contenteditable tetap bisa dipakai & diseleksi
+     - tombol, link, label tetap responsif (touch-action: manipulation)
+     - slider (input[type=range]) tetap bisa digeser (touch-action: pan-x)
+
+   Sengaja TIDAK memakai `pointer-events: none` atau `touch-action: none`
+   secara global, karena itu justru mematikan interaksi tombol dan slider.
+   ========================================================================== */
+
+/* Nonaktifkan seleksi teks di seluruh halaman */
+* {
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  user-select: none !important;
+
+  /* Hilangkan menu pop-up saat teks ditekan lama */
+  -webkit-touch-callout: none;
+}
+
+/* Tetap izinkan input teks diseleksi / dipakai mengetik */
+input,
+textarea,
+[contenteditable="true"] {
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+  user-select: text !important;
+  -webkit-touch-callout: default;
+}
+
+/* Pertahankan interaksi sentuh pada tombol dan kontrol */
+button,
+a,
+input,
+textarea,
+select,
+label,
+[role="button"],
+input[type="range"] {
+  touch-action: manipulation;
+}
+
+/* Slider tetap bisa digeser horizontal */
+input[type="range"] {
+  touch-action: pan-x;
+}
+
+/* ---------- Tombol lirik ditekan padahal lagu tidak punya lirik ----------
+   Tombol memang di-disable, tapi pointerdown tetap bisa memberi umpan balik. */
+@keyframes lyricsBlockedShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-3px); }
+  40% { transform: translateX(3px); }
+  60% { transform: translateX(-2px); }
+  80% { transform: translateX(2px); }
+}
+
+.fx-lyrics-off.lyrics-blocked-shake {
+  animation: lyricsBlockedShake .45s ease;
+}
+
+/* Area aman Android: jangan tampilkan highlight biru saat ditekan. */
+.fx-lyrics-off {
+  -webkit-tap-highlight-color: transparent;
 }

@@ -116,6 +116,75 @@ app.get('/api/soundcloud/track', async (req, res) => {
   }
 });
 
+// ==== Spotify ================================================================
+const SPOTIFY_BASE = () => `http://localhost:${process.env.API_PORT || 8000}/spotify`;
+
+// Cari track Spotify (endpoint backend pakai token anonim, tidak butuh sp_dc)
+app.get('/api/search-spotify', async (req, res) => {
+  try {
+    const qs = new URLSearchParams(req.query).toString();
+    const r = await fetch(`${SPOTIFY_BASE()}/search?${qs}`);
+    const data = await r.json();
+    res.status(r.status).json(data);
+  } catch (e) {
+    res.status(502).json({ error: 'Backend API tidak tersedia. Jalankan backend di port 8000.' });
+  }
+});
+
+// Metadata track Spotify (butuh sp_dc)
+app.get('/api/spotify/track', async (req, res) => {
+  try {
+    const qs = new URLSearchParams(req.query).toString();
+    const r = await fetch(`${SPOTIFY_BASE()}/track?${qs}`);
+    const txt = await r.text();
+    res.status(r.status).set('Content-Type', 'application/json').send(txt);
+  } catch (e) {
+    res.status(502).json({ error: 'Backend API tidak tersedia.' });
+  }
+});
+
+// Lirik tersinkron (butuh sp_dc)
+app.get('/api/spotify/lyrics', async (req, res) => {
+  try {
+    const qs = new URLSearchParams(req.query).toString();
+    const r = await fetch(`${SPOTIFY_BASE()}/lyrics?${qs}`);
+    const txt = await r.text();
+    res.status(r.status).set('Content-Type', 'application/json').send(txt);
+  } catch (e) {
+    res.status(502).json({ error: 'Backend API tidak tersedia.' });
+  }
+});
+
+// Validasi sp_dc (dipakai controller sebelum search)
+app.get('/api/spotify/validate', async (req, res) => {
+  try {
+    const qs = new URLSearchParams(req.query).toString();
+    const r = await fetch(`${SPOTIFY_BASE()}/validate?${qs}`);
+    const txt = await r.text();
+    res.status(r.status).set('Content-Type', 'application/json').send(txt);
+  } catch (e) {
+    res.status(502).json({ error: 'Backend API tidak tersedia.' });
+  }
+});
+
+// Proxy embed Spotify. WAJIB lewat Express supaya satu origin dengan frame
+// player (/screen/spotify/player-spty.html) -> contentDocument iframe bisa
+// dibaca untuk kontrol playback.
+app.get('/api/spotify/embed-proxy', async (req, res) => {
+  try {
+    const qs = new URLSearchParams(req.query).toString();
+    const r = await fetch(`${SPOTIFY_BASE()}/embed-proxy?${qs}`);
+    const body = await r.text();
+    res.status(r.status);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.send(body);
+  } catch (e) {
+    res.status(502).send('Spotify embed tidak tersedia.');
+  }
+});
+
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
@@ -128,7 +197,7 @@ function makeCode() {
 
 function getRoom(code) {
   if (!rooms[code]) {
-    rooms[code] = { code, createdAt: Date.now(), queue: [], currentIndex: -1, playing: false, volume: 30, position: 0, duration: 0 };
+    rooms[code] = { code, createdAt: Date.now(), queue: [], currentIndex: -1, playing: false, volume: 30, position: 0, duration: 0, sp_dc: null };
     saveData({ rooms });
   }
   return rooms[code];
@@ -250,6 +319,50 @@ app.post('/api/room/:code/command', (req, res) => {
   res.json({ ok: true });
 });
 
+// API: sp_dc per room (cookie login Spotify). Dipakai sumber Spotify.
+// Disimpan di backend/data/purplehat.json -> rooms[code].sp_dc
+app.get('/api/room/:code/spdc', (req, res) => {
+  const room = rooms[req.params.code.toUpperCase()];
+  if (!room) return res.status(404).json({ error: 'Room tidak ditemukan' });
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ has: !!room.sp_dc });
+});
+
+// Validasi sp_dc tersimpan (controller tidak perlu tahu nilainya).
+app.get('/api/room/:code/spdc/validate', async (req, res) => {
+  const room = rooms[req.params.code.toUpperCase()];
+  if (!room) return res.status(404).json({ error: 'Room tidak ditemukan' });
+  if (!room.sp_dc) return res.status(409).json({ error: 'sp_dc belum diatur' });
+  try {
+    const r = await fetch(`${SPOTIFY_BASE()}/validate?sp_dc=${encodeURIComponent(room.sp_dc)}`);
+    const txt = await r.text();
+    res.status(r.status).set('Content-Type', 'application/json').send(txt);
+  } catch (e) {
+    res.status(502).json({ error: 'Backend API tidak tersedia.' });
+  }
+});
+
+app.post('/api/room/:code/spdc', (req, res) => {
+  const code = req.params.code.toUpperCase();
+  const room = rooms[code];
+  if (!room) return res.status(404).json({ error: 'Room tidak ditemukan' });
+  const spDc = (req.body && req.body.sp_dc ? String(req.body.sp_dc) : '').trim();
+  if (!spDc || spDc.length < 20) return res.status(400).json({ error: 'sp_dc tidak valid' });
+  room.sp_dc = spDc;
+  saveData({ rooms });
+  // Teruskan ke layar player supaya frame Spotify bisa menggunakannya.
+  broadcastToRoom(code, { type: 'sp_dc', payload: { sp_dc: spDc }, ts: Date.now() }, 'controller');
+  res.json({ ok: true });
+});
+
+app.delete('/api/room/:code/spdc', (req, res) => {
+  const code = req.params.code.toUpperCase();
+  const room = rooms[code];
+  if (room) { room.sp_dc = null; saveData({ rooms }); }
+  broadcastToRoom(code, { type: 'sp_dc', payload: { sp_dc: null }, ts: Date.now() }, 'controller');
+  res.json({ ok: true });
+});
+
 // API: delete room (dipanggil saat player logout, supaya tidak numpuk di file data)
 app.delete('/api/room/:code', (req, res) => {
   const code = req.params.code.toUpperCase();
@@ -314,12 +427,26 @@ wss.on('connection', (ws, req) => {
     if (hasController) {
       try { ws.send(JSON.stringify({ type: 'controller_joined', payload: {}, ts: Date.now() })); } catch (e) {}
     }
+    // Kirim sp_dc tersimpan supaya frame Spotify bisa langsung dipakai
+    // setelah layar reconnect (tanpa menunggu controller mengirim ulang).
+    if (room.sp_dc) {
+      try { ws.send(JSON.stringify({ type: 'sp_dc', payload: { sp_dc: room.sp_dc }, ts: Date.now() })); } catch (e) {}
+    }
   }
 
   ws.on('message', (raw) => {
     let msg;
     try { msg = JSON.parse(raw); } catch (e) { return; }
     msg.ts = Date.now();
+
+    // Controller bisa menyimpan sp_dc lewat WebSocket (selain HTTP POST).
+    if (role === 'controller' && msg.type === 'set_sp_dc') {
+      const spDc = (msg.payload && msg.payload.sp_dc ? String(msg.payload.sp_dc) : '').trim();
+      if (spDc && spDc.length >= 20) {
+        room.sp_dc = spDc;
+        saveData({ rooms });
+      }
+    }
 
     // persist queue/state updates from screen (authoritative)
     if (role === 'screen') {

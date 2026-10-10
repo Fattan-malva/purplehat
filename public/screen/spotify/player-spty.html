@@ -1,0 +1,1247 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Spotify Player</title>
+  <script>
+    // Frame punya dokumen sendiri, jadi deteksi Android di sini juga.
+    (function () {
+      if (/Android/i.test(navigator.userAgent || '')) {
+        document.documentElement.classList.add('ph-android');
+      }
+    })();
+  </script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%
+    }
+
+    body {
+      overflow: hidden;
+      background: #111;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .bg {
+      position: fixed;
+      inset: -80px;
+      z-index: 0;
+      background-size: cover;
+      background-position: center;
+      filter: blur(80px) brightness(.35) saturate(1.3);
+      transform: scale(1.15);
+      transition: background-image .6s ease
+    }
+
+    .bg-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      background: radial-gradient(ellipse at center, rgba(0, 0, 0, .15) 0%, rgba(0, 0, 0, .65) 100%)
+    }
+
+    .content {
+      position: relative;
+      z-index: 2;
+      width: min(1120px, calc(100% - 48px));
+      height: 100%;
+      max-height: 500px;
+      display: grid;
+      grid-template-columns: min(46vw, 500px) minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr) auto;
+      align-content: center;
+      align-items: stretch;
+      justify-content: center;
+      column-gap: clamp(30px, 4vw, 64px);
+      padding: 0;
+      margin: auto;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+
+    .artwork {
+      grid-column: 1;
+      grid-row: 1 / span 2;
+      width: 100%;
+      height: 100%;
+      min-width: 0;
+      min-height: 0;
+      justify-self: stretch;
+      align-self: stretch;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, .6);
+      background: rgba(255, 255, 255, .06)
+    }
+
+    .artwork img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      opacity: 0;
+      transition: opacity .4s ease
+    }
+
+    .artwork img.loaded {
+      opacity: 1
+    }
+
+    #loadingWrap {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 5
+    }
+
+    .info {
+      grid-column: 2;
+      grid-row: 1;
+      text-align: left;
+      max-width: none;
+      width: 100%;
+      min-width: 0;
+      align-self: start;
+      padding-top: 4px;
+      overflow: hidden
+    }
+
+    .info h1 {
+      color: #fff;
+      font-size: clamp(24px, 4vw, 36px);
+      font-weight: 700;
+      white-space: nowrap;
+      display: inline-block;
+      padding-left: 100%;
+      animation: scrollText 12s linear infinite
+    }
+
+    @keyframes scrollText {
+      0% {
+        transform: translateX(0)
+      }
+
+      100% {
+        transform: translateX(-100%)
+      }
+    }
+
+    .info h2 {
+      color: rgba(255, 255, 255, .7);
+      font-size: clamp(14px, 2vw, 18px);
+      margin-top: 6px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis
+    }
+
+    .info .stats {
+      color: rgba(255, 255, 255, .45);
+      font-size: 13px;
+      margin-top: 16px;
+      display: flex;
+      gap: 18px;
+      justify-content: flex-start;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    /* Badge ketersediaan lirik: hijau hanya saat Spotify MENYEDIAKAN lirik
+       tersinkron; merah bila tidak ada lirik sinkron. */
+    .lyr-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      border: 1px solid transparent;
+    }
+
+    .lyr-badge.on {
+      color: #1ed760;
+      background: rgba(30, 215, 96, .12);
+      border-color: rgba(30, 215, 96, .45);
+    }
+
+    .lyr-badge.off {
+      color: #ff6b6b;
+      background: rgba(255, 107, 107, .12);
+      border-color: rgba(255, 107, 107, .4);
+    }
+
+    .lyr-badge.pending {
+      color: rgba(255, 255, 255, .5);
+      background: rgba(255, 255, 255, .06);
+    }
+
+    .player {
+      grid-column: 2;
+      grid-row: 2;
+      width: 100%;
+      height: auto;
+      max-width: none;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, .5);
+      align-self: end;
+      background: rgba(0, 0, 0, .2)
+    }
+
+    .player iframe {
+      width: 100%;
+      height: 152px;
+      border: 0;
+      display: block;
+      background: #181818
+    }
+
+    /* ============ FULLSCREEN LYRICS OVERLAY (lyric-spty.html) ============ */
+    /* Tampilan sesuai spty-web: latar diburamkan + digelapkan, embed di
+       pojok kanan-bawah, konten lirik digeser ke kiri. */
+    #lyricsView {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      background: rgba(0, 0, 0, .35);
+      backdrop-filter: blur(30px) brightness(.3);
+      -webkit-backdrop-filter: blur(30px) brightness(.3);
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity .4s ease, visibility 0s linear .4s;
+    }
+
+    #lyricsView.active {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+      transition: opacity .4s ease, visibility 0s;
+    }
+
+    #lyricFrame {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      display: block;
+      background: transparent;
+    }
+
+    /* Saat lirik aktif: artwork & info disembunyikan, embed kecil muncul di
+       pojok KANAN-bawah.
+       PENTING: pemutar TIDAK PERNAH dipindah ke induk DOM lain. Memindahkan
+       elemen yang berisi <iframe> membuat iframe dimuat ulang dan lagu ikut
+       terputus/jeda. Solusinya hanya CSS: #content diangkat di atas overlay
+       lirik (z-index 40) supaya pemutarnya tetap tampil tajam dan tidak
+       ikut diburamkan backdrop-filter milik overlay. */
+    body.lyrics-active #content {
+      z-index: 45;
+    }
+
+    .artwork,
+    .info {
+      transition: opacity .3s ease;
+    }
+
+    body.lyrics-active .artwork,
+    body.lyrics-active .info {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    body.lyrics-active .player {
+      position: fixed;
+      right: 28px;
+      left: auto;
+      bottom: 28px;
+      width: min(340px, calc(100vw - 48px));
+      z-index: 50;
+      opacity: 1;
+      pointer-events: auto;
+      border-radius: 14px;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, .55);
+      transition: opacity .4s ease;
+      animation: miniIn .45s ease both;
+    }
+
+    @keyframes miniIn {
+      from {
+        opacity: 0;
+        transform: translateY(14px) scale(.96);
+      }
+
+      to {
+        opacity: 1;
+        transform: none;
+      }
+    }
+
+    @media (max-width:760px) {
+      .content {
+        width: 100%;
+        height: auto;
+        min-height: 100%;
+        display: grid;
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto auto;
+        align-content: center;
+        justify-items: center;
+        align-items: center;
+        row-gap: 28px;
+        padding: 24px 18px;
+        overflow: auto
+      }
+
+      .artwork {
+        grid-column: 1;
+        grid-row: 1;
+        width: min(78vw, 360px);
+        height: auto;
+        aspect-ratio: 1;
+      }
+
+      .info {
+        grid-column: 1;
+        grid-row: 2;
+        text-align: center;
+        width: 100%;
+        padding-top: 0;
+      }
+
+      .info .stats {
+        justify-content: center
+      }
+
+      .player {
+        grid-column: 1;
+        grid-row: 3;
+        width: 100%;
+        height: 166px;
+      }
+
+      body.lyrics-active .player {
+        right: 12px;
+        left: 12px;
+        bottom: 12px;
+        width: auto;
+      }
+
+      body.lyrics-active .player iframe {
+        height: 152px;
+      }
+    }
+
+    .loading {
+      color: rgba(255, 255, 255, .8);
+      font-size: 14px;
+      letter-spacing: .5px
+    }
+
+    .spinner {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: 3px solid rgba(255, 255, 255, .15);
+      border-top-color: #1db954;
+      animation: spin .8s linear infinite
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg)
+      }
+    }
+
+    .error {
+      color: #fff;
+      font-size: 16px;
+      text-align: center;
+      max-width: 480px;
+      padding: 20px
+    }
+
+    .error small {
+      display: block;
+      margin-top: 10px;
+      color: rgba(255, 255, 255, .5);
+      font-size: 12px
+    }
+
+    /* Android WebView: kurangi blur berat demi kelancaran. */
+    html.ph-android .bg {
+      filter: blur(36px) brightness(.35) saturate(1.2);
+    }
+
+    html.ph-android #lyricsView {
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      background: rgba(0, 0, 0, .74);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="bg" id="bg"></div>
+  <div class="bg-overlay"></div>
+
+  <div class="content" id="content">
+    <div id="loadingWrap" style="display:flex;flex-direction:column;align-items:center;gap:16px">
+      <div class="spinner"></div>
+      <div class="loading">Loading track...</div>
+    </div>
+  </div>
+
+  <!-- Overlay lirik: iframe fullscreen memuat lyric-spty.html (dibuat saat dibutuhkan) -->
+  <div id="lyricsView"></div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      // ===== STATE (diisi lewat cmd 'load' dari halaman induk) =====
+      var trackId = null;
+      var spDc = '';
+      var startVolume = 80;
+
+      var isPlaying = false;
+      var endedSent = false;
+      var embedReady = false;
+      var checkInterval = null;
+
+      var currentPosition = 0; // ms
+      var currentDuration = 0; // ms
+      var currentTitle = '';
+      var currentArtist = '';
+      var lastMedia = null;
+
+      // Lirik
+      var isLyricsActive = false;
+      var lyricFrame = null;
+      var lyricsView = document.getElementById('lyricsView');
+
+      // Ketersediaan lirik tersinkron untuk lagu saat ini (true/false/null).
+      var lyricsAvailable = null;
+      var lyricsCheckToken = 0;
+
+      // Status pemutaran asli dari embed Spotify (playback_update / playhead /
+      // playback_started). Begitu pesan pertama masuk, sampling DOM tidak
+      // dipakai lagi untuk menentukan isPlaying.
+      var gotEmbedMsg = false;
+
+      var loadingWrap = document.getElementById('loadingWrap');
+      var bgEl = document.getElementById('bg');
+
+      // ===== PROTOKOL DENGAN HALAMAN INDUK (screen player.html) =====
+      function post(m) {
+        try { parent.postMessage(Object.assign({ ph: 1 }, m), '*'); } catch (e) {}
+      }
+
+      function reportState() {
+        if (lastMedia) {
+          currentPosition = (lastMedia.currentTime || 0) * 1000;
+          if (isFinite(lastMedia.duration)) currentDuration = (lastMedia.duration || 0) * 1000;
+        }
+        post({
+          type: 'state',
+          playing: isPlaying,
+          position: currentPosition / 1000,
+          duration: currentDuration / 1000
+        });
+      }
+
+      function notifyEnded() {
+        if (endedSent) return;
+        endedSent = true;
+        isPlaying = false;
+        post({ type: 'ended' });
+        reportState();
+      }
+
+      function spdcInvalid() {
+        stopMonitoring();
+        post({ type: 'sp_dc_invalid' });
+      }
+
+      function showError(msg) {
+        if (loadingWrap) loadingWrap.style.display = 'none';
+        var old = document.querySelector('.error');
+        if (old) old.remove();
+        var err = document.createElement('div');
+        err.className = 'error';
+        err.innerHTML = '<strong>' + (msg || 'Failed to load track') + '</strong>' +
+          '<small>Check trackId or sp_dc</small>';
+        var content = document.getElementById('content');
+        if (content) content.appendChild(err);
+      }
+
+      // ===== EMBED HELPERS (same-origin lewat /api/spotify/embed-proxy) =====
+      function getIframe() {
+        return document.getElementById('spWidget');
+      }
+
+      function getEmbedDoc() {
+        var iframe = getIframe();
+        try {
+          return iframe && iframe.contentDocument ? iframe.contentDocument : null;
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function getMediaElement() {
+        // Abaikan audio "primer" (WAV senyap) yang dibuat sendiri: itu bukan
+        // pemutar lagu, kalau tidak posisi/durasi yang dilaporkan jadi kacau.
+        try {
+          var doc = getEmbedDoc();
+          if (!doc) return null;
+          var all = doc.querySelectorAll('audio, video');
+          for (var i = 0; i < all.length; i++) {
+            if (all[i].__phPrime) continue;
+            return all[i];
+          }
+        } catch (e) {}
+        return null;
+      }
+
+      // Semua elemen media milik pemutar (tanpa elemen primer).
+      function realMediaElements(doc) {
+        var out = [];
+        if (!doc) return out;
+        var all = doc.querySelectorAll('audio, video');
+        for (var i = 0; i < all.length; i++) {
+          if (all[i].__phPrime) continue;
+          out.push(all[i]);
+        }
+        return out;
+      }
+
+      // ===== BUKA IZIN MEDIA (konsep spty-web) =====
+      // WAV senyap dipakai sebagai "kunci" izin media: diputar sekali lalu
+      // langsung dihentikan, volumenya 0 dan muted jadi tidak ada suara.
+      // Dokumen embed juga same-origin, jadi izinnya dibuka di sana juga.
+      var SILENT_WAV =
+        'data:audio/wav;base64,UklGRqQHAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YYAHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+
+      var primedDocs = [];
+
+      function primePlayback() {
+        primeAudioIn(document);
+        var doc = getEmbedDoc();
+        if (doc) primeAudioIn(doc);
+      }
+
+      function primeAudioIn(doc) {
+        if (!doc || primedDocs.indexOf(doc) !== -1) return;
+        if (primedDocs.length > 8) primedDocs.shift();
+        primedDocs.push(doc);
+        var a = null;
+        try {
+          a = doc.createElement('audio');
+          a.src = SILENT_WAV;
+          a.preload = 'auto';
+          a.volume = 0;
+          a.muted = true;
+          // Tandai supaya tidak dikira media pemutar lagu saat monitoring.
+          a.__phPrime = true;
+          if (doc.body) doc.body.appendChild(a);
+          var p = a.play();
+          if (p && typeof p.then === 'function') {
+            p.then(function () { resetPrime(a); }).catch(function () {});
+          }
+          a.addEventListener('playing', function () { resetPrime(a); }, { once: true });
+        } catch (e) {}
+      }
+
+      function resetPrime(a) {
+        try {
+          a.muted = true;
+          a.volume = 0;
+          a.pause();
+          a.currentTime = 0;
+        } catch (e) {}
+      }
+
+      // Gestur asli di dalam frame: buka izin media.
+      ['touchend', 'mousedown', 'keydown'].forEach(function (type) {
+        document.addEventListener(type, function () { primePlayback(); }, {
+          capture: true, passive: true, once: true
+        });
+      });
+
+      // ===== DETEKSI EMBED SIAP =====
+      var EMBED_WAIT_TIMEOUT = 30000;
+      var embedWaitRunning = false;
+
+      function isElementUsable(el) {
+        try {
+          if (!el || !el.tagName) return false;
+          if (el.disabled) return false;
+          var rect = el.getBoundingClientRect();
+          if (!rect || rect.width <= 0 || rect.height <= 0) return false;
+          var cs = window.getComputedStyle(el);
+          if (cs) {
+            if (cs.display === 'none' || cs.visibility === 'hidden') return false;
+            if (parseFloat(cs.opacity || '1') < 0.15) return false;
+          }
+          return true;
+        } catch (e) {
+          return false;
+        }
+      }
+
+      function findPlayButton() {
+        var doc;
+        try { doc = getEmbedDoc(); } catch (e) { return null; }
+        if (!doc) return null;
+
+        var selectors = [
+          'button[data-testid="play-pause-button"]',
+          'button[data-testid="playpause-button"]',
+          'button[data-testid="play-button"]',
+          'button[aria-label="Play"]',
+          'button[aria-label="Putar"]'
+        ];
+        for (var i = 0; i < selectors.length; i++) {
+          var list = doc.querySelectorAll(selectors[i]);
+          for (var j = 0; j < list.length; j++) {
+            var el = list[j];
+            var label = (el.getAttribute('aria-label') || '').toLowerCase();
+            if (label.indexOf('pause') !== -1 || label.indexOf('jeda') !== -1) continue;
+            if (isElementUsable(el)) return el;
+          }
+        }
+        var all = doc.querySelectorAll('button[data-testid]');
+        for (var k = 0; k < all.length; k++) {
+          var b = all[k];
+          var tid = (b.getAttribute('data-testid') || '').toLowerCase();
+          if (tid.indexOf('play') === -1) continue;
+          var lb = (b.getAttribute('aria-label') || '').toLowerCase();
+          if (lb.indexOf('pause') !== -1 || lb.indexOf('jeda') !== -1) continue;
+          if (isElementUsable(b)) return b;
+        }
+        return null;
+      }
+
+      function clickEmbedPlayButton() {
+        var btn = findPlayButton();
+        if (!btn) return false;
+        try { btn.click(); return true; } catch (e) { return false; }
+      }
+
+      function waitForEmbed(onReady) {
+        if (embedReady || embedWaitRunning) return;
+        embedWaitRunning = true;
+        var startedAt = Date.now();
+        var delay = 150;
+
+        function attempt() {
+          if (embedReady) { embedWaitRunning = false; return; }
+          if (isPreviewMode()) { embedWaitRunning = false; spdcInvalid(); return; }
+          var ready = !!findPlayButton();
+          if (ready || Date.now() - startedAt >= EMBED_WAIT_TIMEOUT) {
+            embedWaitRunning = false;
+            onReady();
+            return;
+          }
+          setTimeout(attempt, delay);
+          if (delay < 1000) delay += 150;
+        }
+        attempt();
+      }
+
+      function completeEmbedReady() {
+        if (embedReady) return;
+        embedReady = true;
+        startMonitoring();
+        playSound();
+      }
+
+      function isPreviewMode() {
+        try {
+          var doc = getEmbedDoc();
+          if (!doc) return false;
+          // Tanda embed hanya memutar preview (sp_dc anonim/basi).
+          if (doc.querySelector('[data-testid*="preview" i], [class*="preview" i], [title="Preview"], [title="Pratinjau"]')) {
+            return true;
+          }
+          // Badge teks persis "Preview"/"Pratinjau" pada elemen kecil.
+          var badges = doc.querySelectorAll('[data-testid="tag"], [data-testid="badge"], [data-testid="preview-tag"]');
+          for (var i = 0; i < badges.length; i++) {
+            var t = (badges[i].textContent || '').trim().toLowerCase();
+            if (t === 'preview' || t === 'pratinjau') return true;
+          }
+        } catch (e) {}
+        return false;
+      }
+
+      function isActuallyPlaying() {
+        try {
+          var doc = getEmbedDoc();
+          if (!doc) return false;
+          var audios = realMediaElements(doc);
+          for (var i = 0; i < audios.length; i++) {
+            var a = audios[i];
+            if (!a.paused && !a.ended && a.currentTime > 0) return true;
+          }
+          if (doc.querySelector('button[aria-label="Pause"], button[aria-label="Jeda"]')) return true;
+        } catch (e) {}
+        return false;
+      }
+
+      // ===== VOLUME =====
+      function applyVolume(media) {
+        var m = media || getMediaElement();
+        if (!m) return;
+        try { m.volume = Math.max(0, Math.min(1, startVolume / 100)); } catch (e) {}
+      }
+
+      // ===== PLAY / PAUSE =====
+      // Konsep spty-web: JANGAN kirim { command: 'play' } ke embed - perintah
+      // itu mengulang lagu DARI AWAL (inilah bug "jeda di tengah -> play lagi
+      // balik dari awal"). Resume/hidupkan pemutaran selalu lewat tombol
+      // toggle bawaan embed, diklik SEKALI saja (satu jalur), supaya tidak
+      // terjadi play-pause yang saling membatalkan.
+      function playSound() {
+        if (!embedReady) return;
+        endedSent = false;
+        var wasPlaying = isPlaying;
+        isPlaying = true;
+        applyVolume();
+        primePlayback();
+        if (clickEmbedPlayButton()) {
+          // Tombol "play" milik embed sudah diklik -> pemutaran dilanjutkan
+          // dari posisi saat ini.
+          reportState();
+          return;
+        }
+        if (wasPlaying) return; // sudah berjalan -> jangan kirim apa pun
+        // Tombol belum ada di DOM: pakai 'toggle' (mengikuti status embed),
+        // bukan 'play' yang mengulang dari awal.
+        var iframe = getIframe();
+        if (iframe) {
+          try { iframe.contentWindow.postMessage({ command: 'toggle' }, '*'); } catch (e) {}
+        }
+        reportState();
+      }
+
+      function pauseSound() {
+        isPlaying = false;
+        var iframe = getIframe();
+        // Satu jalur saja: perintah 'pause' resmi. JANGAN sekaligus mengklik
+        // tombol "jeda" di DOM - pesan postMessage itu async, sehingga urutan
+        // klik bisa berbalik arah (embed kebanjiran pause lalu toggle jadi play
+        // lagi). Elemen media jika ada tetap di-pause langsung.
+        if (iframe) {
+          try { iframe.contentWindow.postMessage({ command: 'pause' }, '*'); } catch (e) {}
+        }
+        try {
+          var doc = getEmbedDoc();
+          if (doc) {
+            doc.querySelectorAll('audio, video').forEach(function (a) {
+              try { a.pause(); } catch (e) {}
+            });
+          }
+        } catch (e) {}
+        reportState();
+      }
+
+      function togglePlay() {
+        if (isPlaying) pauseSound(); else playSound();
+      }
+
+      // ===== REPLAY =====
+      // Ulangi lagu dari awal: perintah 'seek' ke detik 0, lalu pastikan
+      // pemutaran berjalan. Memuat ulang iframe hanya jadi jalan terakhir.
+      function replaySound() {
+        endedSent = false;
+        isPlaying = false;
+        currentPosition = 0;
+        var iframe = getIframe();
+        if (iframe) {
+          try { iframe.contentWindow.postMessage({ command: 'seek', timestamp: 0 }, '*'); } catch (e) {}
+        }
+        if (isLyricsActive) postLyric({ type: 'lyric-pos', position: 0 });
+        playSound();
+        // Jaring pengaman: kalau embed tidak menuruti 'seek 0', muat ulang
+        // embed dari awal.
+        setTimeout(function () {
+          if (endedSent) return;
+          if (currentPosition > 2000) replayFallback();
+        }, 1500);
+        reportState();
+      }
+
+      function replayFallback() {
+        if (clickEmbedPlayButton()) { isPlaying = true; return; }
+        var iframe = getIframe();
+        if (iframe && trackId) {
+          // Muat ulang embed dari awal
+          embedReady = false;
+          stopMonitoring();
+          iframe.src = embedURL(trackId);
+          waitForEmbed(completeEmbedReady);
+        }
+      }
+
+      // ===== SEEK =====
+      // Konsep spty-web: tidak ada elemen media yang bisa di-set currentTime-nya,
+      // embed menerima perintah resmi { command: 'seek', timestamp } (detik).
+      function seekTo(ms) {
+        var target = Math.max(0, ms || 0);
+        var iframe = getIframe();
+        if (iframe) {
+          try {
+            iframe.contentWindow.postMessage(
+              { command: 'seek', timestamp: Math.round(target / 1000) }, '*');
+          } catch (e) {}
+        }
+        var media = getMediaElement();
+        if (media) {
+          try { media.currentTime = target / 1000; } catch (e) {}
+        }
+        currentPosition = target;
+        if (isLyricsActive) postLyric({ type: 'lyric-pos', position: currentPosition });
+        reportState();
+      }
+
+      // ===== LIRIK (overlay iframe) =====
+      function ensureLyricFrame() {
+        if (lyricFrame) return lyricFrame;
+        lyricFrame = document.createElement('iframe');
+        lyricFrame.id = 'lyricFrame';
+        lyricFrame.setAttribute('allow', 'autoplay');
+        lyricFrame.setAttribute('frameborder', '0');
+        lyricFrame.src = 'lyric-spty.html?v=20261010k';
+        lyricsView.appendChild(lyricFrame);
+        return lyricFrame;
+      }
+
+      function postLyric(m) {
+        if (lyricFrame && lyricFrame.contentWindow) {
+          try { lyricFrame.contentWindow.postMessage(Object.assign({ ph: 1 }, m), '*'); } catch (e) {}
+        }
+      }
+
+      function sendLyricConfig() {
+        postLyric({
+          type: 'lyric-config',
+          trackId: trackId,
+          sp_dc: spDc,
+          title: currentTitle,
+          artist: currentArtist,
+          corner: true
+        });
+        postLyric({ type: 'lyric-pos', position: currentPosition });
+      }
+
+      function showLyrics() {
+        ensureLyricFrame();
+        lyricsView.classList.add('active');
+        document.body.classList.add('lyrics-active');
+        isLyricsActive = true;
+        sendLyricConfig();
+      }
+
+      function closeLyrics() {
+        lyricsView.classList.remove('active');
+        document.body.classList.remove('lyrics-active');
+        isLyricsActive = false;
+      }
+
+      function toggleLyrics() {
+        if (isLyricsActive) closeLyrics(); else showLyrics();
+      }
+
+      // ===== MONITOR PLAYBACK =====
+      function attachMedia(media) {
+        if (!media || media.__phBound) return;
+        media.__phBound = true;
+        media.addEventListener('play', function () { isPlaying = true; reportState(); });
+        media.addEventListener('pause', function () { isPlaying = false; reportState(); });
+        media.addEventListener('ended', function () { notifyEnded(); });
+        media.addEventListener('timeupdate', function () {
+          currentPosition = (media.currentTime || 0) * 1000;
+          if (isFinite(media.duration)) currentDuration = (media.duration || 0) * 1000;
+          if (isLyricsActive) postLyric({ type: 'lyric-pos', position: currentPosition });
+        });
+      }
+
+      function stopMonitoring() {
+        if (checkInterval) { clearInterval(checkInterval); checkInterval = null; }
+      }
+
+      function hookEmbedGestures() {
+        // Klik/tap di dalam embed = gestur asli di dokumen same-origin itu.
+        // Cukup buka izin media (prime); JANGAN mengklik tombol play lagi,
+        // karena tombol embed adalah toggle.
+        var doc = getEmbedDoc();
+        if (!doc || doc.__phGestureHooked) return;
+        doc.__phGestureHooked = true;
+        doc.addEventListener('click', function () { primePlayback(); }, true);
+        doc.addEventListener('touchend', function () { primePlayback(); }, true);
+      }
+
+      function startMonitoring() {
+        stopMonitoring();
+        checkInterval = setInterval(function () {
+          if (isPreviewMode()) { spdcInvalid(); return; }
+          if (!embedReady) return;
+
+          var media = getMediaElement();
+          if (media && media !== lastMedia) {
+            lastMedia = media;
+            attachMedia(media);
+            applyVolume(media);
+          }
+          // Posisi utama datang dari pesan embed; elemen media hanya cadangan
+          // untuk kasus ketika embed belum pernah mengirim pesan sama sekali.
+          if (!gotEmbedMsg && media) {
+            currentPosition = (media.currentTime || 0) * 1000;
+            if (isFinite(media.duration)) currentDuration = (media.duration || 0) * 1000;
+          }
+
+          // Kirim posisi ke overlay lirik dari loop monitoring juga (bukan hanya
+          // pesan embed) - ini yang menjaga lirik tetap tersinkron.
+          if (isLyricsActive) postLyric({ type: 'lyric-pos', position: currentPosition });
+
+          // Status pemutaran: percayai pesan embed; baru sampling DOM dipakai
+          // sebagai cadangan selama belum ada pesan embed sama sekali.
+          if (!gotEmbedMsg) {
+            var playing = isActuallyPlaying();
+            if (playing !== isPlaying) { isPlaying = playing; }
+          }
+
+          hookEmbedGestures();
+
+          // Deteksi selesai (jaring pengaman selain event 'ended')
+          try {
+            var doc = getEmbedDoc();
+            var arr = realMediaElements(doc);
+            for (var i = 0; i < arr.length; i++) {
+              if (arr[i].ended && isPlaying) { notifyEnded(); break; }
+            }
+          } catch (e) {}
+
+          reportState();
+        }, 500);
+      }
+
+      // ===== RENDER TRACK =====
+      function embedURL(id) {
+        return '/api/spotify/embed-proxy?trackId=' + encodeURIComponent(id) +
+          (spDc ? '&sp_dc=' + encodeURIComponent(spDc) : '');
+      }
+
+      function clearContent() {
+        stopMonitoring();
+        embedReady = false;
+        embedWaitRunning = false;
+        isPlaying = false;
+        endedSent = false;
+        lastMedia = null;
+        currentPosition = 0;
+        currentDuration = 0;
+        // Cari dari dokumen, bukan hanya #content: saat mode lirik aktif embed
+        // tinggal di #miniHost, jadi harus ikut dibuang saat ganti lagu.
+        document.querySelectorAll('.track-el, .error').forEach(function (el) { el.remove(); });
+        if (loadingWrap) loadingWrap.style.display = 'flex';
+      }
+
+      // ===== KETERSEDIAAN LIRIK =====
+      // Tandai "available" HANYA kalau Spotify menyediakan lirik tersinkron
+      // (hasSync === true). Hasilnya dipakai dua tempat: badge di panel info
+      // dan tombol lirik di controller (hijau / merah coret).
+      function markLyricsBadge(infoEl, state) {
+        if (!infoEl) return;
+        var stats = infoEl.querySelector('.stats');
+        if (!stats) {
+          stats = document.createElement('div');
+          stats.className = 'stats';
+          infoEl.appendChild(stats);
+        }
+        var badge = stats.querySelector('.lyr-badge');
+        if (!badge) {
+          badge = document.createElement('span');
+          badge.className = 'lyr-badge';
+          stats.appendChild(badge);
+        }
+        badge.classList.remove('on', 'off', 'pending');
+        if (state === 'on') {
+          badge.classList.add('on');
+          badge.innerHTML = '\u266B Lirik tersedia \u2022 sinkron';
+        } else if (state === 'off') {
+          badge.classList.add('off');
+          badge.innerHTML = '\u266B Lirik tidak tersedia';
+        } else {
+          badge.classList.add('pending');
+          badge.innerHTML = '\u266B Cek lirik\u2026';
+        }
+      }
+
+      // Beri tahu halaman induk (screen) status lirik lagu saat ini supaya
+      // diteruskan ke controller.
+      function reportLyricsAvailable(avail, tid) {
+        post({ type: 'lyrics_available', available: avail, trackId: tid || null });
+      }
+
+      function checkLyricsAvailability(tid, infoEl) {
+        if (!tid) { lyricsAvailable = null; markLyricsBadge(infoEl, 'off'); return; }
+        var token = ++lyricsCheckToken;
+        lyricsAvailable = null;
+        reportLyricsAvailable(null, tid);
+        markLyricsBadge(infoEl, 'pending');
+        fetch('/api/spotify/lyrics?trackId=' + encodeURIComponent(tid) +
+          (spDc ? '&sp_dc=' + encodeURIComponent(spDc) : ''))
+          .then(function (res) {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.json();
+          })
+          .then(function (data) {
+            if (token !== lyricsCheckToken) return; // lagu sudah berganti
+            var avail = !!(data && data.hasSync && data.lines && data.lines.length);
+            lyricsAvailable = avail;
+            markLyricsBadge(infoEl, avail ? 'on' : 'off');
+            reportLyricsAvailable(avail, tid);
+            // Ganti lagu saat mode lirik terbuka: hanya lanjut ke layar lirik
+            // kalau lagu barunya punya lirik tersinkron. Kalau tidak ada,
+            // keluar dari mode lirik (kembali ke tampilan player biasa).
+            if (isLyricsActive && !avail) closeLyrics();
+          })
+          .catch(function () {
+            if (token !== lyricsCheckToken) return;
+            lyricsAvailable = false;
+            markLyricsBadge(infoEl, 'off');
+            reportLyricsAvailable(false, tid);
+            if (isLyricsActive) closeLyrics();
+          });
+      }
+
+      function render(track) {
+        document.title = (track.title || 'Spotify') + ' - ' + (track.artist || '');
+        currentTitle = track.title || '';
+        currentArtist = track.artist || '';
+        if (loadingWrap) loadingWrap.style.display = 'none';
+
+        if (track.thumbnail) {
+          bgEl.style.backgroundImage = "url('" + String(track.thumbnail).replace(/'/g, "\\'") + "')";
+        }
+
+        var content = document.getElementById('content');
+
+        var artwork = document.createElement('div');
+        artwork.className = 'artwork track-el';
+        var img = document.createElement('img');
+        img.alt = track.title || '';
+        img.onload = function () { this.classList.add('loaded'); };
+        if (track.thumbnail) img.src = track.thumbnail;
+        artwork.appendChild(img);
+        content.appendChild(artwork);
+
+        var info = document.createElement('div');
+        info.className = 'info track-el';
+        var stats = [];
+        if (track.duration && track.duration !== '0:00') stats.push('&#9201; ' + track.duration);
+        if (track.album) stats.push(track.album);
+        var statsHtml = stats.length
+          ? '<div class="stats">' + stats.map(function (s) { return '<span>' + s + '</span>'; }).join('') + '</div>'
+          : '';
+        info.innerHTML = '<h1>' + (track.title || 'Unknown') + '</h1>' +
+          '<h2>' + (track.artist || '') + '</h2>' + statsHtml;
+        content.appendChild(info);
+
+        // Cek ketersediaan lirik tersinkron + tandai di panel info.
+        checkLyricsAvailability(track.trackId || trackId, info);
+
+        var player = document.createElement('div');
+        player.className = 'player track-el';
+        var iframe = document.createElement('iframe');
+        iframe.id = 'spWidget';
+        iframe.setAttribute('allow', 'autoplay *; encrypted-media; fullscreen');
+        iframe.setAttribute('allowfullscreen', '');
+        iframe.setAttribute('frameborder', '0');
+        iframe.setAttribute('loading', 'eager');
+        iframe.src = embedURL(track.trackId || trackId);
+        player.appendChild(iframe);
+        // PEMUTAR SELALU di dalam #content. Tidak boleh dipindah ke induk lain:
+        // memindahkan elemen berisi <iframe> membuat iframe dimuat ulang dan
+        // lagu ikut terputus. Posisi pojok kanan-bawah saat mode lirik cukup
+        // diatur lewat CSS (body.lyrics-active .player).
+        content.appendChild(player);
+
+        // Kalau overlay lirik sedang terbuka (ganti lagu), kirim config baru.
+        if (isLyricsActive) sendLyricConfig();
+
+        waitForEmbed(completeEmbedReady);
+      }
+
+      function loadTrack(id, dc, vol) {
+        trackId = id;
+        spDc = dc || '';
+        if (vol != null) startVolume = vol;
+        // Batalkan cek lirik lagu sebelumnya & reset status tombol lirik.
+        lyricsCheckToken++;
+        lyricsAvailable = null;
+        reportLyricsAvailable(null, id);
+        // Sengaja TIDAK menutup layar lirik di sini: kalau lagu berikutnya
+        // masih Spotify DAN punya lirik tersinkron, user tetap di layar lirik.
+        // Kalau liriknya tidak tersedia, checkLyricsAvailability() yang akan
+        // menutup layar lirik setelah jawaban server datang.
+        clearContent();
+
+        fetch('/api/spotify/track?trackId=' + encodeURIComponent(id) +
+          (spDc ? '&sp_dc=' + encodeURIComponent(spDc) : ''))
+          .then(function (res) {
+            if (res.status === 400 || res.status === 401 || res.status === 403) {
+              var e = new Error('sp_dc'); e.spdc = true; throw e;
+            }
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.json();
+          })
+          .then(function (track) {
+            if (track && track.title) {
+              // Server menandai sp_dc kedaluwarsa (spdcValid === false) -> modal.
+              if (track.spdcValid === false) { spdcInvalid(); return; }
+              render(track);
+            } else { var e = new Error('Track tidak ditemukan'); e.spdc = true; throw e; }
+          })
+          .catch(function (err) {
+            if (err && err.spdc) { spdcInvalid(); }
+            else { showError('Failed to load: ' + err.message); post({ type: 'error' }); }
+          });
+      }
+
+      // ===== KONTROL DARI HALAMAN INDUK =====
+      window.addEventListener('message', function (e) {
+        var d = e.data;
+        if (!d || !d.ph) return;
+
+        // Pesan dari overlay lirik (child iframe)
+        if (!d.cmd && d.type) {
+          if (d.type === 'lyric-close') { closeLyrics(); return; }
+          if (d.type === 'lyric-seek') { seekTo(d.ms); return; }
+          if (d.type === 'lyric-ready') {
+            if (isLyricsActive) sendLyricConfig();
+            return;
+          }
+          return;
+        }
+
+        switch (d.cmd) {
+          case 'load':
+            if (d.trackId) loadTrack(d.trackId, d.sp_dc, d.volume);
+            break;
+          case 'play':
+          case 'gesture':
+            playSound();
+            break;
+          case 'pause':
+            pauseSound();
+            break;
+          case 'seek':
+            seekTo((d.to || 0) * 1000);
+            break;
+          case 'volume':
+            startVolume = d.vol;
+            applyVolume();
+            break;
+          case 'replay':
+            replaySound();
+            break;
+          case 'stop':
+            pauseSound();
+            closeLyrics();
+            break;
+          case 'lyrics':
+            toggleLyrics();
+            break;
+        }
+      });
+
+      // ===== PESAN DARI EMBED SPOTIFY =====
+      // Embed membalas perintah IFrame API-nya dengan pesan seperti:
+      //   { type: 'ready' }
+      //   { type: 'playback_started' } / { type: 'playback_resumed' }
+      //   { type: 'playback_paused' }
+      //   { type: 'playback_update', payload: { isPaused, position, duration } }
+      //   { type: 'playhead', ... }
+      //   { type: 'ended' }
+      // Inilah SATU-SATUNYA sumber kebenaran soal posisi & status pemutaran:
+      // halaman embed tidak punya elemen media yang bisa dijangkau, jadi
+      // sampling DOM hanya dipakai sebagai cadangan.
+      window.addEventListener('message', function (e) {
+        var data = e.data;
+        if (!data || typeof data !== 'object' || data.ph) return;
+
+        var type = data.type;
+        var payload = data.payload || data.data || {};
+
+        if (type === 'ready') { gotEmbedMsg = true; return; }
+
+        var pos = payload.position;
+        if (typeof pos !== 'number') pos = payload.positionMs;
+        if (typeof pos !== 'number') pos = data.ms;
+
+        if (type === 'playback_started' || type === 'playback_resumed') {
+          gotEmbedMsg = true;
+          isPlaying = true;
+        }
+        if (type === 'playback_paused') {
+          gotEmbedMsg = true;
+          isPlaying = false;
+        }
+        if (type === 'playback_update' || type === 'playhead') {
+          gotEmbedMsg = true;
+          if (typeof payload.isPaused === 'boolean') isPlaying = !payload.isPaused;
+          else if (type === 'playhead' && typeof pos === 'number') isPlaying = true;
+        }
+
+        // Posisi (ms) diteruskan ke overlay lirik supaya tetap sinkron.
+        if (typeof pos === 'number' && pos >= 0) {
+          currentPosition = pos;
+          if (isLyricsActive) postLyric({ type: 'lyric-pos', position: currentPosition });
+        }
+
+        // Durasi bisa datang dalam ms detik -> dinormalkan ke ms.
+        var dur = payload.duration;
+        if (typeof dur !== 'number') dur = payload.durationMs;
+        if (typeof dur !== 'number') dur = payload.totalDuration;
+        if (typeof dur === 'number' && dur > 0) currentDuration = dur > 1000 ? dur : dur * 1000;
+
+        if (type === 'ended' || type === 'track_ended') {
+          notifyEnded();
+        } else if (typeof pos === 'number' && currentDuration > 0 &&
+                   payload.isPaused === true && currentDuration - pos <= 1000) {
+          // Embed melapor berhenti tepat di akhir lagu -> anggap selesai.
+          notifyEnded();
+        }
+      });
+
+      // Siap menerima perintah dari halaman induk.
+      post({ type: 'ready' });
+
+      // Siapkan iframe lirik SEKARANG (di dalam kontainer yang masih
+      // visibility:hidden) supaya saat user menekan tombol lirik, tampilannya
+      // langsung muncul tanpa perlu menunggu dokumen lirik dimuat - perpindahan
+      // player <-> lirik jadi terasa mulus dan lagu tidak ikut terhenti.
+      ensureLyricFrame();
+    })();
+  </script>
+</body>
+
+</html>
