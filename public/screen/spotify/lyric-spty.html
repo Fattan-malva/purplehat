@@ -96,10 +96,7 @@
     .lyrics-viewport::-webkit-scrollbar {
       display: none;
     }
-
-    /* Lirik TIDAK di-align kiri: setiap baris dibuat rata tengah. Kolom lirik
-       diletakkan di sisi kiri layar (bukan di tengah) sehingga tidak menabrak
-       pemutar di pojok kanan-bawah. */
+    
     #lyricsContainer {
       display: flex;
       flex-direction: column;
@@ -107,7 +104,8 @@
       padding: 45vh 0;
       max-width: 680px;
       margin: 0;
-      text-align: center;
+      text-align: left;
+      align-items: flex-start;
     }
 
     .lyric-line {
@@ -223,7 +221,7 @@
       var trackInfo = document.getElementById('trackInfo');
 
       function post(m) {
-        try { parent.postMessage(Object.assign({ ph: 1 }, m), '*'); } catch (e) {}
+        try { parent.postMessage(Object.assign({ ph: 1 }, m), '*'); } catch (e) { }
       }
 
       function setState(text) {
