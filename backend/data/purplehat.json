@@ -233,6 +233,61 @@
       "position": 0,
       "duration": 0,
       "sp_dc": null
+    },
+    "ZZZZZZ": {
+      "code": "ZZZZZZ",
+      "createdAt": 1791638391903,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 30,
+      "position": 0,
+      "duration": 0,
+      "sp_dc": null
+    },
+    "UN3TGP": {
+      "code": "UN3TGP",
+      "createdAt": 1791638395783,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 30,
+      "position": 0,
+      "duration": 0,
+      "sp_dc": null
+    },
+    "3FQHDS": {
+      "code": "3FQHDS",
+      "createdAt": 1791639093447,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 30,
+      "position": 0,
+      "duration": 0,
+      "sp_dc": null
+    },
+    "5ZM63J": {
+      "code": "5ZM63J",
+      "createdAt": 1791639170163,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 30,
+      "position": 0,
+      "duration": 0,
+      "sp_dc": null
+    },
+    "9BBR6P": {
+      "code": "9BBR6P",
+      "createdAt": 1791639203190,
+      "queue": [],
+      "currentIndex": -1,
+      "playing": false,
+      "volume": 30,
+      "position": 0,
+      "duration": 0,
+      "sp_dc": null
     }
   }
 }

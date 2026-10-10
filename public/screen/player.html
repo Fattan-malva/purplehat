@@ -17,6 +17,8 @@
     })();
   </script>
   <link rel="stylesheet" href="screen.css?v=20261010g">
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/icons/icon-192.png">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="/shared/protocol.js?v=20261010c"></script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
@@ -32,9 +34,21 @@
          Dokumen diganti total saat pindah sumber, sehingga pemutar lama pasti berhenti. -->
     <iframe id="player-frame" class="hidden" allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe>
     <div id="idle-screen">
-      <div class="brand-logo idle-logo"><i class="fas fa-hat-wizard"></i></div>
+      <div class="brand-logo idle-logo">
+        <img src="/assets/icons/brand-icon.png?v=2" alt="Purplehat">
+      </div>
       <div class="idle-title">PURPLE<span>HAT</span></div>
       <div class="idle-text"><i data-lucide="music" class="icon-glow"></i> Menunggu lagu berikutnya...</div>
+
+      <!-- Sumber lagu yang tersedia: 3 logo berjajar -->
+      <div class="idle-sources">
+        <div class="idle-sources-label">Tersedia sekarang</div>
+        <div class="idle-sources-row">
+          <span class="src-chip src-yt"><i class="fab fa-youtube"></i><em>YouTube</em></span>
+          <span class="src-chip src-sp"><i class="fab fa-spotify"></i><em>Spotify</em></span>
+          <span class="src-chip src-sc"><i class="fab fa-soundcloud"></i><em>SoundCloud</em></span>
+        </div>
+      </div>
     </div>
   </div>
 

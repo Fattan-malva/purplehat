@@ -40,16 +40,25 @@ body {
   gap: 12px;
 }
 
+/* Logo merek: memakai PNG transparan (tanpa latar kotak membulat). Cahaya
+   ungu dibuat dengan drop-shadow supaya mengikuti bentuk ikon, bukan kotak. */
 .brand-logo {
   width: 42px;
   height: 42px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #a855f7, #7e22ce);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 15px rgba(168, 85, 247, 0.5);
   font-size: 20px;
+  filter: drop-shadow(0 0 12px rgba(168, 85, 247, 0.55));
+}
+
+/* Logo merek memakai gambar (ikon baru, background sudah dihapus). */
+.brand-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
 }
 
 .brand h1 {
@@ -125,13 +134,65 @@ body {
 }
 .idle-logo { width: 84px; height: 84px; border-radius: 24px; font-size: 40px; animation: idle-pulse 2.4s ease-in-out infinite; }
 @keyframes idle-pulse {
-  0%, 100% { box-shadow: 0 0 18px rgba(168, 85, 247, 0.4); transform: scale(1); }
-  50% { box-shadow: 0 0 34px rgba(168, 85, 247, 0.75); transform: scale(1.05); }
+  0%, 100% { filter: drop-shadow(0 0 12px rgba(168, 85, 247, 0.4)); transform: scale(1); }
+  50% { filter: drop-shadow(0 0 26px rgba(168, 85, 247, 0.8)); transform: scale(1.05); }
 }
 .idle-title { font-size: 34px; font-weight: 700; letter-spacing: 6px; }
 .idle-title span { color: #a855f7; }
 .idle-text { color: #9ca3af; font-size: 15px; letter-spacing: 1px; }
 .idle-text i { color: #c084fc; margin-right: 6px; }
+
+/* ---------- Sumber lagu tersedia (idle screen) ---------- */
+.idle-sources {
+  margin-top: 26px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.idle-sources-label {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+/* 3 logo berjajar: YouTube | Spotify | SoundCloud */
+.idle-sources-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.src-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 15px;
+  transition: transform .2s ease, background .2s ease;
+}
+.src-chip:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.12);
+}
+.src-chip em {
+  font-style: normal;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+}
+.src-chip i { font-size: 22px; }
+.src-yt i { color: #ff0000; }
+.src-sp i { color: #1db954; }
+.src-sc i { color: #ff5500; }
+
+/* Android WebView: jangan transparan total supaya layar tidak kosong */
+html.ph-android .src-chip { background: rgba(255, 255, 255, 0.08); }
 
 #overlay {
   display: flex;
