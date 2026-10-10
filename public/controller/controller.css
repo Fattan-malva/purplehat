@@ -462,8 +462,9 @@ input:focus-visible {
   font-size: 11.5px;
   color: var(--muted);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   max-width: 46vw;
   padding-left: 8px;
   border-left: 1px solid var(--line-soft);
@@ -474,6 +475,45 @@ input:focus-visible {
   color: var(--accent);
   font-weight: 700;
   letter-spacing: 0.04em;
+}
+
+/* Indikator status di kanan kode room (semua ikon) */
+#status .status-ico {
+  width: 15px;
+  height: 15px;
+  color: var(--accent-hi);
+}
+
+#status .status-ico.on {
+  color: #4ade80;
+}
+
+#status .status-ico.off {
+  color: var(--muted);
+}
+
+#status .status-ico.playing {
+  color: #4ade80;
+  animation: status-pulse 1.1s ease-in-out infinite;
+}
+
+#status .status-ico.spin {
+  color: #fbbf24;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes status-pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: .5;
+    transform: scale(.88);
+  }
 }
 
 .icon-btn {
@@ -589,6 +629,36 @@ input:focus-visible {
   text-overflow: ellipsis;
 }
 
+/* Marquee: teks yang kepanjangan bergerak mulus & looping. Hanya aktif saat
+   memang meluap (kelas .mq-on dipasang dari JS). Judul & artist diberi delay
+   berbeda supaya tidak bergerak bersamaan. */
+.now-title .mq-inner,
+.now-sub .mq-inner {
+  display: inline-flex;
+  white-space: nowrap;
+  will-change: transform;
+}
+
+.now-title .mq-part,
+.now-sub .mq-part {
+  padding-right: 3rem;
+}
+
+.mq-on .mq-inner {
+  animation: ph-marquee var(--mq-dur, 14s) linear infinite;
+  animation-delay: var(--mq-delay, 0s);
+}
+
+@keyframes ph-marquee {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
+
 .time-mini {
   flex-shrink: 0;
   display: flex;
@@ -616,7 +686,7 @@ input:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
+  gap: 12px;
   flex: 0 1 auto;
 }
 
@@ -640,6 +710,22 @@ input:focus-visible {
 
 .btn-round:active {
   transform: scale(.92);
+}
+
+/* Stop: menghentikan lagu (merah) */
+.btn-stop {
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.5);
+  background: rgba(248, 113, 113, 0.12);
+}
+
+.btn-stop:hover {
+  background: rgba(248, 113, 113, 0.22);
+}
+
+/* Salinan tombol loop di panel transport (badge "1" butuh posisi relatif) */
+.btn-loop-panel {
+  position: relative;
 }
 
 .btn-play {
@@ -705,7 +791,7 @@ input:focus-visible {
   }
 
   .transport {
-    gap: 12px;
+    gap: 8px;
   }
 
   .btn-round {
@@ -1465,6 +1551,48 @@ input[type="range"]::-moz-range-thumb {
   min-height: 0;
 }
 
+/* ---------- Modal: Master Volume ---------- */
+.modal-box-vol {
+  max-width: 440px;
+}
+
+/* Volume: nilai punya glow -> jangan dipotong overflow .modal-body */
+.modal-box-vol .modal-body {
+  overflow: visible;
+}
+
+.vol-body {
+  align-items: stretch;
+  gap: 18px;
+  text-align: center;
+  padding: 18px 6px 4px;
+}
+
+.vol-value {
+  font-size: 44px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: #f3e8ff;
+  padding: 8px 12px;
+  text-shadow: 0 0 20px rgba(168, 85, 247, 0.55);
+}
+
+.vol-step-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.vol-bar {
+  flex: 1;
+  height: 8px;
+}
+
+.vol-hint {
+  text-align: center;
+}
+
 /* Up Next: tanpa wrapper rounded, full sampai bawah, shadow di bawah */
 #upnext-modal .queue-list {
   display: flex;
@@ -1551,24 +1679,57 @@ input[type="range"]::-moz-range-thumb {
     display: none;
   }
 
+  /* Panel kontrol: thumbnail persegi besar + teks di tengah, tombol di bawah */
   #player-dock .dock {
     flex: 1;
-    display: flex;
+    display: grid;
+    grid-template-areas:
+      "now"
+      "bar"
+      "tools";
+    grid-template-rows: 1fr auto auto;
+    gap: 12px;
+    padding: 16px 14px 14px;
+  }
+
+  .dock-now {
     flex-direction: column;
-    justify-content: space-between;
-    gap: 14px;
-    padding: 18px;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 10px;
+  }
+
+  .now-body {
+    flex: 0 0 auto;
+    width: 100%;
+    align-items: center;
+  }
+
+  .now-title,
+  .now-sub {
+    width: 100%;
+  }
+
+  .time-mini {
+    justify-content: center;
+  }
+
+  .art {
+    width: 104px;
+    height: 104px;
+    border-radius: 20px;
   }
 
   .dock-tools {
     flex-direction: column;
     align-items: stretch;
-    gap: 14px;
+    gap: 10px;
   }
 
   .transport {
     justify-content: center;
-    gap: 12px;
+    gap: 8px;
   }
 
   .btn-play {
@@ -1591,25 +1752,9 @@ input[type="range"]::-moz-range-thumb {
     gap: 6px;
   }
 
-  /* Hemat ruang di kolom sempit: indikator cukup dari bar volume */
-  .master-inline .val-mini {
-    display: none;
-  }
-
   .master-inline .btn-step.sm {
     width: 34px;
     height: 34px;
-  }
-
-  .master-inline .bar {
-    min-width: 24px;
-    max-width: none;
-  }
-
-  .art {
-    width: 50px;
-    height: 50px;
-    border-radius: 12px;
   }
 
   .now-title {
@@ -1637,17 +1782,17 @@ input[type="range"]::-moz-range-thumb {
   }
 
   .art {
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
-  }
-
-  .now-sub {
-    display: none;
+    width: 80px;
+    height: 80px;
+    border-radius: 16px;
   }
 
   .now-title {
     font-size: 13px;
+  }
+
+  .now-sub {
+    font-size: 11px;
   }
 
   .time-mini {
@@ -1659,7 +1804,7 @@ input[type="range"]::-moz-range-thumb {
   }
 
   .transport {
-    gap: 10px;
+    gap: 6px;
   }
 
   .btn-play {

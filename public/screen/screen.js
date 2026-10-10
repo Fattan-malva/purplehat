@@ -15,6 +15,9 @@ var volume = 30;
 var modeLoop = false;       // ulangi lagu yang sedang diputar
 var modeShuffle = false;    // acak urutan
 var modeLoopQueue = false;  // loop semua antrian (lagu tidak dihapus setelah diputar)
+// Lagu yang dihentikan lewat tombol Stop. Dipakai oleh tombol Play agar bisa
+// melanjutkan lagu lagi setelah idle (bukan sekadar pause).
+var stoppedSong = null;
 
 // ==== Frame playback ====
 var currentSource = 'youtube'; // sumber lagu aktif
@@ -84,6 +87,7 @@ function sendLoad(song) {
 function startSong(song) {
   const src = song.source === 'soundcloud' ? 'soundcloud' : 'youtube';
   const f = document.getElementById('player-frame');
+  stoppedSong = null; // lagu mulai lagi -> memori "lagu yang di-Stop" tidak relevan
   currentSource = src;
   if (f) f.classList.remove('hidden');
   if (frameSrc !== src) {
@@ -168,6 +172,11 @@ function handleMessage(msg) {
     case PH.MSG.NEXT:
     case PH.MSG.SKIP: playNext(); break;
     case PH.MSG.REPLAY: replay(); break;
+    case PH.MSG.STOP:
+      // Ingat lagu yang berhenti supaya tombol Play bisa melanjutkannya lagi.
+      stoppedSong = (currentIndex >= 0 && queue[currentIndex]) ? queue[currentIndex] : null;
+      stopPlayback();
+      break;
     case PH.MSG.SEEK: seekTo(p.to); break;
     case PH.MSG.VOLUME: setVolume(p.vol); break;
     case PH.MSG.REQUEST_STATE: broadcastState(); break;
@@ -338,7 +347,26 @@ function replay() {
   broadcastState();
 }
 
+// Putar lagu pada indeks tertentu (dipakai Play untuk melanjutkan lagu yang di-Stop)
+function playAt(index) {
+  if (index < 0 || index >= queue.length) return;
+  const song = queue[index];
+  if (!(song.source === 'soundcloud' ? song.trackId : song.videoId)) return;
+  currentIndex = index;
+  startSong(song);
+  updateUI();
+  send(PH.MSG.NOW_PLAYING, { song: Object.assign({}, song, { index }), index });
+  broadcastState();
+}
+
 function togglePlay() {
+  // Idle (mis. baru di-Stop atau antrian habis): tombol play memulai lagi.
+  if (currentIndex < 0 || !queue[currentIndex]) {
+    const idx = stoppedSong ? queue.indexOf(stoppedSong) : -1;
+    if (idx >= 0) playAt(idx);
+    else if (queue.length) playNext();
+    return;
+  }
   sendFrame({ cmd: isPlaying ? 'pause' : 'play' });
   isPlaying = !isPlaying;
   broadcastState();

@@ -7,6 +7,8 @@ const MSG = {
   REMOVE_SONG: 'remove_song',
   PLAY_PAUSE: 'play_pause',
   NEXT: 'next',
+  // Stop: hentikan lagu yang sedang diputar dan kembalikan layar ke menu idle.
+  STOP: 'stop',
   REPLAY: 'replay',
   SEEK: 'seek',
   VOLUME: 'volume',

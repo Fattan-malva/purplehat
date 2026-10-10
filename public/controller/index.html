@@ -21,7 +21,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="controller.css?v=20261009k">
+    <link rel="stylesheet" href="controller.css?v=20261010d">
 
     <script>
         // ==== ATURAN KERAS: controller hanya boleh tampil sebagai aplikasi ====
@@ -48,7 +48,7 @@
     </script>
 
     <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
-    <script src="/shared/protocol.js?v=20261009b"></script>
+    <script src="/shared/protocol.js?v=20261010a"></script>
     <script src="/vendor/jsqr/dist/jsQR.js"></script>
 </head>
 
@@ -174,24 +174,27 @@
                         <button id="btn-replay" class="btn-round" title="Replay" aria-label="Replay">
                             <i data-lucide="rotate-ccw"></i>
                         </button>
+                        <button id="btn-stop" class="btn-round btn-stop" title="Stop lagu" aria-label="Stop lagu">
+                            <i data-lucide="square"></i>
+                        </button>
                         <button id="btn-play" class="btn-play" aria-label="Play / Pause">
                             <span id="play-icon"><i data-lucide="pause"></i></span>
                         </button>
                         <button id="btn-next" class="btn-round" title="Skip / Next" aria-label="Next">
                             <i data-lucide="skip-forward"></i>
                         </button>
+                        <!-- Salinan tombol loop (tetap satu tombol bergantian), sinkron
+                             dengan tombol loop di modal Up Next. -->
+                        <button id="btn-loop-panel" class="btn-round btn-loop-panel" data-mode="off" title="Loop: mati"
+                            aria-label="Loop">
+                            <i data-lucide="repeat"></i>
+                            <span id="loop-one-badge-panel" class="loop-one-badge hidden">1</span>
+                        </button>
                     </div>
 
                     <div class="master-inline">
-                        <span class="val val-mini" id="vol-label">30%</span>
-                        <button id="vol-down" class="btn-step sm" title="Volume turun" aria-label="Volume turun">
-                            <i data-lucide="minus"></i>
-                        </button>
-                        <div class="bar">
-                            <div id="vol-progress" style="width: 30%"></div>
-                        </div>
-                        <button id="vol-up" class="btn-step sm" title="Volume naik" aria-label="Volume naik">
-                            <i data-lucide="plus"></i>
+                        <button id="btn-volume" class="btn-step sm" title="Volume" aria-label="Volume">
+                            <i data-lucide="volume-2"></i>
                         </button>
                         <button id="btn-fx" class="btn-step sm fx-open" title="FX & Tuning" aria-label="FX & Tuning">
                             <i data-lucide="wand-sparkles"></i>
@@ -257,6 +260,34 @@
         </div>
     </div>
 
+    <!-- ===== MODAL: MASTER VOLUME (dibuka dari ikon volume di panel) ===== -->
+    <div id="volume-modal" class="modal hidden">
+        <div class="modal-box modal-box-vol">
+            <div class="modal-head">
+                <h3 class="section-title"><i data-lucide="volume-2"></i> Master Volume</h3>
+                <button class="icon-btn" data-close="volume-modal" aria-label="Tutup">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+
+            <div class="modal-body vol-body">
+                <div class="vol-value" id="vol-label">30%</div>
+                <div class="vol-step-row">
+                    <button id="vol-down" class="btn-step" title="Volume turun" aria-label="Volume turun">
+                        <i data-lucide="minus"></i>
+                    </button>
+                    <div class="bar vol-bar">
+                        <div id="vol-progress" style="width: 30%"></div>
+                    </div>
+                    <button id="vol-up" class="btn-step" title="Volume naik" aria-label="Volume naik">
+                        <i data-lucide="plus"></i>
+                    </button>
+                </div>
+                <p class="hint vol-hint">Tekan tahan tombol −/+ untuk naik/turun cepat.</p>
+            </div>
+        </div>
+    </div>
+
     <!-- ===== MODAL: UP NEXT (loop + shuffle juga di sini) ===== -->
     <div id="upnext-modal" class="modal hidden">
         <div class="modal-box modal-box-tall">
@@ -294,7 +325,7 @@
             pitchDisplay.classList.toggle('is-on', currentPitch !== 0);
         }
     </script>
-    <script src="controller.js?v=20261009k"></script>
+    <script src="controller.js?v=20261010d"></script>
 </body>
 
 </html>

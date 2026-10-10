@@ -39,9 +39,31 @@ function send(type, payload) {
   }
 }
 
-function setStatus(text) {
+// Status di header: kode room + indikator IKON di sebelah kanannya.
+// Semua keterangan memakai ikon (tanpa teks).
+var connState = 'off'; // 'off' | 'on' | 'reconnect' | 'poll'
+var _lastStatusHtml = null;
+
+function renderStatus() {
   const el = document.getElementById('status');
-  if (el) el.innerHTML = text;
+  if (!el) return;
+  let indicator;
+  if (connState === 'reconnect') {
+    indicator = '<i data-lucide="loader-circle" class="status-ico spin" aria-label="Menyambung ulang" title="Menyambung ulang"></i>';
+  } else if (state.playing && (connState === 'on' || connState === 'poll')) {
+    indicator = '<i data-lucide="audio-lines" class="status-ico playing" aria-label="Sedang memutar" title="Sedang memutar"></i>';
+  } else if (connState === 'on' || connState === 'poll') {
+    indicator = '<i data-lucide="wifi" class="status-ico on" aria-label="Terhubung" title="Terhubung"></i>';
+  } else {
+    indicator = '<i data-lucide="wifi-off" class="status-ico off" aria-label="Belum terhubung" title="Belum terhubung"></i>';
+  }
+  const html = roomCode
+    ? '<b class="status-code">' + escapeHtml(roomCode) + '</b>' + indicator
+    : indicator;
+  if (html === _lastStatusHtml) return; // hindari rebuild/refresh ikon tiap sync
+  _lastStatusHtml = html;
+  el.innerHTML = html;
+  refreshIcons();
 }
 
 function refreshIcons() {
@@ -94,7 +116,8 @@ function showPairScreen() {
   document.getElementById('pair-status').classList.add('hidden');
   document.getElementById('pair-code-input').value = '';
   document.getElementById('results').classList.add('hidden');
-  setStatus('Belum terhubung');
+  connState = 'off';
+  renderStatus();
   document.getElementById('queue-badge').textContent = '0';
   state = { current: null, queue: [], playing: false, position: 0, duration: 0, volume: 30, modes: { loop: false, shuffle: false, loopQueue: false } };
   updateVolUI();
@@ -109,7 +132,8 @@ function openSocket(attempt) {
   ws.onopen = () => {
     reconnectAttempts = 0;
     suppressReconnect = false;
-    setStatus('Terhubung ke <b class="status-code">' + roomCode + '</b>');
+    connState = 'on';
+    renderStatus();
     showMainUI();
     send(PH.MSG.JOIN, {});
   };
@@ -126,7 +150,8 @@ function openSocket(attempt) {
     if (ws._opened) {
       // Sudah pernah tersambung lalu putus (HP tidur / sinyal) -> sambung
       // ulang otomatis supaya layar tidak ikut kehilangan controller.
-      setStatus('Terputus. Menyambung ulang...');
+      connState = 'reconnect';
+      renderStatus();
       scheduleReconnect();
     } else if (attempt < 3) {
       statusEl.textContent = 'Hubungan realtime gagal (percobaan ' + (attempt + 1) + '). Mencoba lagi...';
@@ -135,7 +160,8 @@ function openSocket(attempt) {
       fallbackMode = true;
       statusEl.style.color = '#fbbf24';
       statusEl.textContent = 'Mode polling (realtime tidak aktif di koneksi ini). Tetap berfungsi.';
-      setStatus('Terhubung (polling) ke <b class="status-code">' + roomCode + '</b>');
+      connState = 'poll';
+      renderStatus();
       showMainUI();
       pollState();
     }
@@ -218,6 +244,8 @@ function bindUI() {
   document.getElementById('btn-play').addEventListener('click', () => send(PH.MSG.PLAY_PAUSE, {}));
   document.getElementById('btn-replay').addEventListener('click', () => send(PH.MSG.REPLAY, {}));
   document.getElementById('btn-next').addEventListener('click', () => send(PH.MSG.NEXT, {}));
+  // Stop: hentikan lagu sekarang juga, layar langsung kembali ke menu idle.
+  document.getElementById('btn-stop').addEventListener('click', () => send(PH.MSG.STOP, {}));
 
   // Progress: bisa diklik DAN diseret (mouse + layar sentuh).
   bindScrub();
@@ -226,8 +254,9 @@ function bindUI() {
   bindHoldVolume('vol-down', -1);
   bindHoldVolume('vol-up', 1);
 
-  // Toggle playback modes (loop gabungan di modal Up Next + shuffle)
+  // Toggle playback modes (loop gabungan di modal Up Next + salinannya di panel)
   document.getElementById('btn-loop').addEventListener('click', cycleLoop);
+  document.getElementById('btn-loop-panel').addEventListener('click', cycleLoop);
   document.getElementById('btn-shuffle').addEventListener('click', () => toggleMode('btn-shuffle', PH.MSG.SHUFFLE));
 
   document.getElementById('pair-connect-btn').addEventListener('click', () => {
@@ -259,6 +288,12 @@ function bindUI() {
   // ==== Modal: FX & Up Next ====
   document.getElementById('btn-fx').addEventListener('click', () => {
     document.getElementById('fx-modal').classList.remove('hidden');
+    refreshIcons();
+  });
+  // Ikon volume di sebelah FX: buka modal master volume.
+  document.getElementById('btn-volume').addEventListener('click', () => {
+    document.getElementById('volume-modal').classList.remove('hidden');
+    updateVolUI();
     refreshIcons();
   });
   document.getElementById('btn-upnext').addEventListener('click', () => {
@@ -456,9 +491,36 @@ function renderResults(items, append) {
   refreshIcons();
 }
 
+// Marquee teks panjang: bergerak mulus & looping. Hanya aktif bila teks
+// benar-benar meluap, dan tidak restart saat STATE_SYNC rutin masuk karena
+// konten yang sama dilewati (dataset.mq). delaySec membuat judul dan artist
+// tidak bergerak bersamaan.
+function setMarquee(el, html, delaySec) {
+  if (!el) return;
+  if (el.dataset.mq === html) return; // belum berubah -> jangan restart animasi
+  el.dataset.mq = html;
+  el.classList.remove('mq-on');
+  el.innerHTML = '<span class="mq-inner"><span class="mq-part">' + html + '</span></span>';
+  const inner = el.querySelector('.mq-inner');
+  const part = el.querySelector('.mq-part');
+  if (!inner || !part) return;
+  const pad = parseFloat(getComputedStyle(part).paddingRight) || 0;
+  const textW = part.scrollWidth - pad;
+  if (textW - el.clientWidth > 6) {
+    // Duplikasi teks supaya loop mulus (track digeser -50%).
+    inner.innerHTML =
+      '<span class="mq-part">' + html + '</span>' +
+      '<span class="mq-part" aria-hidden="true">' + html + '</span>';
+    const dur = Math.max(8, Math.round(textW / 40)); // ~40px/detik
+    el.style.setProperty('--mq-dur', dur + 's');
+    el.style.setProperty('--mq-delay', (delaySec || 0) + 's');
+    el.classList.add('mq-on');
+  }
+}
+
 function render() {
   const np = state.current ? state.current.title : (state.queue[0] ? state.queue[0].title : 'Menunggu lagu...');
-  document.getElementById('np-title').textContent = np;
+  setMarquee(document.getElementById('np-title'), escapeHtml(np), 0);
   const npThumb = document.getElementById('np-thumb');
   const artSrc = (state.current && state.current.thumbnail) || (state.queue[0] && state.queue[0].thumbnail);
   if (npThumb) {
@@ -474,11 +536,13 @@ function render() {
   if (state.current) {
     const src = state.current.source === 'soundcloud' ? 'soundcloud' : 'youtube';
     const artist = state.current.artist || '';
-    subEl.innerHTML = `${artist ? escapeHtml(artist) + ' &bull; ' : ''}${sourceIcon(src)} ${src === 'soundcloud' ? 'SoundCloud' : 'YouTube'}`;
+    const label = src === 'soundcloud' ? 'SoundCloud' : 'YouTube';
+    const subHtml = `${artist ? escapeHtml(artist) + ' &bull; ' : ''}${sourceIcon(src)} ${label}`;
+    setMarquee(subEl, subHtml, 1.2);
   } else {
-    subEl.textContent = 'Purplehat Karaoke';
+    setMarquee(subEl, 'Purplehat Karaoke', 1.2);
   }
-  setStatus(state.playing ? 'Sedang Memutar • <b class="status-code">' + roomCode + '</b>' : 'Terhubung ke <b class="status-code">' + roomCode + '</b>');
+  renderStatus();
   document.getElementById('queue-badge').textContent = state.queue.length;
   const pos = state.position || 0, dur = state.duration || 0;
   // Saat scrub, jangan timpa preview bar/label posisi milik pengguna.
@@ -627,20 +691,23 @@ function cycleLoop() {
 
 function syncModeButtons() {
   const m = state.modes || {};
-  const loopBtn = document.getElementById('btn-loop');
-  if (loopBtn) {
-    const cur = loopState();
-    loopBtn.classList.toggle('mode-active', cur !== 'off');
-    loopBtn.dataset.mode = cur; // 'off' | 'queue' | 'one'
-    loopBtn.title = cur === 'one' ? 'Loop: lagu ini' :
-      cur === 'queue' ? 'Loop: semua antrian' : 'Loop: mati';
-    const badge = document.getElementById('loop-one-badge');
-    if (badge) badge.classList.toggle('hidden', cur !== 'one');
-    const icon = loopBtn.querySelector('.lucide');
-    if (icon) icon.classList.toggle('lucide-loop-one', cur === 'one');
-  }
+  const cur = loopState();
+  // Dua tombol loop (modal Up Next + salinan di panel) selalu sinkron.
+  syncOneLoopButton(document.getElementById('btn-loop'), document.getElementById('loop-one-badge'), cur);
+  syncOneLoopButton(document.getElementById('btn-loop-panel'), document.getElementById('loop-one-badge-panel'), cur);
   const shuf = document.getElementById('btn-shuffle');
   if (shuf) shuf.classList.toggle('mode-active', !!m.shuffle);
+}
+
+function syncOneLoopButton(loopBtn, badge, cur) {
+  if (!loopBtn) return;
+  loopBtn.classList.toggle('mode-active', cur !== 'off');
+  loopBtn.dataset.mode = cur; // 'off' | 'queue' | 'one'
+  loopBtn.title = cur === 'one' ? 'Loop: lagu ini' :
+    cur === 'queue' ? 'Loop: semua antrian' : 'Loop: mati';
+  if (badge) badge.classList.toggle('hidden', cur !== 'one');
+  const icon = loopBtn.querySelector('.lucide');
+  if (icon) icon.classList.toggle('lucide-loop-one', cur === 'one');
 }
 
 function toggleMode(btnId, msgType) {
