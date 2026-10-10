@@ -405,3 +405,29 @@ body.immersive #screen-logout {
   .pair-banner, .promo-slider { max-width: 100%; }
   .promo-slider { height: 300px; }
 }
+
+/* ===== Mode hemat Android WebView =====
+   backdrop-filter di atas video fullscreen (.bg-dim) + animasi background-size
+   pada body sangat mahal di GPU Android -> frame drop saat video berjalan.
+   Kelas .ph-android dipasang lewat JS HANYA di Android (lihat index.html &
+   player.html). WebView2 Windows/desktop tidak punya kelas ini, jadi tampilan
+   desktop tetap sama persis. Tata letak & warna tetap; hanya blur/animasi
+   background yang dilepas. */
+html.ph-android body {
+  animation: none;
+  /* Gradient dipertahankan tapi statis (tanpa animasi background-size). */
+  background: #0a0a0c;
+}
+html.ph-android .bg-dim {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  /* Kompensasi brightness(0.55) + blur yang dilepas, supaya hasil gelapnya
+     tetap mirip dengan versi yang memakai backdrop-filter. */
+  background: rgba(3, 3, 8, 0.92);
+}
+html.ph-android .glass-panel,
+html.ph-android body.immersive #screen-logout,
+html.ph-android .room-badge {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}

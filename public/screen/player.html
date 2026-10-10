@@ -4,7 +4,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Purplehat - Player</title>
-  <link rel="stylesheet" href="screen.css?v=20261009d">
+  <script>
+    // Hemat performa HANYA di Android WebView: pasang kelas .ph-android sebelum
+    // render, supaya screen.css bisa mematikan backdrop-filter & animasi
+    // background yang berat. Windows/WebView2 tidak tersentuh.
+    (function () {
+      var ua = navigator.userAgent || '';
+      var plat = (navigator.userAgentData && navigator.userAgentData.platform) || '';
+      if (/Android/i.test(ua) || /Android/i.test(plat)) {
+        document.documentElement.classList.add('ph-android');
+      }
+    })();
+  </script>
+  <link rel="stylesheet" href="screen.css?v=20261009e">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="/shared/protocol.js?v=20261009b"></script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>

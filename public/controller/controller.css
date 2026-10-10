@@ -899,6 +899,20 @@ input:focus-visible {
   border-radius: 10px;
 }
 
+/* Tombol volume tahan-untuk-ubah: cegah zoom/scroll/selection saat ditahan,
+   dan beri umpan balik visual selama ditekan. */
+#vol-up, #vol-down {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-step.holding {
+  background: rgba(168, 85, 247, 0.28);
+  border-color: rgba(168, 85, 247, 0.55);
+  transform: scale(.96);
+}
+
 .fx-open {
   color: var(--accent-hi);
   border-color: rgba(168, 85, 247, 0.45);

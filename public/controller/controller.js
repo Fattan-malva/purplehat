@@ -222,8 +222,9 @@ function bindUI() {
   // Progress: bisa diklik DAN diseret (mouse + layar sentuh).
   bindScrub();
 
-  document.getElementById('vol-down').addEventListener('click', () => setVolume((state.volume ?? 30) - 2));
-  document.getElementById('vol-up').addEventListener('click', () => setVolume((state.volume ?? 30) + 2));
+  // Volume: TAP = 1 langkah, TAHAN = naik/turun terus (tanpa tap-tap).
+  bindHoldVolume('vol-down', -1);
+  bindHoldVolume('vol-up', 1);
 
   // Toggle playback modes (loop gabungan di modal Up Next + shuffle)
   document.getElementById('btn-loop').addEventListener('click', cycleLoop);
@@ -556,6 +557,51 @@ function setVolume(v) {
   state.volume = v;
   updateVolUI();
   send(PH.MSG.VOLUME, { vol: v });
+}
+
+// Tombol volume: TAP = 1 langkah (2), TAHAN = naik/turun terus.
+// Jeda awal ~350ms mencegah tap biasa terhitung dobel; setelah itu
+// auto-repeat tiap ~110ms sampai jari/mouse dilepas atau sudah mentok (0/100).
+function bindHoldVolume(btnId, dir) {
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+  let startTimer = null;
+  let repeatTimer = null;
+
+  function stop() {
+    clearTimeout(startTimer);
+    clearInterval(repeatTimer);
+    startTimer = repeatTimer = null;
+    btn.classList.remove('holding');
+  }
+
+  function step() {
+    const before = state.volume ?? 30;
+    setVolume(before + dir * 2);
+    // Sudah mentok (tidak berubah): hentikan agar tidak mengirim perintah
+    // sia-sia ke jaringan.
+    if ((state.volume ?? 30) === before) stop();
+  }
+
+  btn.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    stop();
+    btn.classList.add('holding');
+    try { btn.setPointerCapture(e.pointerId); } catch (err) {}
+    step(); // langkah pertama langsung terasa
+    startTimer = setTimeout(() => { repeatTimer = setInterval(step, 110); }, 350);
+  });
+
+  // Lepas jari/mouse atau dibatalkan sistem. Didengarkan juga di window
+  // sebagai jaring pengaman supaya auto-repeat pasti berhenti; sengaja tidak
+  // memakai 'lostpointercapture' karena bisa terpicu palsu dan mematikan
+  // repeat terlalu dini.
+  ['pointerup', 'pointercancel'].forEach((ev) => {
+    btn.addEventListener(ev, stop);
+    window.addEventListener(ev, stop);
+  });
+  window.addEventListener('blur', stop);
 }
 
 // Satu tombol loop: mati -> loop semua antrian -> loop lagu ini -> mati.
