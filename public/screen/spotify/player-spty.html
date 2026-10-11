@@ -1026,7 +1026,7 @@
       function clearContent() {
         stopMonitoring();
         autoPlaySeq++;      // batalkan watchdog autoplay lagu sebelumnya
-        embedSeq++;
+        //embedSeq++;
         embedWin = null;    // pesan dari embed lama tidak lagi dipakai
         embedReady = false;
         embedWaitRunning = false;
@@ -1185,7 +1185,7 @@
         // dibuang saat ganti lagu) sering terlambat datang dan bisa menimpa
         // posisi lagu baru, bahkan memicu 'ended' palsu -> auto-next mandek.
         try { embedWin = iframe.contentWindow; } catch (e) { embedWin = null; }
-        embedSeq++;
+        // embedSeq++;
 
         // Kalau overlay lirik sedang terbuka (ganti lagu), kirim config baru.
         if (isLyricsActive) sendLyricConfig();
@@ -1347,6 +1347,9 @@
           notifyEnded();
         } else if (payload.isPaused === true && currentDuration > 0 &&
                    typeof pos === 'number' && pos >= currentDuration * 0.9) {
+          notifyEnded();
+        } else if (typeof pos === 'number' && currentDuration > 0 && pos >= currentDuration * 0.95) {
+          // Embed kadang tidak mengirim isPaused saat selesai – gunakan ambang posisi.
           notifyEnded();
         }
       });

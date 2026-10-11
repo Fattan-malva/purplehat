@@ -21,8 +21,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="controller.css?v=20261010i">
-
+    <link rel="stylesheet" href="controller.css?v=20261012b">
     <script>
         // ==== ATURAN KERAS: controller hanya boleh tampil sebagai aplikasi ====
         (function () {
@@ -174,11 +173,11 @@
                 <!-- Transport + Master sebaris -->
                 <div class="dock-tools">
                     <div class="transport">
-                        <button id="btn-replay" class="btn-round" title="Replay" aria-label="Replay">
-                            <i data-lucide="rotate-ccw"></i>
-                        </button>
                         <button id="btn-stop" class="btn-round btn-stop" title="Stop lagu" aria-label="Stop lagu">
                             <i data-lucide="square"></i>
+                        </button>
+                        <button id="btn-replay" class="btn-round" title="Replay" aria-label="Replay">
+                            <i data-lucide="rotate-ccw"></i>
                         </button>
                         <button id="btn-play" class="btn-play" aria-label="Play / Pause">
                             <span id="play-icon"><i data-lucide="pause"></i></span>
@@ -338,6 +337,32 @@
         </div>
     </div>
 
+    <!-- ===== MODAL: Konfirmasi tambah ke Up Next (tombol + pada hasil) ===== -->
+    <div id="confirm-modal" class="modal hidden">
+        <div class="modal-box modal-box-confirm">
+            <div class="modal-head">
+                <h3 class="section-title"><i data-lucide="list-plus"></i> Tambah ke Up Next?</h3>
+                <button class="icon-btn" data-close="confirm-modal" aria-label="Tutup">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="confirm-song">
+                    <img id="confirm-thumb" class="thumb" alt="">
+                    <div class="row-main">
+                        <div class="row-title" id="confirm-title">-</div>
+                        <div class="row-sub"><span class="truncate" id="confirm-sub"></span></div>
+                    </div>
+                </div>
+                <p class="hint">Lagu ini akan ditambahkan ke antrian <strong>Up Next</strong>.</p>
+                <div class="confirm-actions">
+                    <button class="btn-ghost" data-close="confirm-modal">Batal</button>
+                    <button class="btn-primary" id="confirm-add-btn">Tambah</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Pitch Control Logic
         let currentPitch = 0;
@@ -351,7 +376,7 @@
             pitchDisplay.classList.toggle('is-on', currentPitch !== 0);
         }
     </script>
-    <script src="controller.js?v=20261010i"></script>
+    <script src="controller.js?v=20261012b"></script>
 </body>
 
 </html>

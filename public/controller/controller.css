@@ -25,6 +25,11 @@
   color-scheme: dark;
 }
 
+html {
+  height: 100%;
+  overflow: hidden;
+}
+
 /* ---------- Base / reset ---------- */
 *,
 *::before,
@@ -35,7 +40,8 @@
 }
 
 html {
-  background: var(--bg);
+  background: linear-gradient(-45deg, #07060b, #1a0b2e, #07060b, #130624);
+  background-color: #07060b;
   height: 100%;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
@@ -49,8 +55,10 @@ body {
   font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 15px;
   line-height: 1.45;
-  padding: calc(var(--safe-t) + 12px) calc(var(--safe-r) + var(--gutter)) calc(var(--safe-b) + 16px) calc(var(--safe-l) + var(--gutter));
-  overscroll-behavior-y: none;
+  padding: calc(var(--safe-t)) 0 0 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: manipulation;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
 }
@@ -59,6 +67,8 @@ body::before {
   content: "";
   position: fixed;
   inset: 0;
+  width: 100vw;
+  min-height: 100lvh;
   z-index: -1;
   pointer-events: none;
   background: linear-gradient(-45deg, #07060b, #1a0b2e, #07060b, #130624);
@@ -343,12 +353,9 @@ input:focus-visible {
   width: 100%;
   max-width: 580px;
   margin: 0 auto;
-  height: calc(100dvh - var(--safe-t) - var(--safe-b) - 28px);
-  /* Pemotongan kontainer: fallback lama dulu, lalu clip+margin supaya glow
-     logo header di atas/kiri TIDAK kejepit di tepi saat dekat batas. */
-  overflow: hidden;
-  overflow: clip;
-  overflow-clip-margin: 22px;
+  height: calc(100dvh - var(--safe-t));
+  /* Biarkan glow/knob progress tidak terpotong. */
+  overflow: visible;
 }
 
 /* Header di paling atas — tidak ikut scroll */
@@ -413,7 +420,7 @@ input:focus-visible {
   gap: 10px;
   /* Ruang napas di semua sisi supaya logo (dan wilayah sekitarnya) tidak
      terjepit/terpotong oleh tepi kontainer, baik portrait maupun landscape. */
-  padding: 12px 12px 6px;
+  padding: 0 max(12px, var(--safe-r)) 6px max(12px, var(--safe-l));
 }
 
 .brand {
@@ -568,8 +575,8 @@ input:focus-visible {
     "bar  bar";
   grid-template-columns: minmax(0, 1fr);
   gap: 10px;
-  padding: 14px 16px 12px;
-  overflow: hidden;
+  padding: 14px max(16px, var(--safe-r)) calc(12px + var(--safe-b)) max(16px, var(--safe-l));
+  overflow: visible;
 }
 
 /* Baris info lagu */
@@ -1191,14 +1198,30 @@ input[type="range"]::-moz-range-thumb {
 
 .chips {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding-bottom: 2px;
+}
+
+.chips::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .src-tab {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  flex: 0 0 auto;
   height: 30px;
   padding: 0 12px;
   border-radius: 999px;
@@ -1206,7 +1229,22 @@ input[type="range"]::-moz-range-thumb {
   border: 1px solid var(--line-soft);
   font-size: 12px;
   font-weight: 600;
+  white-space: nowrap;
   transition: background .2s, transform .15s;
+}
+
+/* Layar sempit: perkecil badge supaya tetap satu baris (tetap bisa digeser). */
+@media (max-width: 400px) {
+  .src-tab {
+    padding: 0 9px;
+    height: 28px;
+    font-size: 11px;
+    gap: 4px;
+  }
+
+  .src-tab .fab {
+    font-size: 12px;
+  }
 }
 
 .src-tab:active {
@@ -1240,6 +1278,7 @@ input[type="range"]::-moz-range-thumb {
   max-height: none;
   overflow-y: auto;
   overscroll-behavior: contain;
+  touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
   background: transparent;
   border: 0;
@@ -1348,10 +1387,30 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .row-add {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--line-soft);
   color: var(--accent-hi);
+  transition: background .2s, transform .15s;
+  cursor: pointer;
+}
+
+.row-add:hover {
+  background: rgba(168, 85, 247, 0.22);
+}
+
+.row-add:active {
+  transform: scale(.92);
+}
+
+.row-add .lucide {
   width: 18px;
   height: 18px;
-  flex-shrink: 0;
 }
 
 .state-msg {
@@ -1557,6 +1616,7 @@ input[type="range"]::-moz-range-thumb {
   gap: 14px;
   overflow-y: auto;
   overscroll-behavior: contain;
+  touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
   min-height: 0;
 }
@@ -1564,6 +1624,32 @@ input[type="range"]::-moz-range-thumb {
 /* ---------- Modal: Master Volume ---------- */
 .modal-box-vol {
   max-width: 440px;
+}
+
+/* ---------- Modal: konfirmasi "Putar Sekarang" ---------- */
+.modal-box-confirm {
+  max-width: 440px;
+}
+
+.confirm-song {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--line-soft);
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.confirm-actions .btn-primary,
+.confirm-actions .btn-ghost {
+  flex: 1;
+  width: auto;
 }
 
 /* ---------- Modal: sp_dc Spotify ---------- */
@@ -1720,7 +1806,7 @@ input[type="range"]::-moz-range-thumb {
   body {
     height: 100vh;
     height: 100dvh;
-    padding: calc(var(--safe-t) + 10px) calc(var(--safe-r) + 12px) calc(var(--safe-b) + 10px) calc(var(--safe-l) + 12px);
+    padding: calc(var(--safe-t)) 0 0 0;
     overflow: hidden;
   }
 
@@ -1735,7 +1821,7 @@ input[type="range"]::-moz-range-thumb {
     width: 100%;
     max-width: none;
     margin: 0;
-    height: calc(100dvh - var(--safe-t) - var(--safe-b) - 20px);
+    height: calc(100dvh - var(--safe-t));
   }
 
   #main-ui>.topbar {
@@ -2150,6 +2236,20 @@ input[type="range"]::-moz-range-thumb {
   padding: 10px;
   font-size: 13px;
 }
+
+/* Auto-hide UI (topbar + player dock) for mobile */
+body.ui-hidden .topbar,
+body.ui-hidden #player-dock {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .3s ease;
+}
+body .topbar,
+body #player-dock {
+  opacity: 1;
+  transition: opacity .3s ease;
+}
+
 
 .install-modal-box .btn-primary:disabled {
   opacity: .55;

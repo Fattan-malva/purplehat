@@ -300,7 +300,7 @@ body.immersive #player-wrapper {
    (bukan terpisah ke pojok kiri). */
 .screen-top-right {
   position: fixed;
-  top: 16px;
+  top: calc(var(--safe-t));
   right: 16px;
   z-index: 60;
   display: flex;
@@ -356,7 +356,7 @@ body.immersive #screen-logout {
 }
 
 @media (max-width: 640px) {
-  .container { padding: 12px; }
+  .container { padding: 0 12px 12px 12px; }
   #overlay { flex-direction: column; }
 }
 

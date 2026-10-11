@@ -1,88 +1,8 @@
 {
   "rooms": {
-    "AS7CJR": {
-      "code": "AS7CJR",
-      "createdAt": 1791557472551,
-      "queue": [],
-      "currentIndex": -1,
-      "playing": false,
-      "volume": 30,
-      "position": 0,
-      "duration": 0
-    },
-    "TMX4SJ": {
-      "code": "TMX4SJ",
-      "createdAt": 1791557507084,
-      "queue": [],
-      "currentIndex": -1,
-      "playing": false,
-      "volume": 30,
-      "position": 0,
-      "duration": 0
-    },
-    "ZCNA49": {
-      "code": "ZCNA49",
-      "createdAt": 1791558311951,
-      "queue": [],
-      "currentIndex": -1,
-      "playing": false,
-      "volume": 30,
-      "position": 0,
-      "duration": 0
-    },
-    "DATJD3": {
-      "code": "DATJD3",
-      "createdAt": 1791624989898,
-      "queue": [],
-      "currentIndex": -1,
-      "playing": false,
-      "volume": 30,
-      "position": 0,
-      "duration": 0
-    },
-    "TESTXX": {
-      "code": "TESTXX",
-      "createdAt": 1791625873446,
-      "queue": [],
-      "currentIndex": -1,
-      "playing": false,
-      "volume": 30,
-      "position": 0,
-      "duration": 0
-    },
-    "RLZU8Y": {
-      "code": "RLZU8Y",
-      "createdAt": 1791625934055,
-      "queue": [],
-      "currentIndex": -1,
-      "playing": false,
-      "volume": 30,
-      "position": 0,
-      "duration": 0
-    },
-    "X927GD": {
-      "code": "X927GD",
-      "createdAt": 1791626663804,
-      "queue": [],
-      "currentIndex": -1,
-      "playing": false,
-      "volume": 30,
-      "position": 0,
-      "duration": 0
-    },
-    "NPXDCW": {
-      "code": "NPXDCW",
-      "createdAt": 1791627631083,
-      "queue": [],
-      "currentIndex": -1,
-      "playing": false,
-      "volume": 30,
-      "position": 0,
-      "duration": 0
-    },
-    "ZKA7DB": {
-      "code": "ZKA7DB",
-      "createdAt": 1791628851137,
+    "FS85LM": {
+      "code": "FS85LM",
+      "createdAt": 1791740970265,
       "queue": [],
       "currentIndex": -1,
       "playing": false,
@@ -91,9 +11,9 @@
       "duration": 0,
       "sp_dc": null
     },
-    "8ZMGA3": {
-      "code": "8ZMGA3",
-      "createdAt": 1791628881612,
+    "5E3X5Y": {
+      "code": "5E3X5Y",
+      "createdAt": 1791740970295,
       "queue": [],
       "currentIndex": -1,
       "playing": false,
@@ -102,9 +22,9 @@
       "duration": 0,
       "sp_dc": null
     },
-    "KDY53H": {
-      "code": "KDY53H",
-      "createdAt": 1791628894390,
+    "6Z3FJJ": {
+      "code": "6Z3FJJ",
+      "createdAt": 1791743445180,
       "queue": [],
       "currentIndex": -1,
       "playing": false,
@@ -113,9 +33,9 @@
       "duration": 0,
       "sp_dc": null
     },
-    "AW2RDM": {
-      "code": "AW2RDM",
-      "createdAt": 1791628927146,
+    "JSZXH4": {
+      "code": "JSZXH4",
+      "createdAt": 1791743472059,
       "queue": [],
       "currentIndex": -1,
       "playing": false,
@@ -124,9 +44,9 @@
       "duration": 0,
       "sp_dc": null
     },
-    "UNEX58": {
-      "code": "UNEX58",
-      "createdAt": 1791628941849,
+    "6EPTPF": {
+      "code": "6EPTPF",
+      "createdAt": 1791743612447,
       "queue": [],
       "currentIndex": -1,
       "playing": false,
@@ -134,193 +54,6 @@
       "position": 0,
       "duration": 0,
       "sp_dc": null
-    },
-    "59DJHW": {
-      "code": "59DJHW",
-      "createdAt": 1791629166760,
-      "queue": [],
-      "currentIndex": -1,
-      "playing": false,
-      "volume": 30,
-      "position": 0,
-      "duration": 0,
-      "sp_dc": null
-    },
-    "27X4B9": {
-      "code": "27X4B9",
-      "createdAt": 1791629189587,
-      "queue": [],
-      "currentIndex": -1,
-      "playing": false,
-      "volume": 30,
-      "position": 0,
-      "duration": 0,
-      "sp_dc": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-    },
-    "FX7J2F": {
-      "code": "FX7J2F",
-      "createdAt": 1791630151083,
-      "queue": [],
-      "currentIndex": -1,
-      "playing": false,
-      "volume": 30,
-      "position": 0,
-      "duration": 0,
-      "sp_dc": null
-    },
-    "W4AD6L": {
-      "code": "W4AD6L",
-      "createdAt": 1791630854056,
-      "queue": [],
-      "currentIndex": -1,
-      "playing": false,
-      "volume": 30,
-      "position": 0,
-      "duration": 0,
-      "sp_dc": null
-    },
-    "Q86MW8": {
-      "code": "Q86MW8",
-      "createdAt": 1791631893065,
-      "queue": [],
-      "currentIndex": -1,
-      "playing": false,
-      "volume": 30,
-      "position": 0,
-      "duration": 0,
-      "sp_dc": null
-    },
-    "MVJVWP": {
-      "code": "MVJVWP",
-      "createdAt": 1791633761231,
-      "queue": [],
-      "currentIndex": -1,
-      "playing": false,
-      "volume": 30,
-      "position": 0,
-      "duration": 0,
-      "sp_dc": null
-    },
-    "LLE2Q5": {
-      "code": "LLE2Q5",
-      "createdAt": 1791635107790,
-      "queue": [],
-      "currentIndex": -1,
-      "playing": false,
-      "volume": 30,
-      "position": 0,
-      "duration": 0,
-      "sp_dc": "AQAddTIw3FInhfanpJ0i8vkXFwYKCyT6kIfS6JVy_I92EDR4lqlWfWM7aaeWG7FUdP6qBOqblPYqZrfiAcPo0wsTpWIcFMs4h6OvOurG1IOtFAmU_i_UkYapV8nLhVjD5B6O4ESSmce5qv_kn1vuJB0FNMTuGJYjt1G801H2uULmijI3kOwSpHsmFVTPTkjZ-uvKyEkJ07u2IZRHBkuawGQhlpqv8Spfg51e1loNXtccfxbkMLmV60EazSJhU4GQGCDrvvlRxflsQ2E"
-    },
-    "EHW88M": {
-      "code": "EHW88M",
-      "createdAt": 1791635725939,
-      "queue": [],
-      "currentIndex": -1,
-      "playing": false,
-      "volume": 30,
-      "position": 0,
-      "duration": 0,
-      "sp_dc": null
-    },
-    "8HU8NN": {
-      "code": "8HU8NN",
-      "createdAt": 1791635834207,
-      "queue": [],
-      "currentIndex": -1,
-      "playing": false,
-      "volume": 30,
-      "position": 0,
-      "duration": 0,
-      "sp_dc": null
-    },
-    "ZZZZZZ": {
-      "code": "ZZZZZZ",
-      "createdAt": 1791638391903,
-      "queue": [],
-      "currentIndex": -1,
-      "playing": false,
-      "volume": 30,
-      "position": 0,
-      "duration": 0,
-      "sp_dc": null
-    },
-    "UN3TGP": {
-      "code": "UN3TGP",
-      "createdAt": 1791638395783,
-      "queue": [],
-      "currentIndex": -1,
-      "playing": false,
-      "volume": 30,
-      "position": 0,
-      "duration": 0,
-      "sp_dc": null
-    },
-    "3FQHDS": {
-      "code": "3FQHDS",
-      "createdAt": 1791639093447,
-      "queue": [],
-      "currentIndex": -1,
-      "playing": false,
-      "volume": 30,
-      "position": 0,
-      "duration": 0,
-      "sp_dc": null
-    },
-    "9BBR6P": {
-      "code": "9BBR6P",
-      "createdAt": 1791639203190,
-      "queue": [],
-      "currentIndex": -1,
-      "playing": false,
-      "volume": 30,
-      "position": 0,
-      "duration": 0,
-      "sp_dc": null
-    },
-    "TFDCNS": {
-      "code": "TFDCNS",
-      "createdAt": 1791640282170,
-      "queue": [],
-      "currentIndex": -1,
-      "playing": false,
-      "volume": 30,
-      "position": 0,
-      "duration": 0,
-      "sp_dc": null
-    },
-    "LZKMND": {
-      "code": "LZKMND",
-      "createdAt": 1791640463365,
-      "queue": [],
-      "currentIndex": -1,
-      "playing": false,
-      "volume": 30,
-      "position": 0,
-      "duration": 0,
-      "sp_dc": null
-    },
-    "NFN54H": {
-      "code": "NFN54H",
-      "createdAt": 1791643372118,
-      "queue": [],
-      "currentIndex": -1,
-      "playing": false,
-      "volume": 30,
-      "position": 0,
-      "duration": 0,
-      "sp_dc": "AQAddTIw3FInhfanpJ0i8vkXFwYKCyT6kIfS6JVy_I92EDR4lqlWfWM7aaeWG7FUdP6qBOqblPYqZrfiAcPo0wsTpWIcFMs4h6OvOurG1IOtFAmU_i_UkYapV8nLhVjD5B6O4ESSmce5qv_kn1vuJB0FNMTuGJYjt1G801H2uULmijI3kOwSpHsmFVTPTkjZ-uvKyEkJ07u2IZRHBkuawGQhlpqv8Spfg51e1loNXtccfxbkMLmV60EazSJhU4GQGCDrvvlRxflsQ2E"
-    },
-    "Q7TCVK": {
-      "code": "Q7TCVK",
-      "createdAt": 1791643459039,
-      "queue": [],
-      "currentIndex": -1,
-      "playing": false,
-      "volume": 30,
-      "position": 0,
-      "duration": 0,
-      "sp_dc": "AQAddTIw3FInhfanpJ0i8vkXFwYKCyT6kIfS6JVy_I92EDR4lqlWfWM7aaeWG7FUdP6qBOqblPYqZrfiAcPo0wsTpWIcFMs4h6OvOurG1IOtFAmU_i_UkYapV8nLhVjD5B6O4ESSmce5qv_kn1vuJB0FNMTuGJYjt1G801H2uULmijI3kOwSpHsmFVTPTkjZ-uvKyEkJ07u2IZRHBkuawGQhlpqv8Spfg51e1loNXtccfxbkMLmV60EazSJhU4GQGCDrvvlRxflsQ2E"
     }
   }
 }

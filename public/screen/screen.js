@@ -285,14 +285,25 @@ function addSong(p) {
   const trackId = payload.trackId;
   if (src === 'youtube' && !videoId) return;
   if (src !== 'youtube' && !trackId) return;
-  queue.push({
+  const song = {
     videoId: videoId || null,
     trackId: trackId || null,
     source: src,
     title: payload.title || videoId || String(trackId || ''),
     artist: payload.artist || '',
     thumbnail: payload.thumbnail || (videoId ? 'https://img.youtube.com/vi/' + videoId + '/hqdefault.jpg' : '')
-  });
+  };
+  // playNow: lagu ditaruh di PALING ATAS antrian lalu langsung diputar.
+  if (payload.playNow) {
+    queue.unshift(song);
+    currentIndex = -1;
+    updateQueueUI();
+    send(PH.MSG.QUEUE_UPDATE, { queue });
+    playNext();
+    broadcastState();
+    return;
+  }
+  queue.push(song);
   updateQueueUI();
   send(PH.MSG.QUEUE_UPDATE, { queue });
   if (currentIndex < 0) playNext();

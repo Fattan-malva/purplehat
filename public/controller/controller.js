@@ -333,6 +333,9 @@ function bindUI() {
     syncModeButtons();
     refreshIcons();
   });
+  // Konfirmasi "Tambah ke Up Next" dari tombol + pada hasil pencarian.
+  const confirmBtn = document.getElementById('confirm-add-btn');
+  if (confirmBtn) confirmBtn.addEventListener('click', confirmAddToQueue);
   document.querySelectorAll('[data-close]').forEach(btn => {
     btn.addEventListener('click', () => {
       document.getElementById(btn.dataset.close).classList.add('hidden');
@@ -608,6 +611,41 @@ function sourceIcon(src) {
   return '<i class="fab fa-youtube src-yt" title="Available on YouTube"></i>';
 }
 
+function addSongToQueue(item, src, playNow) {
+  if (src === 'spotify') {
+    send(PH.MSG.ADD_SONG, { source: 'spotify', trackId: item.trackId, title: item.title, artist: item.artist, thumbnail: item.thumbnail, playNow: !!playNow });
+  } else if (src === 'soundcloud') {
+    send(PH.MSG.ADD_SONG, { source: 'soundcloud', trackId: item.trackId, title: item.title, artist: item.artist, thumbnail: item.thumbnail, playNow: !!playNow });
+  } else {
+    send(PH.MSG.ADD_SONG, { source: 'youtube', videoId: item.videoId, title: item.title, artist: item.channelName, thumbnail: item.thumbnail, playNow: !!playNow });
+  }
+}
+
+// Modal konfirmasi "Tambah ke Up Next" untuk tombol + pada setiap hasil.
+var pendingAdd = null;
+
+function openConfirmAdd(item, src) {
+  pendingAdd = { item: item, src: src };
+  var img = document.getElementById('confirm-thumb');
+  if (img) {
+    if (item.thumbnail) { img.src = item.thumbnail; img.classList.remove('hidden'); }
+    else { img.removeAttribute('src'); img.classList.add('hidden'); }
+  }
+  var t = document.getElementById('confirm-title');
+  if (t) t.textContent = item.title || '';
+  var s = document.getElementById('confirm-sub');
+  if (s) s.textContent = [item.artist || item.channelName || '', item.duration || ''].filter(Boolean).join(' • ');
+  document.getElementById('confirm-modal').classList.remove('hidden');
+  refreshIcons();
+}
+
+function confirmAddToQueue() {
+  if (!pendingAdd) return;
+  addSongToQueue(pendingAdd.item, pendingAdd.src, false);
+  document.getElementById('confirm-modal').classList.add('hidden');
+  pendingAdd = null;
+}
+
 function buildResultRow(item) {
   const src = item.source || resultsState.src || 'youtube';
   const sub = [item.artist || item.channelName || '', item.duration || ''].filter(Boolean).join(' • ');
@@ -624,16 +662,19 @@ function buildResultRow(item) {
         <div class="row-title">${escapeHtml(item.title || '')}</div>
         <div class="row-sub">${sourceIcon(src)} <span class="truncate">${escapeHtml(sub)}</span></div>
       </div>
-      <i data-lucide="plus" class="row-add"></i>`;
-  div.addEventListener('click', () => {
-    if (src === 'spotify') {
-      send(PH.MSG.ADD_SONG, { source: 'spotify', trackId: item.trackId, title: item.title, artist: item.artist, thumbnail: item.thumbnail });
-    } else if (src === 'soundcloud') {
-      send(PH.MSG.ADD_SONG, { source: 'soundcloud', trackId: item.trackId, title: item.title, artist: item.artist, thumbnail: item.thumbnail });
-    } else {
-      send(PH.MSG.ADD_SONG, { source: 'youtube', videoId: item.videoId, title: item.title, artist: item.channelName, thumbnail: item.thumbnail });
-    }
-  });
+      <button type="button" class="row-add" title="Tambah ke Up Next" aria-label="Tambah ke Up Next">
+        <i data-lucide="plus"></i>
+      </button>`;
+  // Klik baris = LANGSUNG putar sekarang: masuk paling atas Up Next + play.
+  div.addEventListener('click', () => addSongToQueue(item, src, true));
+  // Klik tombol + = konfirmasi tambah ke Up Next (tanpa langsung play).
+  const addBtn = div.querySelector('.row-add');
+  if (addBtn) {
+    addBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openConfirmAdd(item, src);
+    });
+  }
   return div;
 }
 
@@ -1008,6 +1049,48 @@ setInterval(() => { if (!fallbackMode) send(PH.MSG.REQUEST_STATE, {}); }, 3000);
     if (resultsEl.scrollTop + resultsEl.clientHeight >= resultsEl.scrollHeight - 220) loadMore();
   }, { passive: true });
 })();
+
+// ==== Fullscreen / immersive: sembunyikan UI sistem (status & navigation bar) ====
+(function () {
+  var done = false;
+  function goFull() {
+    if (done) return;
+    var el = document.documentElement;
+    var req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+    if (!req) return;
+    try {
+      var p = req.call(el, { navigationUI: 'hide' });
+      if (p && p.catch) p.catch(function () {});
+    } catch (e) {}
+    done = true;
+    document.removeEventListener('pointerdown', goFull);
+    document.removeEventListener('click', goFull);
+    document.removeEventListener('touchstart', goFull);
+  }
+  document.addEventListener('pointerdown', goFull, { passive: true });
+  document.addEventListener('click', goFull, { passive: true });
+  document.addEventListener('touchstart', goFull, { passive: true });
+  // Cegah pinch-zoom (iOS Safari) supaya UI tetap satu layar penuh.
+  document.addEventListener('gesturestart', function (e) { e.preventDefault(); }, { passive: false });
+  document.addEventListener('gesturechange', function (e) { e.preventDefault(); }, { passive: false });
+  // Coba langsung saat load (Android Chrome PWA standalone mengizinkan).
+  if (document.fullscreenEnabled) { try { goFull(); } catch (e) {} }
+})();
+
+// ==== Auto-hide UI (topbar + player dock) disabled ====
+// (function(){
+//   var idleTimer;
+//   var idleDelay = 3000; // ms
+//   function hideUI(){ document.body.classList.add('ui-hidden'); }
+//   function showUI(){ document.body.classList.remove('ui-hidden'); resetTimer(); }
+//   function resetTimer(){ clearTimeout(idleTimer); idleTimer = setTimeout(hideUI, idleDelay); }
+//   // Show UI on any user interaction
+//   ['touchstart','touchmove','mousemove','keydown'].forEach(function(ev){
+//     document.addEventListener(ev, showUI, {passive:true});
+//   });
+//   resetTimer();
+// })();
+
 
 // Default pencarian: query "breakbeat" sudah terisi, hasil langsung tampil sejak awal.
 document.getElementById('search-input').value = 'breakbeat';
