@@ -225,7 +225,7 @@ function handleMessage(msg) {
     case PH.MSG.LOOP: modeLoop = !!p.on; broadcastState(); break;
     case PH.MSG.SHUFFLE: modeShuffle = !!p.on; broadcastState(); break;
     case PH.MSG.LOOP_QUEUE: modeLoopQueue = !!p.on; broadcastState(); break;
-    case PH.MSG.MOVE_SONG: moveSong(p.index, p.dir); break;
+    case PH.MSG.MOVE_SONG: moveSong(p.index, p.dir, p.to); break;
     case PH.MSG.LYRICS:
       // Command lirik dari controller (tombol FX saat lagu Spotify aktif).
       sendFrame({ cmd: 'lyrics' });
@@ -320,14 +320,17 @@ function removeSong(index) {
   broadcastState();
 }
 
-// Geser lagu naik/turun dalam antrian
-function moveSong(index, dir) {
-  const to = index + dir;
-  if (index == null || index < 0 || index >= queue.length || to < 0 || to >= queue.length) return;
+// Geser lagu naik/turun dalam antrian, atau pindah ke indeks tertentu
+// (dipakai drag & drop: payload.to). Dir tetap didukung untuk kompatibilitas.
+function moveSong(index, dir, toExplicit) {
+  if (index == null || index < 0 || index >= queue.length) return;
+  const to = (typeof toExplicit === 'number') ? toExplicit : index + dir;
+  if (to < 0 || to >= queue.length || to === index) return;
   const [song] = queue.splice(index, 1);
   queue.splice(to, 0, song);
   if (currentIndex === index) currentIndex = to;
-  else if (currentIndex === to) currentIndex = index;
+  else if (index < currentIndex && to >= currentIndex) currentIndex--;
+  else if (index > currentIndex && to <= currentIndex) currentIndex++;
   updateQueueUI();
   send(PH.MSG.QUEUE_UPDATE, { queue });
   broadcastState();

@@ -83,14 +83,21 @@
     .lyrics-viewport {
       width: 100%;
       height: 100vh;
-      overflow-y: auto;
+      overflow: hidden;
       padding: 0 5vw;
+      position: relative;
       mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
       -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
       scrollbar-width: none;
       -ms-overflow-style: none;
-      scroll-behavior: smooth;
       z-index: 11;
+    }
+
+    /* Lirik tanpa sinkronisasi: biarkan bisa digulir manual. */
+    .lyrics-viewport.scrollable {
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      scroll-behavior: smooth;
     }
 
     .lyrics-viewport::-webkit-scrollbar {
@@ -106,6 +113,15 @@
       margin: 0;
       text-align: left;
       align-items: flex-start;
+      /* Pergantian lirik menggeser seluruh daftar dengan mulus (seperti
+         Spotify) sehingga baris aktif "naik" ke tengah. */
+      transition: transform .6s cubic-bezier(.22, .61, .36, 1);
+      will-change: transform;
+    }
+
+    /* Dipakai saat menempatkan posisi awal tanpa animasi. */
+    #lyricsContainer.no-anim {
+      transition: none !important;
     }
 
     .lyric-line {
@@ -262,6 +278,12 @@
       function renderLyrics() {
         lyricsContainer.innerHTML = '';
         var isSynced = !!lyricsData.hasSync;
+        lyricsViewport.classList.toggle('scrollable', !isSynced);
+        // Reset posisi tanpa animasi saat daftar baru dirender.
+        lyricsContainer.classList.add('no-anim');
+        lyricsContainer.style.transform = 'translate3d(0, 0, 0)';
+        void lyricsContainer.offsetHeight;
+        lyricsContainer.classList.remove('no-anim');
         lyricsData.lines.forEach(function (line, index) {
           var el = document.createElement('div');
           el.className = 'lyric-line' + (isSynced ? '' : ' unsynced');
@@ -275,6 +297,26 @@
           lyricsContainer.appendChild(el);
         });
         updateActive(true);
+      }
+
+      // Geser seluruh daftar supaya baris aktif berada tepat di tengah viewport.
+      // `instant` = langsung tanpa animasi (untuk render/seek/ganti lagu).
+      function centerActive(index, instant) {
+        var els = lyricsContainer.getElementsByClassName('lyric-line');
+        var vh = lyricsViewport.clientHeight;
+        var target = 0;
+        if (index >= 0 && index < els.length) {
+          var activeEl = els[index];
+          target = activeEl.offsetTop - (vh / 2) + (activeEl.offsetHeight / 2);
+        }
+        if (instant) {
+          lyricsContainer.classList.add('no-anim');
+          lyricsContainer.style.transform = 'translate3d(0, ' + (-target) + 'px, 0)';
+          void lyricsContainer.offsetHeight; // paksa reflow agar tidak dianimasikan
+          lyricsContainer.classList.remove('no-anim');
+        } else {
+          lyricsContainer.style.transform = 'translate3d(0, ' + (-target) + 'px, 0)';
+        }
       }
 
       function updateActive(forceScroll) {
@@ -291,21 +333,13 @@
         if (newIndex === activeLineIndex && !forceScroll) return;
 
         var els = lyricsContainer.getElementsByClassName('lyric-line');
-        // Posisi biasa saja: teks yang sedang dinyanyikan putih & diperbesar,
-        // sisanya diredupkan (sama seperti tampilan lirik spty-web).
+        // Teks yang sedang dinyanyikan putih & sedikit diperbesar, sisanya redup.
         for (var j = 0; j < els.length; j++) {
           els[j].classList.toggle('active', j === newIndex);
           els[j].classList.toggle('dim', j !== newIndex);
         }
         activeLineIndex = newIndex;
-        if (newIndex >= 0 && newIndex < els.length) {
-          var activeEl = els[newIndex];
-          var vh = lyricsViewport.clientHeight;
-          lyricsViewport.scrollTo({
-            top: activeEl.offsetTop - (vh / 2) + (activeEl.clientHeight / 2),
-            behavior: 'smooth'
-          });
-        }
+        centerActive(newIndex, !!forceScroll);
       }
 
       function applyConfig(d) {

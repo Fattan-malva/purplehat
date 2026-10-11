@@ -330,6 +330,7 @@ function bindUI() {
   document.getElementById('btn-upnext').addEventListener('click', () => {
     document.getElementById('upnext-modal').classList.remove('hidden');
     renderQueue();
+    refreshQueueMarquees();
     syncModeButtons();
     refreshIcons();
   });
@@ -768,8 +769,45 @@ function render() {
   renderQueue();
 }
 
+// Penanda konten antrian: kalau tidak berubah, renderQueue tidak membangun ulang
+// DOM (supaya animasi marquee tidak restart tiap STATE_SYNC dan drag tetap mulus).
+function queueSignature() {
+  const q = state.queue || [];
+  const parts = q.map(function (s) {
+    return [s.title || '', s.artist || '', s.source || '', s.videoId || s.trackId || '', s.thumbnail || ''].join('\u0001');
+  });
+  return (state.current ? state.current.index : -1) + '\u0002' + parts.join('\u0003');
+}
+
+// Ukur ulang & aktifkan marquee judul Up Next yang kepanjangan. Hanya jalan
+// saat elemen terlihat (clientWidth > 0) supaya pengukuran tidak salah ketika
+// modal Up Next masih tersembunyi.
+function refreshQueueMarquees() {
+  const items = document.querySelectorAll('#queue-list .queue-item .q-mq');
+  items.forEach(function (mq, i) {
+    if (!mq.clientWidth) return;
+    setMarquee(mq, mq.dataset.text || '', (i % 3) * 0.5);
+  });
+}
+
+function resetQueueMarquees() {
+  document.querySelectorAll('#queue-list .q-mq').forEach(function (mq) {
+    mq.removeAttribute('data-mq');
+    mq.classList.remove('mq-on');
+  });
+}
+
+var queueDragging = false;
+
 function renderQueue() {
   const el = document.getElementById('queue-list');
+  if (!el || queueDragging) return; // jangan ganggu saat drag & drop berlangsung
+  const sig = queueSignature();
+  if (el.dataset.sig === sig && el.children.length) {
+    refreshQueueMarquees();
+    return;
+  }
+  el.dataset.sig = sig;
   el.innerHTML = '';
   if (!state.queue || state.queue.length === 0) {
     el.innerHTML = '<div class="state-msg">Antrian kosong</div>';
@@ -783,33 +821,140 @@ function renderQueue() {
     const div = document.createElement('div');
     div.className = 'queue-item' + (isCurrent ? ' is-playing' : '');
     div.innerHTML = `
+      <button class="q-handle" title="Tahan & geser untuk urutkan" aria-label="Tahan dan geser untuk urutkan" data-idx="${idx}">
+        <i data-lucide="grip-vertical"></i>
+      </button>
       ${qthumb}
       <div class="row-main">
-        <div class="row-title">${isCurrent ? '<i data-lucide="play" class="now-icon"></i>' : ''}${escapeHtml(s.title)}</div>
-        ${s.artist ? `<div class="row-sub">${escapeHtml(s.artist)}</div>` : ''}
+        <div class="row-title">${isCurrent ? '<i data-lucide="play" class="now-icon"></i>' : ''}<span class="q-mq"></span></div>
+        <div class="row-sub">${sourceIcon(s.source)}${s.artist ? ' ' + escapeHtml(s.artist) : ''}</div>
       </div>
       <div class="queue-actions">
-        <button class="q-btn" title="Naikkan" aria-label="Naikkan" data-act="up" data-idx="${idx}" ${idx === 0 ? 'disabled' : ''}>
-          <i data-lucide="chevron-up"></i>
-        </button>
-        <button class="q-btn" title="Turunkan" aria-label="Turunkan" data-act="down" data-idx="${idx}" ${idx === state.queue.length - 1 ? 'disabled' : ''}>
-          <i data-lucide="chevron-down"></i>
-        </button>
         <button class="q-btn danger" title="Hapus" aria-label="Hapus" data-act="del" data-idx="${idx}">
           <i data-lucide="trash-2"></i>
         </button>
       </div>`;
-    div.querySelectorAll('.q-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const i = parseInt(btn.dataset.idx);
-        if (btn.dataset.act === 'up') send(PH.MSG.MOVE_SONG, { index: i, dir: -1 });
-        else if (btn.dataset.act === 'down') send(PH.MSG.MOVE_SONG, { index: i, dir: 1 });
-        else send(PH.MSG.REMOVE_SONG, { index: i });
-      });
-    });
+    const mqEl = div.querySelector('.q-mq');
+    if (mqEl) mqEl.dataset.text = escapeHtml(s.title || '');
+    const delBtn = div.querySelector('.q-btn[data-act="del"]');
+    if (delBtn) delBtn.addEventListener('click', () => send(PH.MSG.REMOVE_SONG, { index: idx }));
+    const handle = div.querySelector('.q-handle');
+    if (handle) bindQueueDrag(div, idx, handle);
     el.appendChild(div);
   });
   refreshIcons();
+  refreshQueueMarquees();
+}
+
+// Drag & drop Up Next: tahan ikon 6-titik lalu geser. Item langsung berpindah
+// tempat mengikuti jari (live reorder) dengan animasi halus (FLIP), lalu urutan
+// final dikirim ke layar sekali saat jari/mouse dilepas.
+function bindQueueDrag(item, idx, handle) {
+  const list = document.getElementById('queue-list');
+  if (!list) return;
+  let dragging = false;
+  let pointerId = null;
+  let startY = 0;
+  let lastY = 0;
+
+  function itemsArr() {
+    return Array.prototype.slice.call(list.querySelectorAll('.queue-item'));
+  }
+
+  function applyTransform() {
+    item.style.transform = 'translateY(' + (lastY - startY) + 'px)';
+  }
+
+  function clearAnims(el) {
+    if (el.getAnimations) el.getAnimations().forEach(a => { try { a.cancel(); } catch (err) {} });
+  }
+
+  // Pindahkan item di DOM, lalu kompensasi posisi jari (startY) supaya item
+  // tetap di bawah jari, dan animasikan elemen lain yang bergeser (FLIP).
+  function reorder(mutate) {
+    const els = itemsArr();
+    els.forEach(clearAnims);
+    const before = new Map();
+    els.forEach(el => before.set(el, el.getBoundingClientRect().top));
+    const itemBefore = item.getBoundingClientRect().top;
+    mutate();
+    const itemAfter = item.getBoundingClientRect().top;
+    startY += (itemAfter - itemBefore);
+    els.forEach(el => {
+      if (el === item) return;
+      const oldTop = before.get(el);
+      if (oldTop == null) return;
+      const dy = oldTop - el.getBoundingClientRect().top;
+      if (dy) {
+        el.animate(
+          [{ transform: 'translateY(' + dy + 'px)' }, { transform: 'translateY(0px)' }],
+          { duration: 170, easing: 'cubic-bezier(.2,.7,.3,1)' }
+        );
+      }
+    });
+    applyTransform();
+  }
+
+  function onDown(e) {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragging = true;
+    queueDragging = true;
+    pointerId = e.pointerId;
+    startY = e.clientY;
+    lastY = e.clientY;
+    item.classList.add('dragging');
+    try { handle.setPointerCapture(pointerId); } catch (err) {}
+  }
+
+  function onMove(e) {
+    if (!dragging) return;
+    e.preventDefault();
+    lastY = e.clientY;
+    applyTransform();
+
+    // Tukar posisi dengan tetangga begitu pusat item melewati pusat tetangga.
+    let guard = 0;
+    while (guard++ < 40) {
+      const rect = item.getBoundingClientRect();
+      const center = rect.top + rect.height / 2;
+      const next = item.nextElementSibling;
+      const prev = item.previousElementSibling;
+      let moved = false;
+      if (next) {
+        const nr = next.getBoundingClientRect();
+        if (center > nr.top + nr.height / 2) {
+          reorder(() => list.insertBefore(next, item));
+          moved = true;
+        }
+      }
+      if (!moved && prev) {
+        const pr = prev.getBoundingClientRect();
+        if (center < pr.top + pr.height / 2) {
+          reorder(() => list.insertBefore(item, prev));
+          moved = true;
+        }
+      }
+      if (!moved) break;
+    }
+  }
+
+  function onUp() {
+    if (!dragging) return;
+    dragging = false;
+    queueDragging = false;
+    item.classList.remove('dragging');
+    item.style.transform = '';
+    try { handle.releasePointerCapture(pointerId); } catch (err) {}
+    const newIdx = itemsArr().indexOf(item);
+    if (newIdx >= 0 && newIdx !== idx) send(PH.MSG.MOVE_SONG, { index: idx, to: newIdx });
+  }
+
+  handle.addEventListener('pointerdown', onDown);
+  handle.addEventListener('pointermove', onMove);
+  handle.addEventListener('pointerup', onUp);
+  handle.addEventListener('pointercancel', onUp);
 }
 
 function updateVolUI() {
@@ -1002,6 +1147,7 @@ refreshIcons();
 // #queue-modes & #queue-list adalah elemen yang sama, dipindahkan (reparent)
 // sesuai orientasi supaya tidak ada duplikasi logika/render.
 var mqWide = window.matchMedia('(min-width: 900px), (orientation: landscape) and (min-width: 640px)');
+var lastWide = null;
 
 function layoutUpNext() {
   var col = document.getElementById('upnext-col');
@@ -1020,6 +1166,12 @@ function layoutUpNext() {
     modalHead.insertBefore(modes, closeBtn);
     modalBox.appendChild(list);
   }
+  // Lebar/posisi berubah -> ukur ulang marquee hanya saat mode tata letak ganti.
+  if (lastWide !== mqWide.matches) {
+    lastWide = mqWide.matches;
+    resetQueueMarquees();
+  }
+  refreshQueueMarquees();
 }
 
 layoutUpNext();
