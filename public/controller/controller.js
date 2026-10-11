@@ -1205,23 +1205,31 @@ setInterval(() => { if (!fallbackMode) send(PH.MSG.REQUEST_STATE, {}); }, 3000);
 // ==== Fullscreen / immersive: sembunyikan UI sistem (status & navigation bar) ====
 (function () {
   var done = false;
-  function goFull() {
-    if (done) return;
-    var el = document.documentElement;
-    var req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
-    if (!req) return;
-    try {
-      var p = req.call(el, { navigationUI: 'hide' });
-      if (p && p.catch) p.catch(function () {});
-    } catch (e) {}
+  function stopTrying() {
     done = true;
     document.removeEventListener('pointerdown', goFull);
     document.removeEventListener('click', goFull);
     document.removeEventListener('touchstart', goFull);
   }
+  function goFull() {
+    if (done) return;
+    var el = document.documentElement;
+    var req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+    if (!req) { stopTrying(); return; }
+    try {
+      var p = req.call(el, { navigationUI: 'hide' });
+      // Sukses -> berhenti mencoba. Gagal/ditolak -> tetap dicoba lagi saat
+      // interaksi berikutnya (beberapa browser butuh gesture "user activation").
+      if (p && p.then) p.then(stopTrying, function () {});
+      else if (document.fullscreenElement) stopTrying();
+    } catch (e) {}
+  }
   document.addEventListener('pointerdown', goFull, { passive: true });
   document.addEventListener('click', goFull, { passive: true });
   document.addEventListener('touchstart', goFull, { passive: true });
+  document.addEventListener('fullscreenchange', function () {
+    if (document.fullscreenElement) stopTrying();
+  });
   // Cegah pinch-zoom (iOS Safari) supaya UI tetap satu layar penuh.
   document.addEventListener('gesturestart', function (e) { e.preventDefault(); }, { passive: false });
   document.addEventListener('gesturechange', function (e) { e.preventDefault(); }, { passive: false });
