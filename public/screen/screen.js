@@ -29,6 +29,8 @@ var mediaDuration = 0;          // detik, dari frame
 var sp_dc = null;               // cookie login Spotify (per room, dari server)
 var lyricsAvailable = null;     // true/false/null: lirik tersinkron untuk lagu Spotify aktif
 
+function t(key, params) { return (window.PH && PH.i18n) ? PH.i18n.t(key, params) : key; }
+
 function isSC() { return currentSource === 'soundcloud'; }
 
 // Sumber normal ('youtube'|'soundcloud'|'spotify')
@@ -146,7 +148,7 @@ window.addEventListener('message', (e) => {
   } else if (d.type === 'sp_dc_invalid') {
     // Spotify: sp_dc hilang/kedaluwarsa -> minta controller buka modal input.
     const st = document.getElementById('status');
-    if (st) st.textContent = 'Status: sp_dc Spotify tidak valid - masukkan ulang dari controller';
+    if (st) st.textContent = t('screen.status.spdcInvalid');
     isPlaying = false;
     send(PH.MSG.SPDC_INVALID, { sp_dc: sp_dc });
     broadcastState();
@@ -160,14 +162,14 @@ window.addEventListener('message', (e) => {
       // Sumber Spotify gagal (biasanya sp_dc) -> jangan lewati lagu,
       // beri tahu controller agar sp_dc diperbarui.
       const st2 = document.getElementById('status');
-      if (st2) st2.textContent = 'Status: Spotify tidak bisa diputar - cek sp_dc';
+      if (st2) st2.textContent = t('screen.status.spotifyError');
       isPlaying = false;
       send(PH.MSG.SPDC_INVALID, { sp_dc: sp_dc });
       broadcastState();
       return;
     }
     const st = document.getElementById('status');
-    if (st) st.textContent = 'Status: Video tidak bisa diputar, lanjut ke berikutnya...';
+    if (st) st.textContent = t('screen.status.videoError');
     isPlaying = false;
     setTimeout(playNext, 1500);
   }
@@ -188,9 +190,11 @@ async function init() {
   ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/?role=screen&code=' + roomCode);
   ws.onopen = () => {
     broadcastState();
+    // Minta bahasa aktif ke controller (kalau controller sudah connect lebih dulu).
+    send(PH.MSG.LANG_REQUEST, {});
   };
   ws.onerror = () => {
-    document.getElementById('status').textContent = 'Status: Realtime gagal - cek port 3000 public';
+    document.getElementById('status').textContent = t('screen.status.realtimeFail');
   };
   ws.onmessage = (e) => {
     let msg;
@@ -198,7 +202,7 @@ async function init() {
     handleMessage(msg);
   };
   ws.onclose = () => {
-    document.getElementById('status').textContent = 'Status: Terputus - refresh halaman';
+    document.getElementById('status').textContent = t('screen.status.disconnected');
   };
 }
 
@@ -238,22 +242,26 @@ function handleMessage(msg) {
         sendLoad(queue[currentIndex]);
       }
       break;
+    case PH.MSG.LANG:
+      // Controller memilih bahasa -> terapkan ke seluruh layar TV.
+      if (p.lang && PH.i18n) PH.i18n.setLang(p.lang);
+      break;
     case PH.MSG.CONTROLLER_JOINED:
-      document.getElementById('status').textContent = 'Status: Controller terhubung';
+      document.getElementById('status').textContent = t('screen.status.controllerJoined');
       break;
     case PH.MSG.CONTROLLER_LEFT:
       // Controller putus mendadak (HP mati / sinyal hilang) BUKAN logout
       // sengaja. Jangan hentikan apa pun: biarkan playlist yang sedang
       // berjalan diselesaikan dulu sampai habis, baru idle. Layar tetap
       // hidup dan menunggu controller tersambung lagi.
-      document.getElementById('status').textContent = 'Status: Controller terputus - menunggu sambungan ulang...';
+      document.getElementById('status').textContent = t('screen.status.controllerLeft');
       break;
     case PH.MSG.CONTROLLER_LOGOUT:
       // Logout sengaja dari controller TIDAK lagi me-reset layar. Sesi/room
       // tetap hidup supaya controller bisa menyambung lagi dengan kode yang
       // sama; layar hanya menandai bahwa controller pergi (seperti putus
       // mendadak). Room baru dihapus saat player logout / form ditutup.
-      document.getElementById('status').textContent = 'Status: Controller logout - menunggu sambungan ulang...';
+      document.getElementById('status').textContent = t('screen.status.controllerLogout');
       break;
   }
 }
@@ -468,8 +476,8 @@ function setVolume(vol) {
 function updateUI() {
   const np = document.getElementById('now-playing');
   const qc = document.getElementById('queue-count');
-  np.textContent = currentIndex >= 0 && queue[currentIndex] ? 'Sedang Diputar: ' + queue[currentIndex].title : 'Menunggu lagu pertama...';
-  qc.textContent = 'Antrian: ' + queue.length;
+  np.textContent = currentIndex >= 0 && queue[currentIndex] ? t('screen.nowPlaying', { title: queue[currentIndex].title }) : t('screen.waitingFirst');
+  qc.textContent = t('screen.queueCount', { n: queue.length });
   updateIdle();
   updateQueueUI();
 }
@@ -501,6 +509,9 @@ document.addEventListener('click', () => {
 // volume OS langsung sinkron dengan angka yang ditampilkan di controller
 // (tanpa harus menunggu user menggeser volume dulu).
 setVolume(volume);
+
+// Bahasa berubah (dari controller) -> segarkan teks dinamis.
+document.addEventListener('ph-lang-change', function () { updateUI(); });
 
 init();
 setInterval(broadcastState, 5000);

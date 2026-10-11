@@ -1,5 +1,5 @@
 ﻿<!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
@@ -21,7 +21,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="controller.css?v=20261012f">
+    <link rel="stylesheet" href="controller.css?v=20261012h">
     <script>
         // ==== ATURAN KERAS: controller hanya boleh tampil sebagai aplikasi ====
         (function () {
@@ -47,7 +47,8 @@
     </script>
 
     <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
-    <script src="/shared/protocol.js?v=20261010c"></script>
+    <script src="/shared/protocol.js?v=20261012a"></script>
+    <script src="/shared/i18n.js?v=20261012a"></script>
     <script src="/vendor/jsqr/dist/jsQR.js"></script>
 </head>
 
@@ -55,30 +56,31 @@
 
     <!-- Pairing Screen (hilang setelah terhubung) -->
     <section id="pair-screen" class="panel pair-card">
-        <h2>Hubungkan ke Player</h2>
-        <p class="hint">Masukkan kode pairing dari layar TV/Desktop, atau scan QR.</p>
+        <h2 data-i18n="pair.title">Connect to Player</h2>
+        <p class="hint" data-i18n="pair.hint">Enter the pairing code from the TV/Desktop screen, or scan the QR.</p>
 
         <div class="pair-row">
-            <input type="text" id="pair-code-input" placeholder="KODEXX" maxlength="6" autocapitalize="characters"
-                autocomplete="off" spellcheck="false" aria-label="Kode pairing">
-            <button id="pair-connect-btn" class="btn-primary">Hubungkan</button>
+            <input type="text" id="pair-code-input" placeholder="CODEXX" maxlength="6" autocapitalize="characters"
+                autocomplete="off" spellcheck="false" aria-label="Pairing code"
+                data-i18n-placeholder="pair.codePlaceholder" data-i18n-aria="pair.codeAria">
+            <button id="pair-connect-btn" class="btn-primary" data-i18n="pair.connect">Connect</button>
         </div>
 
         <div id="pair-status" class="hidden"></div>
 
         <button id="scan-btn" class="btn-ghost">
-            <i data-lucide="qr-code"></i> Scan QR
+            <i data-lucide="qr-code"></i> <span data-i18n="pair.scan">Scan QR</span>
         </button>
 
         <p class="hint">
-            <strong>Cara scan QR:</strong> klik tombol di atas, izinkan akses kamera saat diminta browser, lalu arahkan
-            kamera ke kode QR yang tampil di layar player.
+            <strong data-i18n="pair.scanHowTitle">How to scan the QR:</strong>
+            <span data-i18n="pair.scanHowText">tap the button above, allow camera access when the browser asks, then point the camera at the QR code shown on the player screen.</span>
         </p>
 
         <div id="scan-area" class="hidden scan-box">
             <video id="scan-video" autoplay playsinline muted></video>
             <canvas id="scan-canvas" class="hidden"></canvas>
-            <button id="scan-stop-btn" class="btn-secondary">Tutup Kamera</button>
+            <button id="scan-stop-btn" class="btn-secondary" data-i18n="pair.closeCam">Close Camera</button>
         </div>
     </section>
 
@@ -96,11 +98,14 @@
                 </div>
                 <div class="brand-info">
                     <h1 class="brand-name">PURPLE<span>HAT</span></h1>
-                    <p id="status">Belum terhubung</p>
+                    <p id="status" data-i18n="header.notConnected">Not connected</p>
                 </div>
             </div>
-            <button id="btn-logout" class="icon-btn btn-danger-ghost" title="Logout" aria-label="Logout">
-                <i data-lucide="log-out"></i>
+            <button id="btn-settings" class="icon-btn" type="button"
+                title="Settings" aria-label="Settings"
+                data-i18n-title="header.settings" data-i18n-aria="header.settings"
+                onclick="location.href='setting.html'">
+                <i data-lucide="settings"></i>
             </button>
         </header>
 
@@ -111,7 +116,7 @@
                         jadi kolom kiri (3 kolom berjajar). -->
         <section id="upnext-col" class="panel" aria-label="Up Next">
             <div class="col-head">
-                <h3 class="section-title"><i data-lucide="list-music"></i> Up Next</h3>
+                <h3 class="section-title"><i data-lucide="list-music"></i> <span data-i18n="upnext.title">Up Next</span></h3>
             </div>
         </section>
 
@@ -121,18 +126,19 @@
             <div class="search">
                 <i data-lucide="search"></i>
                 <input type="text" id="search-input" placeholder="Search songs, artists..." autocomplete="off"
-                    enterkeyhint="search" aria-label="Cari lagu">
+                    enterkeyhint="search" aria-label="Search songs"
+                    data-i18n-placeholder="search.placeholder" data-i18n-aria="search.aria">
             </div>
 
             <div class="chips" id="search-tabs">
                 <button class="src-tab mode-active" data-src="youtube">
-                    <i class="fab fa-youtube src-yt" title="Available on YouTube"></i> YouTube
+                    <i class="fab fa-youtube src-yt" title="Available on YouTube" data-i18n-title="src.youtubeTitle"></i> YouTube
                 </button>
                 <button class="src-tab" data-src="soundcloud">
-                    <i class="fab fa-soundcloud src-sc" title="Available on SoundCloud"></i> SoundCloud
+                    <i class="fab fa-soundcloud src-sc" title="Available on SoundCloud" data-i18n-title="src.soundcloudTitle"></i> SoundCloud
                 </button>
                 <button class="src-tab" data-src="spotify">
-                    <i class="fab fa-spotify src-sp" title="Available on Spotify"></i> Spotify
+                    <i class="fab fa-spotify src-sp" title="Available on Spotify" data-i18n-title="src.spotifyTitle"></i> Spotify
                 </button>
             </div>
 
@@ -147,7 +153,8 @@
         <section id="player-dock">
 
             <!-- Floating Up Next: melayang tepat di atas dock -->
-            <button id="btn-upnext" class="fab-upnext" title="Up Next" aria-label="Up Next">
+            <button id="btn-upnext" class="fab-upnext" title="Up Next" aria-label="Up Next"
+                data-i18n-title="transport.upNext" data-i18n-aria="transport.upNext">
                 <i data-lucide="list-music"></i>
                 <span class="fab-badge" id="queue-badge">0</span>
             </button>
@@ -161,8 +168,8 @@
                         <img id="np-thumb" class="hidden" alt="">
                     </div>
                     <div class="now-body">
-                        <h2 class="now-title" id="np-title">Menunggu lagu...</h2>
-                        <p class="now-sub" id="np-sub">Purplehat Karaoke</p>
+                        <h2 class="now-title" id="np-title" data-i18n="dock.waiting">Waiting for a song...</h2>
+                        <p class="now-sub" id="np-sub" data-i18n="dock.brandSub">Purplehat Karaoke</p>
                     </div>
                     <div class="time-mini">
                         <span id="pos">0:00</span>
@@ -173,32 +180,38 @@
                 <!-- Transport + Master sebaris -->
                 <div class="dock-tools">
                     <div class="transport">
-                        <button id="btn-stop" class="btn-round btn-stop" title="Stop lagu" aria-label="Stop lagu">
+                        <button id="btn-stop" class="btn-round btn-stop" title="Stop song" aria-label="Stop song"
+                            data-i18n-title="transport.stop" data-i18n-aria="transport.stop">
                             <i data-lucide="square"></i>
                         </button>
-                        <button id="btn-replay" class="btn-round" title="Replay" aria-label="Replay">
+                        <button id="btn-replay" class="btn-round" title="Replay" aria-label="Replay"
+                            data-i18n-title="transport.replay" data-i18n-aria="transport.replay">
                             <i data-lucide="rotate-ccw"></i>
                         </button>
-                        <button id="btn-play" class="btn-play" aria-label="Play / Pause">
+                        <button id="btn-play" class="btn-play" aria-label="Play / Pause"
+                            data-i18n-aria="transport.playPause">
                             <span id="play-icon"><i data-lucide="pause"></i></span>
                         </button>
-                        <button id="btn-next" class="btn-round" title="Skip / Next" aria-label="Next">
+                        <button id="btn-next" class="btn-round" title="Skip / Next" aria-label="Next"
+                            data-i18n-title="transport.nextTitle" data-i18n-aria="transport.nextAria">
                             <i data-lucide="skip-forward"></i>
                         </button>
                         <!-- Salinan tombol loop (tetap satu tombol bergantian), sinkron
                              dengan tombol loop di modal Up Next. -->
-                        <button id="btn-loop-panel" class="btn-round btn-loop-panel" data-mode="off" title="Loop: mati"
-                            aria-label="Loop">
+                        <button id="btn-loop-panel" class="btn-round btn-loop-panel" data-mode="off" title="Loop: off"
+                            aria-label="Loop" data-i18n-title="transport.loopOff" data-i18n-aria="transport.loop">
                             <i data-lucide="repeat"></i>
                             <span id="loop-one-badge-panel" class="loop-one-badge hidden">1</span>
                         </button>
                     </div>
 
                     <div class="master-inline">
-                        <button id="btn-volume" class="btn-step sm" title="Volume" aria-label="Volume">
+                        <button id="btn-volume" class="btn-step sm" title="Volume" aria-label="Volume"
+                            data-i18n-title="transport.volume" data-i18n-aria="transport.volume">
                             <i data-lucide="volume-2"></i>
                         </button>
-                        <button id="btn-fx" class="btn-step sm fx-open" title="FX & Tuning" aria-label="FX & Tuning">
+                        <button id="btn-fx" class="btn-step sm fx-open" title="FX & Tuning" aria-label="FX & Tuning"
+                            data-i18n-title="transport.fx" data-i18n-aria="transport.fx">
                             <i data-lucide="wand-sparkles"></i>
                         </button>
                     </div>
@@ -219,8 +232,8 @@
     <div id="fx-modal" class="modal hidden">
         <div class="modal-box">
             <div class="modal-head">
-                <h3 class="section-title"><i data-lucide="wand-sparkles"></i> FX &amp; Tuning</h3>
-                <button class="icon-btn" data-close="fx-modal" aria-label="Tutup">
+                <h3 class="section-title"><i data-lucide="wand-sparkles"></i> <span data-i18n="fx.title">FX &amp; Tuning</span></h3>
+                <button class="icon-btn" data-close="fx-modal" aria-label="Close" data-i18n-aria="common.close">
                     <i data-lucide="x"></i>
                 </button>
             </div>
@@ -228,21 +241,21 @@
             <div class="modal-body">
                 <div class="fx-item">
                     <div class="row">
-                        <span class="label"><i data-lucide="audio-waveform"></i> Echo Delay</span>
+                        <span class="label"><i data-lucide="audio-waveform"></i> <span data-i18n="fx.echo">Echo Delay</span></span>
                         <span class="val" id="echo-val">40%</span>
                     </div>
-                    <input type="range" min="0" max="100" value="40" aria-label="Echo delay"
+                    <input type="range" min="0" max="100" value="40" aria-label="Echo delay" data-i18n-aria="fx.echoAria"
                         oninput="document.getElementById('echo-val').innerText = this.value + '%'">
                 </div>
 
                 <div class="row">
-                    <span class="label"><i data-lucide="music-2"></i> Key Shift</span>
+                    <span class="label"><i data-lucide="music-2"></i> <span data-i18n="fx.keyShift">Key Shift</span></span>
                     <div class="stepper">
-                        <button class="btn-step sm" onclick="adjustPitch(-1)" aria-label="Turunkan nada">
+                        <button class="btn-step sm" onclick="adjustPitch(-1)" aria-label="Lower pitch" data-i18n-aria="fx.pitchDown">
                             <i data-lucide="minus"></i>
                         </button>
                         <div class="stepper-val" id="pitch-display">0</div>
-                        <button class="btn-step sm" onclick="adjustPitch(1)" aria-label="Naikkan nada">
+                        <button class="btn-step sm" onclick="adjustPitch(1)" aria-label="Raise pitch" data-i18n-aria="fx.pitchUp">
                             <i data-lucide="plus"></i>
                         </button>
                     </div>
@@ -250,11 +263,11 @@
 
                 <div class="row toggle-row">
                     <div class="toggle-text">
-                        <span class="label-strong">Vocal Cancel</span>
-                        <span class="hint">Remove original track vocals</span>
+                        <span class="label-strong" data-i18n="fx.vocalCancel">Vocal Cancel</span>
+                        <span class="hint" data-i18n="fx.vocalCancelHint">Remove original track vocals</span>
                     </div>
                     <label class="switch">
-                        <input type="checkbox" id="vocal-toggle" aria-label="Vocal Cancel">
+                        <input type="checkbox" id="vocal-toggle" aria-label="Vocal Cancel" data-i18n-aria="fx.vocalCancel">
                         <span class="track"></span>
                     </label>
                 </div>
@@ -266,8 +279,8 @@
     <div id="volume-modal" class="modal hidden">
         <div class="modal-box modal-box-vol">
             <div class="modal-head">
-                <h3 class="section-title"><i data-lucide="volume-2"></i> Master Volume</h3>
-                <button class="icon-btn" data-close="volume-modal" aria-label="Tutup">
+                <h3 class="section-title"><i data-lucide="volume-2"></i> <span data-i18n="volume.title">Master Volume</span></h3>
+                <button class="icon-btn" data-close="volume-modal" aria-label="Close" data-i18n-aria="common.close">
                     <i data-lucide="x"></i>
                 </button>
             </div>
@@ -275,17 +288,19 @@
             <div class="modal-body vol-body">
                 <div class="vol-value" id="vol-label">30%</div>
                 <div class="vol-step-row">
-                    <button id="vol-down" class="btn-step" title="Volume turun" aria-label="Volume turun">
+                    <button id="vol-down" class="btn-step" title="Volume down" aria-label="Volume down"
+                        data-i18n-title="volume.down" data-i18n-aria="volume.down">
                         <i data-lucide="minus"></i>
                     </button>
                     <div class="bar vol-bar">
                         <div id="vol-progress" style="width: 30%"></div>
                     </div>
-                    <button id="vol-up" class="btn-step" title="Volume naik" aria-label="Volume naik">
+                    <button id="vol-up" class="btn-step" title="Volume up" aria-label="Volume up"
+                        data-i18n-title="volume.up" data-i18n-aria="volume.up">
                         <i data-lucide="plus"></i>
                     </button>
                 </div>
-                <p class="hint vol-hint">Tekan tahan tombol −/+ untuk naik/turun cepat.</p>
+                <p class="hint vol-hint" data-i18n="volume.hint">Press and hold −/+ to adjust quickly.</p>
             </div>
         </div>
     </div>
@@ -294,22 +309,23 @@
     <div id="spdc-modal" class="modal hidden">
         <div class="modal-box">
             <div class="modal-head">
-                <h3 class="section-title"><i class="fab fa-spotify src-sp"></i> Login Spotify</h3>
-                <button class="icon-btn" data-close="spdc-modal" aria-label="Tutup">
+                <h3 class="section-title"><i class="fab fa-spotify src-sp"></i> <span data-i18n="spdc.title">Spotify Login</span></h3>
+                <button class="icon-btn" data-close="spdc-modal" aria-label="Close" data-i18n-aria="common.close">
                     <i data-lucide="x"></i>
                 </button>
             </div>
             <div class="modal-body">
-                <p class="hint spdc-hint" id="spdc-hint">
-                    Tempelkan cookie <strong>sp_dc</strong> dari akun Spotify. Buka
-                    <em>open.spotify.com</em> &rarr; DevTools &rarr; Application &rarr; Cookies &rarr; salin nilai
-                    <strong>sp_dc</strong>.
+                <p class="hint spdc-hint" id="spdc-hint" data-i18n-html="spdc.hint">
+                    Paste the <strong>sp_dc</strong> cookie from your Spotify account. Open
+                    <em>open.spotify.com</em> &rarr; DevTools &rarr; Application &rarr; Cookies &rarr; copy the
+                    <strong>sp_dc</strong> value.
                 </p>
-                <textarea id="spdc-input" class="spdc-input" rows="4" placeholder="Tempel nilai sp_dc di sini..."
+                <textarea id="spdc-input" class="spdc-input" rows="4" placeholder="Paste the sp_dc value here..."
                     autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
-                    aria-label="Nilai sp_dc Spotify"></textarea>
+                    aria-label="Spotify sp_dc value"
+                    data-i18n-placeholder="spdc.placeholder" data-i18n-aria="spdc.aria"></textarea>
                 <div class="spdc-error hidden" id="spdc-error"></div>
-                <button id="spdc-save" class="btn-primary spdc-save">Simpan &amp; Lanjut</button>
+                <button id="spdc-save" class="btn-primary spdc-save" data-i18n="spdc.save">Save &amp; Continue</button>
             </div>
         </div>
     </div>
@@ -317,22 +333,24 @@
     <!-- ===== MODAL: UP NEXT (loop + shuffle juga di sini) ===== -->
     <div id="upnext-modal" class="modal hidden">        <div class="modal-box modal-box-tall">
             <div class="modal-head">
-                <h3 class="section-title"><i data-lucide="list-music"></i> Up Next</h3>
+                <h3 class="section-title"><i data-lucide="list-music"></i> <span data-i18n="upnext.title">Up Next</span></h3>
                 <div class="queue-modes" id="queue-modes">
-                    <button id="btn-loop" class="btn-mode" data-mode="off" title="Loop: mati" aria-label="Loop">
+                    <button id="btn-loop" class="btn-mode" data-mode="off" title="Loop: off" aria-label="Loop"
+                        data-i18n-title="transport.loopOff" data-i18n-aria="transport.loop">
                         <i data-lucide="repeat"></i>
                         <span id="loop-one-badge" class="loop-one-badge hidden">1</span>
                     </button>
-                    <button id="btn-shuffle" class="btn-mode" title="Acak urutan" aria-label="Acak urutan">
+                    <button id="btn-shuffle" class="btn-mode" title="Shuffle" aria-label="Shuffle"
+                        data-i18n-title="upnext.shuffle" data-i18n-aria="upnext.shuffle">
                         <i data-lucide="shuffle"></i>
                     </button>
                 </div>
-                <button class="icon-btn" data-close="upnext-modal" aria-label="Tutup">
+                <button class="icon-btn" data-close="upnext-modal" aria-label="Close" data-i18n-aria="common.close">
                     <i data-lucide="x"></i>
                 </button>
             </div>
             <div class="queue-list modal-body" id="queue-list">
-                <div class="state-msg">Antrian kosong</div>
+                <div class="state-msg" data-i18n="upnext.empty">Queue is empty</div>
             </div>
         </div>
     </div>
@@ -341,8 +359,8 @@
     <div id="confirm-modal" class="modal hidden">
         <div class="modal-box modal-box-confirm">
             <div class="modal-head">
-                <h3 class="section-title"><i data-lucide="list-plus"></i> Tambah ke Up Next?</h3>
-                <button class="icon-btn" data-close="confirm-modal" aria-label="Tutup">
+                <h3 class="section-title"><i data-lucide="list-plus"></i> <span data-i18n="confirm.title">Add to Up Next?</span></h3>
+                <button class="icon-btn" data-close="confirm-modal" aria-label="Close" data-i18n-aria="common.close">
                     <i data-lucide="x"></i>
                 </button>
             </div>
@@ -354,10 +372,10 @@
                         <div class="row-sub"><span class="truncate" id="confirm-sub"></span></div>
                     </div>
                 </div>
-                <p class="hint">Lagu ini akan ditambahkan ke antrian <strong>Up Next</strong>.</p>
+                <p class="hint" data-i18n-html="confirm.hint">This song will be added to the <strong>Up Next</strong> queue.</p>
                 <div class="confirm-actions">
-                    <button class="btn-ghost" data-close="confirm-modal">Batal</button>
-                    <button class="btn-primary" id="confirm-add-btn">Tambah</button>
+                    <button class="btn-ghost" data-close="confirm-modal" data-i18n="common.cancel">Cancel</button>
+                    <button class="btn-primary" id="confirm-add-btn" data-i18n="common.add">Add</button>
                 </div>
             </div>
         </div>
@@ -376,7 +394,7 @@
             pitchDisplay.classList.toggle('is-on', currentPitch !== 0);
         }
     </script>
-    <script src="controller.js?v=20261012e"></script>
+    <script src="controller.js?v=20261012g"></script>
 </body>
 
 </html>

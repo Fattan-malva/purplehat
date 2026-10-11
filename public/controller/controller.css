@@ -564,6 +564,17 @@ input:focus-visible {
   color: var(--danger);
 }
 
+/* Tombol Pengaturan di header controller: tanpa latar, cukup ikon polos. */
+#btn-settings {
+  background: transparent;
+  border-color: transparent;
+  color: #d4d4d8;
+}
+
+#btn-settings:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
 /* ---------- Player dock: Now Playing + Kontrol digabung (satu panel kompak) ---------- */
 .dock {
   position: relative;
@@ -2555,4 +2566,187 @@ input[type="range"] {
 /* Area aman Android: jangan tampilkan highlight biru saat ditekan. */
 .fx-lyrics-off {
   -webkit-tap-highlight-color: transparent;
+}
+
+/* ==========================================================================
+   Halaman Setting (setting.html) — daftar pengaturan full-screen.
+   ========================================================================== */
+.settings-body {
+  overflow: hidden;
+}
+
+.settings-wrap {
+  height: 100dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 10px max(14px, var(--safe-r)) calc(22px + var(--safe-b)) max(14px, var(--safe-l));
+}
+
+.settings-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 2px;
+}
+
+.settings-top h1 {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.settings-top .icon-btn {
+  width: 40px;
+  height: 40px;
+}
+
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settings-list {
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 12px;
+  border-radius: 14px;
+  text-align: left;
+  color: var(--text);
+  transition: background .18s;
+}
+
+.settings-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.settings-row:active {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.settings-row .lucide {
+  width: 20px;
+  height: 20px;
+  color: var(--accent-hi);
+  flex-shrink: 0;
+}
+
+.settings-row .chev {
+  margin-left: auto;
+  color: var(--muted);
+  width: 18px;
+  height: 18px;
+}
+
+.settings-row .row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings-row .row-text small {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.settings-row.danger .lucide {
+  color: var(--danger);
+}
+
+.settings-row.danger .row-text > span:first-child {
+  color: var(--danger);
+  font-weight: 500;
+}
+
+.settings-row[disabled] {
+  opacity: .55;
+}
+
+/* Pemilih bahasa */
+.lang-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lang-opt {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 14px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid var(--line-soft);
+  color: var(--text);
+  transition: border-color .2s, background .2s;
+}
+
+.lang-opt .lang-flag {
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  min-width: 34px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  background: rgba(168, 85, 247, 0.18);
+  color: #e9d5ff;
+}
+
+.lang-opt .lang-name {
+  font-weight: 500;
+}
+
+.lang-opt .lang-check {
+  margin-left: auto;
+  width: 20px;
+  height: 20px;
+  color: #4ade80;
+  opacity: 0;
+  transition: opacity .2s;
+}
+
+.lang-opt.active {
+  border-color: rgba(168, 85, 247, 0.65);
+  background: rgba(168, 85, 247, 0.12);
+}
+
+.lang-opt.active .lang-check {
+  opacity: 1;
+}
+
+.settings-version {
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+  padding: 6px 0 2px;
+}
+
+.settings-version b {
+  color: #e9d5ff;
+  font-weight: 600;
+}
+
+.settings-text {
+  font-size: 14px;
+  line-height: 1.65;
+  color: #d4d4d8;
 }

@@ -8,6 +8,13 @@
 var roomCode = sessionStorage.getItem('ph_code');
 var navigating = false;
 
+function t(key, params) { return (window.PH && PH.i18n) ? PH.i18n.t(key, params) : key; }
+
+// Setelah isi digandakan untuk animasi, terapkan ulang terjemahan ke salinan.
+function applyI18n() {
+  if (window.PH && PH.i18n) PH.i18n.apply(document);
+}
+
 async function init() {
   try {
     if (!roomCode) {
@@ -23,9 +30,9 @@ async function init() {
     const img = document.getElementById('qr-img');
     img.src = qrd.dataUrl;
     img.style.display = 'block';
-    document.getElementById('status').textContent = 'Status: Menunggu controller...';
+    document.getElementById('status').textContent = t('screen.status.waiting');
   } catch (e) {
-    document.getElementById('status').textContent = 'Status: Gagal membuat room';
+    document.getElementById('status').textContent = t('screen.status.fail');
     return;
   }
   waitForController();
@@ -34,7 +41,7 @@ async function init() {
 function goToPlayer() {
   if (navigating) return;
   navigating = true;
-  document.getElementById('status').textContent = 'Status: Controller terhubung!';
+  document.getElementById('status').textContent = t('screen.status.connected');
   location.href = 'player.html';
 }
 
@@ -66,4 +73,7 @@ init();
   const slidesEl = document.getElementById('slides');
   if (!slidesEl) return;
   slidesEl.innerHTML += slidesEl.innerHTML;
+  applyI18n(); // salinan ikut diterjemahkan
 })();
+
+document.addEventListener('ph-lang-change', applyI18n);

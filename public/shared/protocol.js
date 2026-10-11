@@ -21,6 +21,12 @@ const MSG = {
   SET_SPDC: 'set_sp_dc',
   // Spotify: buka/tutup tampilan lirik di frame player (dipakai tombol FX).
   LYRICS: 'lyrics',
+  // Controller -> screen: pilih bahasa layar TV ('en' | 'id'). Dikirim saat
+  // controller connect (JOIN) dan tiap kali bahasa diubah di Setting.
+  LANG: 'lang',
+  // screen -> controller: minta bahasa aktif (dipakai saat player screen
+  // tersambung setelah controller).
+  LANG_REQUEST: 'lang_request',
   // screen -> controller
   STATE_SYNC: 'state_sync',
   QUEUE_UPDATE: 'queue_update',

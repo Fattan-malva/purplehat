@@ -1,5 +1,5 @@
 ﻿<!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
@@ -7,7 +7,7 @@
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#07060b">
     <meta name="color-scheme" content="dark">
-    <title>Purplehat - Pasang Aplikasi</title>
+    <title>Purplehat - Install App</title>
 
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png">
@@ -17,7 +17,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="controller.css?v=20261009b">
+    <link rel="stylesheet" href="controller.css?v=20261012h">
+    <script src="/shared/i18n.js?v=20261012a"></script>
 </head>
 
 <body class="gate-body">
@@ -38,46 +39,40 @@
         <!-- Android: layar pasang aplikasi (tanpa jalan pintas) -->
         <section id="gate-install" class="install-modal-box hidden" role="dialog" aria-modal="true">
             <div class="install-modal-icon"><i class="fas fa-hat-wizard"></i></div>
-            <h3>Pasang Purplehat</h3>
-            <p id="gate-install-text">Agar lebih cepat dan seperti aplikasi asli, pasang Purplehat ke layar utama HP
-                kamu. Setelah terpasang, Purplehat terbuka sebagai aplikasi (bukan di browser).</p>
+            <h3 data-i18n="gate.installTitle">Install Purplehat</h3>
+            <p id="gate-install-text" data-i18n="gate.installText">For a faster, native-app feel, install Purplehat to your phone's home screen. Once installed, Purplehat opens as an app (not in the browser).</p>
             <div class="gate-slot"></div>
-            <button id="gate-install-btn" class="btn-primary" disabled>Menunggu Chrome…</button>
-            <button id="gate-manual-toggle" class="link-btn" type="button">Chrome tidak menampilkan pemasangan? Lihat
-                cara pasang manual</button>
+            <button id="gate-install-btn" class="btn-primary" disabled data-i18n="gate.installBtnWaiting">Waiting for Chrome…</button>
+            <button id="gate-manual-toggle" class="link-btn" type="button" data-i18n="gate.manualToggle">Chrome not showing the install prompt? See manual steps</button>
             <ol id="gate-steps" class="gate-steps hidden">
-                <li>Ketuk <b>⋮</b> (menu Chrome) di pojok kanan atas.</li>
-                <li>Pilih <b>Instal aplikasi</b> / <b>Tambahkan ke layar utama</b>, lalu konfirmasi.</li>
-                <li>Selesaikan pemasangan. Halaman ini otomatis lanjut ke tahap membuka aplikasi begitu Chrome
-                    memberi tanda pemasangan selesai.</li>
+                <li data-i18n-html="gate.step1">Tap <b>⋮</b> (Chrome menu) in the top-right corner.</li>
+                <li data-i18n-html="gate.step2">Choose <b>Install app</b> / <b>Add to Home screen</b>, then confirm.</li>
+                <li data-i18n-html="gate.step3">Finish the installation. This page automatically continues to the "open app" stage once Chrome signals the installation is done.</li>
             </ol>
-            <a id="gate-manual-open" class="btn-primary gate-link hidden" href="index.html">Sudah Dipasang — Buka
-                Purplehat</a>
+            <a id="gate-manual-open" class="btn-primary gate-link hidden" href="index.html" data-i18n="gate.manualOpen">Already Installed — Open Purplehat</a>
         </section>
 
         <!-- Sudah terpasang -> hanya bisa maju ke aplikasi, bukan ke browser -->
         <section id="gate-open" class="install-modal-box hidden" role="dialog" aria-modal="true">
             <div class="install-modal-icon"><i class="fas fa-check"></i></div>
-            <h3 id="gate-open-title">Terpasang!</h3>
+            <h3 id="gate-open-title" data-i18n="gate.openTitle">Installed!</h3>
             <div class="gate-slot"></div>
-            <p id="gate-open-text">Purplehat berhasil dipasang. Membuka aplikasinya…</p>
-            <a id="gate-open-link" class="btn-primary gate-link" href="index.html">Buka Purplehat</a>
-            <p class="hint" id="gate-open-hint">Kalau yang terbuka tetap tab ini, buka Purplehat dari ikon di layar
-                utama HP kamu.</p>
+            <p id="gate-open-text" data-i18n="gate.openText">Purplehat installed successfully. Opening the app…</p>
+            <a id="gate-open-link" class="btn-primary gate-link" href="index.html" data-i18n="gate.openLink">Open Purplehat</a>
+            <p class="hint" id="gate-open-hint" data-i18n="gate.openHint">If this tab still opens, open Purplehat from the icon on your phone's home screen.</p>
         </section>
 
         <!-- iOS Safari: tidak ada prompt instalasi otomatis -> petunjuk manual -->
         <section id="gate-ios" class="install-modal-box hidden" role="dialog" aria-modal="true">
             <div class="install-modal-icon"><i class="fas fa-hat-wizard"></i></div>
-            <h3>Pasang Purplehat</h3>
-            <p id="gate-ios-text">Di iPhone / iPad pasang manual lewat Safari. Tab biasa tidak bisa membuka controller
-                — Purplehat harus dibuka dari ikon di layar utama.</p>
+            <h3 data-i18n="gate.iosTitle">Install Purplehat</h3>
+            <p id="gate-ios-text" data-i18n="gate.iosText">On iPhone / iPad, install manually via Safari. A regular tab can't open the controller — Purplehat must be opened from the home screen icon.</p>
             <ol class="gate-steps">
-                <li>Ketuk tombol <b>Bagikan</b> (ikon kotak dengan panah).</li>
-                <li>Pilih <b>Tambahkan ke Layar Utama</b>, lalu <b>Tambah</b>.</li>
-                <li>Buka Purplehat dari ikon di layar utama — di situlah controller terbuka.</li>
+                <li data-i18n-html="gate.iosStep1">Tap the <b>Share</b> button (box with an arrow).</li>
+                <li data-i18n-html="gate.iosStep2">Choose <b>Add to Home Screen</b>, then <b>Add</b>.</li>
+                <li data-i18n-html="gate.iosStep3">Open Purplehat from the home screen icon — that's where the controller opens.</li>
             </ol>
-            <a id="gate-ios-open" class="btn-primary gate-link" href="index.html">Buka Purplehat</a>
+            <a id="gate-ios-open" class="btn-primary gate-link" href="index.html" data-i18n="gate.iosOpen">Open Purplehat</a>
         </section>
 
         <!-- Progress instalasi: dipindahkan ke dalam kartu yang sedang aktif
@@ -86,8 +81,7 @@
             <div class="gate-progress-track">
                 <div id="gate-progress-bar" class="gate-progress-bar"></div>
             </div>
-            <p id="gate-progress-label" class="gate-progress-label">Tahap 1/3 · Menunggu Chrome menyiapkan
-                pemasangan…</p>
+            <p id="gate-progress-label" class="gate-progress-label" data-i18n="gate.progressWaiting">Stage 1/3 · Waiting for Chrome to prepare the installation…</p>
         </div>
     </main>
 
@@ -112,6 +106,7 @@
                 (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
             const el = (id) => document.getElementById(id);
+            function t(key, params) { return (window.PH && PH.i18n) ? PH.i18n.t(key, params) : key; }
             const CARDS = ['gate-install', 'gate-open', 'gate-ios'];
 
             function showCard(id) {
@@ -149,9 +144,7 @@
             if (isIOS) {
                 el('gate-ios-open').href = controllerUrl;
                 if (cameBack) {
-                    el('gate-ios-text').innerHTML =
-                        'Masih terbuka di browser. Purplehat harus dibuka dari <b>ikon di layar utama</b> ' +
-                        '(bukan dari tab Safari). Kalau ikonnya belum ada, ikuti langkah di atas dulu.';
+                    el('gate-ios-text').innerHTML = t('gate.iosStillBrowser');
                 }
                 showCard('gate-ios');
                 return;
@@ -170,9 +163,7 @@
                 !/Chrome\//i.test(navigator.userAgent);
             var isWebView = /\(wv\)/i.test(navigator.userAgent);
 
-            const DEFAULT_TEXT =
-                'Agar lebih cepat dan seperti aplikasi asli, pasang Purplehat ke layar utama HP kamu. ' +
-                'Setelah terpasang, Purplehat terbuka sebagai aplikasi (bukan di browser).';
+            const DEFAULT_TEXT = t('gate.installText');
 
             el('gate-open-link').href = controllerUrl;
             el('gate-manual-open').href = controllerUrl;
@@ -192,13 +183,11 @@
                 showCard('gate-install');
                 el('gate-install-text').textContent = msg || DEFAULT_TEXT;
                 setProgress(deferredPrompt ? 35 : 20,
-                    'Tahap 1/3 · ' + (deferredPrompt
-                        ? 'Chrome siap memasang. Ketuk "Pasang Sekarang" untuk melanjutkan.'
-                        : 'Menunggu Chrome menyiapkan pemasangan…'),
+                    deferredPrompt ? t('gate.progressReady') : t('gate.progressWaiting'),
                     false);
                 const btn = el('gate-install-btn');
                 btn.disabled = !deferredPrompt;
-                btn.textContent = deferredPrompt ? 'Pasang Sekarang' : 'Menunggu Chrome…';
+                btn.textContent = deferredPrompt ? t('gate.installBtn') : t('gate.installBtnWaiting');
                 // Browser tanpa dukungan pasang -> jangan tunjukkan tombol yang
                 // tidak akan pernah bisa diklik (sampai event-nya datang)
                 btn.classList.toggle('hidden', !deferredPrompt && noPromptLikely);
@@ -207,13 +196,10 @@
             function showBouncedState() {
                 stage = 'open';
                 showCard('gate-open');
-                el('gate-open-title').textContent = 'Buka Purplehat';
-                el('gate-open-text').textContent =
-                    'Browser tidak bisa menampilkan controller — Purplehat hanya berjalan sebagai aplikasi. ' +
-                    'Ketuk tombol di bawah untuk mencoba membuka aplikasinya.';
-                el('gate-open-hint').textContent =
-                    'Cara paling pasti: ketuk ikon Purplehat di layar utama HP kamu.';
-                setProgress(100, 'Tahap 3/3 · Aplikasi terpasang. Ketuk "Buka Purplehat" atau buka dari ikon di layar utama.', false);
+                el('gate-open-title').textContent = t('gate.bouncedTitle');
+                el('gate-open-text').textContent = t('gate.bouncedText');
+                el('gate-open-hint').textContent = t('gate.bouncedHint');
+                setProgress(100, t('gate.progressDone'), false);
                 el('gate-open-link').href = controllerUrl;
             }
 
@@ -244,10 +230,7 @@
                 // beri tahu langkah yang pasti (halaman tidak diubah).
                 setTimeout(function () {
                     if (!document.hidden && stage === 'open') {
-                        el('gate-open-hint').textContent =
-                            'Belum membuka aplikasi? Kalau Purplehat sudah terpasang tapi tombol ini tidak bisa membukanya, ' +
-                            'hapus lalu pasang ulang dari halaman ini (Chrome perlu mendaftarkan pintu "web+purplehat"), ' +
-                            'atau buka Purplehat langsung dari ikon di layar utama HP kamu.';
+                        el('gate-open-hint').textContent = t('gate.openHint2');
                     }
                 }, 1200);
             }
@@ -258,11 +241,10 @@
                 localStorage.setItem('ph_installed', '1');
                 showCard('gate-open');
 
-                el('gate-open-title').textContent = 'Terpasang!';
-                el('gate-open-text').textContent = 'Purplehat berhasil dipasang. Membuka aplikasinya…';
-                el('gate-open-hint').textContent =
-                    'Kalau yang terbuka tetap tab ini, ketuk tombol "Buka Purplehat" atau buka Purplehat dari ikon di layar utama HP kamu.';
-                setProgress(100, 'Tahap 3/3 · Membuka aplikasi Purplehat…', true);
+                el('gate-open-title').textContent = t('gate.openTitle');
+                el('gate-open-text').textContent = t('gate.openText');
+                el('gate-open-hint').textContent = t('gate.openHint');
+                setProgress(100, t('gate.progressOpening'), true);
                 el('gate-open-link').href = controllerUrl;
 
                 // Jeda "settle" sebentar setelah event appinstalled sebelum
@@ -294,7 +276,7 @@
             document.addEventListener('visibilitychange', () => {
                 if (document.hidden && stage === 'open' &&
                     el('gate-progress').classList.contains('is-indeterminate')) {
-                    setProgress(100, 'Purplehat sedang terbuka di aplikasi. Tab ini bisa ditutup.', false);
+                    setProgress(100, t('gate.progressAppOpened'), false);
                 }
             });
 
@@ -305,14 +287,14 @@
                 stage = 'installing';
                 const btn = el('gate-install-btn');
                 btn.disabled = true;
-                btn.textContent = 'Memasang…';
-                setProgress(60, 'Tahap 2/3 · Selesaikan pemasangan di jendela Chrome…', true);
+                btn.textContent = t('gate.installing');
+                setProgress(60, t('gate.progressInstalling'), true);
 
                 try {
                     await ev.prompt();
                 } catch (err) {
                     el('gate-steps').classList.remove('hidden');
-                    return setInstallIdle('Chrome tidak bisa menampilkan pemasangan. Pasang lewat menu ⋮ (langkah manual di bawah).');
+                    return setInstallIdle(t('gate.promptFail'));
                 }
 
                 let choice = null;
@@ -322,10 +304,10 @@
                     // Baru DISETUJUI, belum tentu SELESAI. "Terpasang!" hanya
                     // boleh muncul dari event appinstalled (kejadian nyata).
                     // Tetap di tahap 2 sambil menunggu event tersebut.
-                    setProgress(90, 'Tahap 2/3 · Menyelesaikan pemasangan…', true);
+                    setProgress(90, t('gate.progressFinishing'), true);
                 } else if (choice) {
                     el('gate-steps').classList.remove('hidden');
-                    setInstallIdle('Pemasangan dibatalkan. Ketuk "Pasang Sekarang" lagi, atau pasang lewat menu ⋮.');
+                    setInstallIdle(t('gate.cancelled'));
                 }
                 // choice == null: Chrome belum memberi hasil -> TETAP di tahap 2,
                 // jangan menebak dengan timer.
@@ -343,7 +325,7 @@
                 // bukan kembali ke browser
                 showBouncedState();
             } else if (cameBack) {
-                setInstallIdle('Purplehat belum terpasang. Selesaikan pemasangan dulu lewat langkah di atas.');
+                setInstallIdle(t('gate.notInstalled'));
             } else if (localStorage.getItem('ph_installed') === '1') {
                 // Sudah pernah terpasang (scan QR berikutnya). Peluncuran
                 // protocol dari script saat LOAD sangat mungkin diblokir Chrome
@@ -351,22 +333,18 @@
                 // tombol "Buka Purplehat" -> openNow() me-resolve via intent.
                 stage = 'open';
                 showCard('gate-open');
-                el('gate-open-title').textContent = 'Purplehat Terpasang';
-                el('gate-open-text').textContent =
-                    'Purplehat sudah terpasang di HP ini. Ketuk tombol di bawah untuk membukanya.';
-                el('gate-open-hint').textContent =
-                    'Kalau halaman ini terbuka kembali di browser, ketuk tombol di bawah atau buka Purplehat dari ikon di layar utama.';
+                el('gate-open-title').textContent = t('gate.alreadyTitle');
+                el('gate-open-text').textContent = t('gate.alreadyText');
+                el('gate-open-hint').textContent = t('gate.alreadyHint');
                 el('gate-open-link').href = controllerUrl;
-                setProgress(100, 'Tahap 3/3 · Aplikasi sudah terpasang. Ketuk "Buka Purplehat" untuk membuka…', false);
+                setProgress(100, t('gate.progressInstalled'), false);
             } else if (noPromptLikely) {
                 // Kapabilitas (deteksi UA, bukan timer): langsung buka langkah
                 // manual supaya tidak menunggu "Chrome" selamanya di browser
                 // yang memang tidak bisa memasang.
                 setInstallIdle(isWebView
-                    ? 'Halaman ini terbuka di dalam aplikasi lain sehingga tidak bisa memasang Purplehat. ' +
-                      'Buka link ini di aplikasi Chrome agar bisa memasang.'
-                    : 'Browser ini tidak menampilkan tombol pasang otomatis. ' +
-                      'Pasang Purplehat lewat langkah manual di bawah.');
+                    ? t('gate.cantInstallWebview')
+                    : t('gate.cantInstallBrowser'));
                 el('gate-steps').classList.remove('hidden');
                 el('gate-manual-open').classList.remove('hidden');
             } else {

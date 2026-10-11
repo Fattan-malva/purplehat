@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#07060b">
+    <meta name="color-scheme" content="dark">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Purplehat">
+    <meta name="format-detection" content="telephone=no">
+    <title>Purplehat - Settings</title>
+
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/assets/icons/icon-192.png">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="controller.css?v=20261012h">
+    <script>
+        // ==== ATURAN KERAS: controller & setting hanya tampil sebagai aplikasi ====
+        (function () {
+            function phMustBounce() {
+                var standalone = window.matchMedia('(display-mode: standalone)').matches ||
+                    window.navigator.standalone === true;
+                var mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+                return !standalone && (mobile || localStorage.getItem('ph_gate_pending') === '1');
+            }
+            if (phMustBounce()) {
+                document.documentElement.style.visibility = 'hidden';
+                location.replace('gate-install.html' +
+                    (location.search ? location.search + '&' : '?') + 'back=1');
+            } else {
+                document.documentElement.style.visibility = 'visible';
+            }
+        })();
+    </script>
+
+    <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+    <script src="/shared/protocol.js?v=20261012a"></script>
+    <script src="/shared/i18n.js?v=20261012a"></script>
+</head>
+
+<body class="settings-body">
+
+    <main class="settings-wrap">
+
+        <header class="settings-top">
+            <button id="settings-back" class="icon-btn" type="button" title="Back" aria-label="Back"
+                data-i18n-title="common.back" data-i18n-aria="common.back">
+                <i data-lucide="arrow-left"></i>
+            </button>
+            <h1 data-i18n="settings.title">Settings</h1>
+        </header>
+
+        <!-- Bahasa -->
+        <section class="panel settings-group">
+            <h3 class="section-title"><i data-lucide="languages"></i> <span data-i18n="settings.language">Language</span></h3>
+            <p class="hint" data-i18n="settings.languageDesc">Choose the app language</p>
+            <div class="lang-choice" id="lang-choice">
+                <button class="lang-opt" type="button" data-lang="en">
+                    <span class="lang-flag">EN</span>
+                    <span class="lang-name" data-i18n="settings.lang.en">English</span>
+                    <i data-lucide="check" class="lang-check"></i>
+                </button>
+                <button class="lang-opt" type="button" data-lang="id">
+                    <span class="lang-flag">ID</span>
+                    <span class="lang-name" data-i18n="settings.lang.id">Bahasa Indonesia</span>
+                    <i data-lucide="check" class="lang-check"></i>
+                </button>
+            </div>
+        </section>
+
+        <!-- Tentang / Privasi -->
+        <section class="panel settings-list">
+            <button class="settings-row" type="button" id="row-about">
+                <i data-lucide="info"></i>
+                <span data-i18n="settings.about">About Us</span>
+                <i data-lucide="chevron-right" class="chev"></i>
+            </button>
+            <button class="settings-row" type="button" id="row-privacy">
+                <i data-lucide="shield-check"></i>
+                <span data-i18n="settings.privacy">Privacy Policy</span>
+                <i data-lucide="chevron-right" class="chev"></i>
+            </button>
+        </section>
+
+        <!-- Logout -->
+        <section class="panel settings-list">
+            <button class="settings-row danger" type="button" id="row-logout">
+                <i data-lucide="log-out"></i>
+                <span class="row-text">
+                    <span data-i18n="settings.logout">Log out</span>
+                    <small data-i18n="settings.logoutDesc">Disconnect from the screen &amp; return to pairing</small>
+                </span>
+            </button>
+        </section>
+
+        <p class="settings-version">
+            <span data-i18n="settings.version">App Version</span>: <b id="app-version">1.0.0</b>
+        </p>
+
+    </main>
+
+    <!-- Modal: Tentang Kami / Kebijakan Privasi -->
+    <div id="info-modal" class="modal hidden">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h3 class="section-title" id="info-title">About Us</h3>
+                <button class="icon-btn" data-close="info-modal" aria-label="Close" data-i18n-aria="common.close">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p class="settings-text" id="info-body"></p>
+            </div>
+        </div>
+    </div>
+
+    <script src="setting.js?v=20261012a"></script>
+</body>
+
+</html>

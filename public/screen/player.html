@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -20,13 +20,15 @@
   <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="192x192" href="/assets/icons/icon-192.png">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <script src="/shared/protocol.js?v=20261010c"></script>
+  <script src="/shared/protocol.js?v=20261012a"></script>
+  <script src="/shared/i18n.js?v=20261012a"></script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 </head>
 <body class="immersive">
   <div class="screen-top-right">
-    <div id="room-badge" class="room-badge">Kode Room: <span id="room-code-badge">-</span></div>
-    <button id="screen-logout" class="logout-btn" title="Logout" aria-label="Logout"><i class="fas fa-sign-out-alt"></i></button>
+    <div id="room-badge" class="room-badge"><span data-i18n="screen.roomCode">Room Code:</span> <span id="room-code-badge">-</span></div>
+    <button id="screen-logout" class="logout-btn" title="Logout" aria-label="Logout"
+      data-i18n-title="screen.logout" data-i18n-aria="screen.logout"><i class="fas fa-sign-out-alt"></i></button>
   </div>
 
   <div id="player-wrapper">
@@ -38,11 +40,11 @@
         <img src="/assets/icons/brand-icon.png?v=4" alt="Purplehat">
       </div>
       <div class="idle-title">PURPLE<span>HAT</span></div>
-      <div class="idle-text"><i data-lucide="music" class="icon-glow"></i> Menunggu lagu berikutnya...</div>
+      <div class="idle-text"><i data-lucide="music" class="icon-glow"></i> <span data-i18n="screen.idleWaiting">Waiting for the next song...</span></div>
 
       <!-- Sumber lagu yang tersedia: 3 logo berjajar -->
       <div class="idle-sources">
-        <div class="idle-sources-label">Tersedia sekarang</div>
+        <div class="idle-sources-label" data-i18n="screen.availableNow">Available now</div>
         <div class="idle-sources-row">
           <span class="src-chip src-yt"><i class="fab fa-youtube"></i><em>YouTube</em></span>
           <span class="src-chip src-sp"><i class="fab fa-spotify"></i><em>Spotify</em></span>
@@ -61,7 +63,7 @@
     <ul id="queue-list"></ul>
   </div>
 
-  <script src="screen.js?v=20261012c"></script>
+  <script src="screen.js?v=20261012d"></script>
   <script>if (window.lucide) lucide.createIcons();</script>
 </body>
 </html>

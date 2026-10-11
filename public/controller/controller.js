@@ -39,6 +39,11 @@ function send(type, payload) {
   }
 }
 
+// Pintasan terjemahan (nama `tr` supaya tidak bentrok dengan variabel lokal `t`).
+function tr(key, params) {
+  return (window.PH && PH.i18n) ? PH.i18n.t(key, params) : key;
+}
+
 // Status di header: kode room + indikator IKON di sebelah kanannya.
 // Semua keterangan memakai ikon (tanpa teks).
 var connState = 'off'; // 'off' | 'on' | 'reconnect' | 'poll'
@@ -49,13 +54,17 @@ function renderStatus() {
   if (!el) return;
   let indicator;
   if (connState === 'reconnect') {
-    indicator = '<i data-lucide="loader-circle" class="status-ico spin" aria-label="Menyambung ulang" title="Menyambung ulang"></i>';
+    const lbl = tr('header.reconnecting');
+    indicator = '<i data-lucide="loader-circle" class="status-ico spin" aria-label="' + lbl + '" title="' + lbl + '"></i>';
   } else if (state.playing && (connState === 'on' || connState === 'poll')) {
-    indicator = '<i data-lucide="audio-lines" class="status-ico playing" aria-label="Sedang memutar" title="Sedang memutar"></i>';
+    const lbl = tr('header.playing');
+    indicator = '<i data-lucide="audio-lines" class="status-ico playing" aria-label="' + lbl + '" title="' + lbl + '"></i>';
   } else if (connState === 'on' || connState === 'poll') {
-    indicator = '<i data-lucide="wifi" class="status-ico on" aria-label="Terhubung" title="Terhubung"></i>';
+    const lbl = tr('header.connected');
+    indicator = '<i data-lucide="wifi" class="status-ico on" aria-label="' + lbl + '" title="' + lbl + '"></i>';
   } else {
-    indicator = '<i data-lucide="wifi-off" class="status-ico off" aria-label="Belum terhubung" title="Belum terhubung"></i>';
+    const lbl = tr('header.offline');
+    indicator = '<i data-lucide="wifi-off" class="status-ico off" aria-label="' + lbl + '" title="' + lbl + '"></i>';
   }
   const html = roomCode
     ? '<b class="status-code">' + escapeHtml(roomCode) + '</b>' + indicator
@@ -75,24 +84,25 @@ function connect(code) {
   const statusEl = document.getElementById('pair-status');
   statusEl.classList.remove('hidden');
   statusEl.style.color = '#93c5fd';
-  statusEl.textContent = 'Memeriksa kode...';
+  statusEl.textContent = tr('pair.status.checking');
 
   fetch('/api/room/' + roomCode)
     .then(async r => {
-      if (!r.ok) throw new Error('Kode tidak ditemukan');
+      if (!r.ok) { const err = new Error(tr('pair.status.notFound')); err.notFound = true; throw err; }
       return r.json();
     })
     .then(() => {
-      statusEl.textContent = 'Menghubungi realtime...';
+      statusEl.textContent = tr('pair.status.contacting');
       localStorage.setItem('ph_last_code', roomCode);
       openSocket(0);
     })
     .catch((e) => {
+      const notFound = !!(e && e.notFound);
       statusEl.style.color = '#f87171';
-      statusEl.textContent = e.message || 'Kode tidak valid';
+      statusEl.textContent = notFound ? tr('pair.status.notFound') : tr('pair.status.invalid');
       // Kode basi (room sudah dihapus/regenerate) -> buang supaya tidak
       // dipakai auto-connect lagi.
-      if (/tidak ditemukan/i.test(e.message || '')) {
+      if (notFound) {
         localStorage.removeItem('ph_last_code');
       }
     });
@@ -136,6 +146,8 @@ function openSocket(attempt) {
     renderStatus();
     showMainUI();
     send(PH.MSG.JOIN, {});
+    // Sinkronkan bahasa layar TV dengan pilihan di controller.
+    try { send(PH.MSG.LANG, { lang: PH.i18n.getLang() }); } catch (e) {}
   };
   ws.onmessage = (e) => {
     let msg; try { msg = JSON.parse(e.data); } catch { return; }
@@ -143,7 +155,7 @@ function openSocket(attempt) {
   };
   ws.onerror = () => {
     statusEl.style.color = '#f87171';
-    statusEl.textContent = 'Realtime gagal. Coba lagi...';
+    statusEl.textContent = tr('pair.status.realtimeFail');
   };
   ws.onclose = () => {
     if (suppressReconnect) return;
@@ -154,12 +166,12 @@ function openSocket(attempt) {
       renderStatus();
       scheduleReconnect();
     } else if (attempt < 3) {
-      statusEl.textContent = 'Hubungan realtime gagal (percobaan ' + (attempt + 1) + '). Mencoba lagi...';
+      statusEl.textContent = tr('pair.status.retry', { n: attempt + 1 });
       setTimeout(() => openSocket(attempt + 1), 1000);
     } else {
       fallbackMode = true;
       statusEl.style.color = '#fbbf24';
-      statusEl.textContent = 'Mode polling (realtime tidak aktif di koneksi ini). Tetap berfungsi.';
+      statusEl.textContent = tr('pair.status.polling');
       connState = 'poll';
       renderStatus();
       showMainUI();
@@ -220,7 +232,11 @@ function handleMessage(msg) {
       break;
     case PH.MSG.SPDC_INVALID:
       // Layar melaporkan sp_dc Spotify hilang/kedaluwarsa -> buka modal input.
-      openSpdcModal('sp_dc Spotify tidak valid / kedaluwarsa. Tempel nilai baru.');
+      openSpdcModal(tr('spdc.invalid'));
+      break;
+    case PH.MSG.LANG_REQUEST:
+      // Layar (player) baru connect dan minta bahasa aktif.
+      try { send(PH.MSG.LANG, { lang: PH.i18n.getLang() }); } catch (e) {}
       break;
     case PH.MSG.LYRICS_AVAIL:
       // Layar melaporkan ketersediaan lirik tersinkron lagu Spotify aktif.
@@ -281,18 +297,6 @@ function bindUI() {
 
   document.getElementById('scan-btn').addEventListener('click', startScan);
   document.getElementById('scan-stop-btn').addEventListener('click', stopScan);
-
-  // Logout controller: beri tahu layar supaya room dihapus + kode di-regenerate
-  document.getElementById('btn-logout').addEventListener('click', () => {
-    suppressReconnect = true;
-    clearTimeout(reconnectTimer);
-    // Kirim sinyal logout sengaja SEBELUM menutup socket (layar akan reset).
-    try { send(PH.MSG.CONTROLLER_LOGOUT, {}); } catch (e) {}
-    localStorage.removeItem('ph_last_code');
-    try { stopScan(); } catch {}
-    setTimeout(() => { try { if (ws) ws.close(); } catch {} }, 60);
-    showPairScreen();
-  });
 
   // ==== Modal: FX & Up Next ====
   // Saat lagu Spotify sedang diputar, tombol ini BERUBAH FUNGSI menjadi
@@ -418,12 +422,12 @@ async function onSpotifyTabClick(btn) {
     const r = await fetch('/api/room/' + roomCode + '/spdc', { cache: 'no-store' });
     if (r.ok) has = !!(await r.json()).has;
   } catch (e) {}
-  if (!has) { openSpdcModal('Masukkan sp_dc Spotify untuk room ini.'); return; }
+  if (!has) { openSpdcModal(tr('spdc.need')); return; }
   // Validasi nilai tersimpan (server yang memeriksa, controller tak perlu tahu isinya).
   try {
     const v = await fetch('/api/room/' + roomCode + '/spdc/validate', { cache: 'no-store' });
     if (!v.ok) {
-      openSpdcModal('sp_dc tersimpan sudah tidak valid / kedaluwarsa. Masukkan yang baru.');
+      openSpdcModal(tr('spdc.expired'));
       return;
     }
   } catch (e) {
@@ -462,24 +466,24 @@ async function saveSpdc() {
   const input = document.getElementById('spdc-input');
   const btn = document.getElementById('spdc-save');
   const value = parseSpdc(input ? input.value : '');
-  if (!value || value.length < 20) { showSpdcError('sp_dc terlalu pendek / tidak valid.'); return; }
-  if (btn) { btn.disabled = true; btn.textContent = 'Memeriksa...'; }
+  if (!value || value.length < 20) { showSpdcError(tr('spdc.errShort')); return; }
+  if (btn) { btn.disabled = true; btn.textContent = tr('spdc.checking'); }
   try {
     const v = await fetch('/api/spotify/validate?sp_dc=' + encodeURIComponent(value), { cache: 'no-store' });
-    if (!v.ok) { showSpdcError('sp_dc tidak valid atau kedaluwarsa. Coba salin ulang.'); return; }
+    if (!v.ok) { showSpdcError(tr('spdc.errInvalid')); return; }
     const r = await fetch('/api/room/' + roomCode + '/spdc', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sp_dc: value })
     });
-    if (!r.ok) { showSpdcError('Gagal menyimpan sp_dc. Coba lagi.'); return; }
+    if (!r.ok) { showSpdcError(tr('spdc.errSave')); return; }
     document.getElementById('spdc-modal').classList.add('hidden');
     setSearchSource('spotify');
     search();
   } catch (e) {
-    showSpdcError('Gagal menghubungi server. Coba lagi.');
+    showSpdcError(tr('spdc.errServer'));
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Simpan & Lanjut'; }
+    if (btn) { btn.disabled = false; btn.textContent = tr('spdc.save'); }
   }
 }
 
@@ -517,8 +521,8 @@ function syncFxButton() {
   const disabled = isSp && avail !== 'on';
   btn.disabled = disabled;
   btn.setAttribute('aria-disabled', disabled ? 'true' : 'false');
-  const title = !isSp ? 'FX & Tuning'
-    : (avail === 'on' ? 'Lirik tersedia' : avail === 'off' ? 'Lirik tidak tersedia' : 'Belum tahu lirik tersedia');
+  const title = !isSp ? tr('transport.fx')
+    : (avail === 'on' ? tr('fx.lyricsOn') : avail === 'off' ? tr('fx.lyricsOff') : tr('fx.lyricsUnknown'));
   btn.title = title;
   btn.setAttribute('aria-label', title);
   const iconName = !isSp ? 'wand-sparkles' : (avail === 'off' ? 'captions-off' : 'captions');
@@ -536,14 +540,14 @@ async function search() {
   el.classList.remove('hidden');
   resultsState = { query: q, src: searchSource, page: 1, offset: 0, hasMore: true, loading: true, limit: 20 };
   const srcName = searchSource === 'soundcloud' ? 'SoundCloud' : (searchSource === 'spotify' ? 'Spotify' : 'YouTube');
-  el.innerHTML = '<div class="state-msg"><i data-lucide="loader-circle" class="spin"></i> Mencari di ' + srcName + '...</div>';
+  el.innerHTML = '<div class="state-msg"><i data-lucide="loader-circle" class="spin"></i> ' + escapeHtml(tr('search.searching', { src: srcName })) + '</div>';
   refreshIcons();
   try {
     const r = await fetchPage(false);
     advanceState(r.items.length, r.hasMore);
     renderResults(r.items);
   } catch (e) {
-    el.innerHTML = '<div class="state-msg error">Gagal mencari</div>';
+    el.innerHTML = '<div class="state-msg error">' + escapeHtml(tr('search.failed')) + '</div>';
   } finally {
     resultsState.loading = false;
   }
@@ -584,7 +588,7 @@ async function loadMore() {
   resultsState.loading = true;
   const loader = document.createElement('div');
   loader.className = 'state-msg';
-  loader.innerHTML = '<i data-lucide="loader-circle" class="spin"></i> Memuat hasil lagi...';
+  loader.innerHTML = '<i data-lucide="loader-circle" class="spin"></i> ' + escapeHtml(tr('search.loadingMore'));
   el.appendChild(loader);
   refreshIcons();
   try {
@@ -595,7 +599,7 @@ async function loadMore() {
     if (!resultsState.hasMore) {
       const end = document.createElement('div');
       end.className = 'results-end';
-      end.textContent = '— Akhir dari hasil —';
+      end.textContent = tr('search.end');
       el.appendChild(end);
     }
   } catch (e) {
@@ -607,9 +611,9 @@ async function loadMore() {
 }
 
 function sourceIcon(src) {
-  if (src === 'soundcloud') return '<i class="fab fa-soundcloud src-sc" title="Available on SoundCloud"></i>';
-  if (src === 'spotify') return '<i class="fab fa-spotify src-sp" title="Available on Spotify"></i>';
-  return '<i class="fab fa-youtube src-yt" title="Available on YouTube"></i>';
+  if (src === 'soundcloud') return '<i class="fab fa-soundcloud src-sc" title="' + escapeAttr(tr('src.soundcloudTitle')) + '"></i>';
+  if (src === 'spotify') return '<i class="fab fa-spotify src-sp" title="' + escapeAttr(tr('src.spotifyTitle')) + '"></i>';
+  return '<i class="fab fa-youtube src-yt" title="' + escapeAttr(tr('src.youtubeTitle')) + '"></i>';
 }
 
 function addSongToQueue(item, src, playNow) {
@@ -663,7 +667,7 @@ function buildResultRow(item) {
         <div class="row-title">${escapeHtml(item.title || '')}</div>
         <div class="row-sub">${sourceIcon(src)} <span class="truncate">${escapeHtml(sub)}</span></div>
       </div>
-      <button type="button" class="row-add" title="Tambah ke Up Next" aria-label="Tambah ke Up Next">
+      <button type="button" class="row-add" title="${escapeAttr(tr('search.addUpNext'))}" aria-label="${escapeAttr(tr('search.addUpNext'))}">
         <i data-lucide="plus"></i>
       </button>`;
   // Klik baris = LANGSUNG putar sekarang: masuk paling atas Up Next + play.
@@ -687,7 +691,7 @@ function renderResults(items, append) {
   } else {
     el.innerHTML = '';
     if (!items || items.length === 0) {
-      el.innerHTML = '<div class="state-msg">Tidak ada hasil</div>';
+      el.innerHTML = '<div class="state-msg">' + escapeHtml(tr('search.empty')) + '</div>';
       return;
     }
     items.forEach(item => el.appendChild(buildResultRow(item)));
@@ -723,7 +727,7 @@ function setMarquee(el, html, delaySec) {
 }
 
 function render() {
-  const np = state.current ? state.current.title : (state.queue[0] ? state.queue[0].title : 'Menunggu lagu...');
+  const np = state.current ? state.current.title : (state.queue[0] ? state.queue[0].title : tr('dock.waiting'));
   setMarquee(document.getElementById('np-title'), escapeHtml(np), 0);
   const npThumb = document.getElementById('np-thumb');
   const artSrc = (state.current && state.current.thumbnail) || (state.queue[0] && state.queue[0].thumbnail);
@@ -745,7 +749,7 @@ function render() {
     const subHtml = `${artist ? escapeHtml(artist) + ' &bull; ' : ''}${sourceIcon(src)} ${label}`;
     setMarquee(subEl, subHtml, 1.2);
   } else {
-    setMarquee(subEl, 'Purplehat Karaoke', 1.2);
+    setMarquee(subEl, escapeHtml(tr('dock.brandSub')), 1.2);
   }
   renderStatus();
   syncFxButton();
@@ -810,7 +814,7 @@ function renderQueue() {
   el.dataset.sig = sig;
   el.innerHTML = '';
   if (!state.queue || state.queue.length === 0) {
-    el.innerHTML = '<div class="state-msg">Antrian kosong</div>';
+    el.innerHTML = '<div class="state-msg">' + escapeHtml(tr('upnext.empty')) + '</div>';
     return;
   }
   state.queue.forEach((s, idx) => {
@@ -821,7 +825,7 @@ function renderQueue() {
     const div = document.createElement('div');
     div.className = 'queue-item' + (isCurrent ? ' is-playing' : '');
     div.innerHTML = `
-      <button class="q-handle" title="Tahan & geser untuk urutkan" aria-label="Tahan dan geser untuk urutkan" data-idx="${idx}">
+      <button class="q-handle" title="${escapeAttr(tr('upnext.gripTitle'))}" aria-label="${escapeAttr(tr('upnext.gripAria'))}" data-idx="${idx}">
         <i data-lucide="grip-vertical"></i>
       </button>
       ${qthumb}
@@ -830,7 +834,7 @@ function renderQueue() {
         <div class="row-sub">${sourceIcon(s.source)}${s.artist ? ' ' + escapeHtml(s.artist) : ''}</div>
       </div>
       <div class="queue-actions">
-        <button class="q-btn danger" title="Hapus" aria-label="Hapus" data-act="del" data-idx="${idx}">
+        <button class="q-btn danger" title="${escapeAttr(tr('upnext.remove'))}" aria-label="${escapeAttr(tr('upnext.remove'))}" data-act="del" data-idx="${idx}">
           <i data-lucide="trash-2"></i>
         </button>
       </div>`;
@@ -1053,8 +1057,8 @@ function syncOneLoopButton(loopBtn, badge, cur) {
   if (!loopBtn) return;
   loopBtn.classList.toggle('mode-active', cur !== 'off');
   loopBtn.dataset.mode = cur; // 'off' | 'queue' | 'one'
-  loopBtn.title = cur === 'one' ? 'Loop: lagu ini' :
-    cur === 'queue' ? 'Loop: semua antrian' : 'Loop: mati';
+  loopBtn.title = cur === 'one' ? tr('transport.loopOne') :
+    cur === 'queue' ? tr('transport.loopQueue') : tr('transport.loopOff');
   if (badge) badge.classList.toggle('hidden', cur !== 'one');
   const icon = loopBtn.querySelector('.lucide');
   if (icon) icon.classList.toggle('lucide-loop-one', cur === 'one');
@@ -1096,7 +1100,7 @@ function startScan() {
         }
       }, 300);
     })
-    .catch(() => alert('Kamera tidak tersedia'));
+    .catch(() => alert(tr('pair.status.camUnavailable')));
 }
 
 function stopScan() {
@@ -1142,6 +1146,16 @@ function extractPairFromQr(data) {
 
 bindUI();
 refreshIcons();
+
+// Ganti bahasa saat aplikasi sedang terbuka (mis. dari tab Setting) ->
+// segarkan teks dinamis yang di-render lewat JS (bukan data-i18n).
+document.addEventListener('ph-lang-change', function () {
+  try { send(PH.MSG.LANG, { lang: PH.i18n.getLang() }); } catch (e) {}
+  renderStatus();
+  render();
+  const up = document.getElementById('upnext-modal');
+  if (up && !up.classList.contains('hidden')) { resetQueueMarquees(); renderQueue(); }
+});
 
 // ==== Susunan Up Next: modal (portrait) atau kolom kiri (landscape) ====
 // #queue-modes & #queue-list adalah elemen yang sama, dipindahkan (reparent)
