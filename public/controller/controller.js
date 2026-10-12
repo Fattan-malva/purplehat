@@ -1237,39 +1237,15 @@ setInterval(() => { if (!fallbackMode) send(PH.MSG.REQUEST_STATE, {}); }, 3000);
   }, { passive: true });
 })();
 
-// ==== Fullscreen / immersive: sembunyikan UI sistem (status & navigation bar) ====
+// ==== Immersive: status & navigation bar sudah disembunyikan oleh manifest
+// (display: "fullscreen") saat app di-install. Fullscreen API SENGAJA tidak
+// dipakai lagi karena di Android Chrome memunculkan toast sistem:
+// "<domain> — Untuk keluar, geser dari atas & tekan tombol kembali" yang
+// mengganggu (muncul "kadang" tepat saat requestFullscreen berhasil). ====
 (function () {
-  var done = false;
-  function stopTrying() {
-    done = true;
-    document.removeEventListener('pointerdown', goFull);
-    document.removeEventListener('click', goFull);
-    document.removeEventListener('touchstart', goFull);
-  }
-  function goFull() {
-    if (done) return;
-    var el = document.documentElement;
-    var req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
-    if (!req) { stopTrying(); return; }
-    try {
-      var p = req.call(el, { navigationUI: 'hide' });
-      // Sukses -> berhenti mencoba. Gagal/ditolak -> tetap dicoba lagi saat
-      // interaksi berikutnya (beberapa browser butuh gesture "user activation").
-      if (p && p.then) p.then(stopTrying, function () {});
-      else if (document.fullscreenElement) stopTrying();
-    } catch (e) {}
-  }
-  document.addEventListener('pointerdown', goFull, { passive: true });
-  document.addEventListener('click', goFull, { passive: true });
-  document.addEventListener('touchstart', goFull, { passive: true });
-  document.addEventListener('fullscreenchange', function () {
-    if (document.fullscreenElement) stopTrying();
-  });
   // Cegah pinch-zoom (iOS Safari) supaya UI tetap satu layar penuh.
   document.addEventListener('gesturestart', function (e) { e.preventDefault(); }, { passive: false });
   document.addEventListener('gesturechange', function (e) { e.preventDefault(); }, { passive: false });
-  // Coba langsung saat load (Android Chrome PWA standalone mengizinkan).
-  if (document.fullscreenEnabled) { try { goFull(); } catch (e) {} }
 })();
 
 // ==== Auto-hide UI (topbar + player dock) disabled ====
