@@ -2,4 +2,10 @@ fastapi==0.115.6
 uvicorn[standard]==0.34.0
 httpx[http2]==0.28.1
 python-dotenv==1.0.1
-pyodbc==5.1.0
+# pyodbc: akses SQL Server (MstRoom / MstSongBank). Tidak ada wheel prebuilt
+# untuk Linux -> di-compile dari source saat build. Dockerfile sudah menyediakan
+# g++ + unixodbc-dev (toolchain) dan msodbcsql18 (driver) agar install & runtime
+# berjalan. >=5.2.0 karena 5.1.0 gagal compile di Python 3.13
+# (_PyLong_AsByteArray berubah tanda tangan). Kredensial server dibaca dari env
+# (backend/.env / docker-compose).
+pyodbc==5.2.0

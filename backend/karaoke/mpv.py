@@ -44,9 +44,10 @@ class MpvError(RuntimeError):
 class MpvPlayer:
     def __init__(self) -> None:
         self._proc: Optional[subprocess.Popen] = None
+        self._fd = None                       # koneksi IPC persisten (int fd / socket)
         self._lock = threading.RLock()
         self._rid = 0
-        self._stop = False
+        self._rxbuf = b""
         self._last_error: Optional[str] = None
         # Parameter FX aktif (agar bisa dikirim ulang saat proses mpv restart).
         self._fx = {
@@ -63,63 +64,76 @@ class MpvPlayer:
         found = shutil.which(MPV_PATH)
         return found or MPV_PATH
 
-    def _open_conn(self):
-        """Satu koneksi IPC baru (non-blocking) untuk satu perintah.
+    def _connect(self, timeout: float = 0.8) -> None:
+        """Buka koneksi IPC persisten (non-blocking) ke mpv.
 
-        mpv Windows memakai named pipe (single instance). Koneksi dipakai
-        SEKALI per perintah lalu ditutup (one-shot), sehingga tidak ada
-        koneksi basi/orphan yang membuat pipe macet — termasuk saat mpv
-        dibunuh lalu dijalankan ulang oleh Flutter.
+        Satu koneksi dipakai untuk banyak perintah. Menutup & membuka ulang
+        named pipe mpv (single-instance) tiap perintah terbukti kehilangan
+        balasan (~30% timeout, terasa sebagai "delay"), jadi koneksi dijaga
+        dan hanya disambung ulang saat benar-benar putus (mis. mpv di-restart).
         """
-        if IS_WIN:
-            fd = os.open(MPV_PIPE, os.O_RDWR | os.O_BINARY)
-            try:
-                os.set_blocking(fd, False)
-            except OSError:
-                pass
-            return fd
-        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        s.connect(MPV_PIPE)
-        s.setblocking(False)
-        return s
-
-    def _close_conn(self, conn) -> None:
-        try:
-            if IS_WIN:
-                os.close(conn)
-            else:
-                conn.close()
-        except Exception:
-            pass
-
-    def _try_open(self):
-        """Satu percobaan buka koneksi; None bila pipe belum tersedia."""
-        try:
-            return self._open_conn()
-        except OSError:
-            return None
-
-    def _pipe_available(self, timeout: float = 0.8) -> bool:
-        """True bila ada mpv yang melayani named pipe (koneksi dibuka & ditutup)."""
         deadline = time.time() + timeout
         while True:
-            conn = self._try_open()
-            if conn is not None:
-                self._close_conn(conn)
-                return True
-            if time.time() >= deadline:
-                return False
-            time.sleep(0.05)
+            try:
+                if IS_WIN:
+                    fd = os.open(MPV_PIPE, os.O_RDWR | os.O_BINARY)
+                    try:
+                        os.set_blocking(fd, False)
+                    except OSError:
+                        pass
+                    self._fd = fd
+                else:
+                    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                    s.settimeout(max(0.5, timeout))
+                    s.connect(MPV_PIPE)
+                    s.setblocking(False)
+                    self._fd = s
+                self._rxbuf = b""
+                return
+            except OSError as exc:
+                if time.time() >= deadline:
+                    raise MpvError(
+                        f"Tidak bisa membuka IPC mpv ({MPV_PIPE}): {exc}"
+                    ) from exc
+                time.sleep(0.05)
+
+    def _disconnect(self) -> None:
+        if self._fd is not None:
+            try:
+                if IS_WIN:
+                    os.close(self._fd)
+                else:
+                    self._fd.close()
+            except Exception:
+                pass
+        self._fd = None
+        self._rxbuf = b""
+
+    def _conn_write(self, data: bytes) -> None:
+        if IS_WIN:
+            os.write(self._fd, data)
+        else:
+            self._fd.sendall(data)
+
+    def _conn_read(self, n: int) -> bytes:
+        if IS_WIN:
+            return os.read(self._fd, n)
+        return self._fd.recv(n)
 
     def _ensure(self) -> None:
-        """Pastikan ada mpv yang melayani named pipe.
+        """Pastikan ada koneksi ke mpv.
 
-        Jalur utama: mpv yang DIJALANKAN Flutter (mpv.exe ter-bundle) — server
-        cukup menyambung ke pipe. Jalur fallback (MPV_LAUNCH=auto/spawn): spawn
-        mpv sendiri bila belum ada.
+        Jalur utama: sambung ke mpv yang DIJALANKAN Flutter (mpv.exe
+        ter-bundle) — server cukup berbicara lewat JSON IPC. Jalur fallback
+        (MPV_LAUNCH=auto/spawn): spawn mpv sendiri bila belum ada.
         """
-        if self._pipe_available():
+        if self._fd is not None:
             return
+        try:
+            self._connect(timeout=0.6)
+            return
+        except MpvError:
+            pass
         if MPV_LAUNCH == "external":
             raise MpvError(
                 "mpv (external) belum berjalan. Jalankan player PurpleHat yang "
@@ -157,13 +171,13 @@ class MpvPlayer:
         last = None
         ok = False
         for _ in range(120):
-            conn = self._try_open()
-            if conn is not None:
-                self._close_conn(conn)
+            try:
+                self._connect(timeout=0.05)
                 ok = True
                 break
-            last = "pipe belum muncul"
-            time.sleep(0.05)
+            except MpvError as exc:
+                last = exc
+                time.sleep(0.05)
         if not ok:
             raise MpvError(f"Tidak bisa membuka IPC mpv ({MPV_PIPE}): {last}")
         # Terapkan FX yang tersimpan (kalau mpv baru di-spawn sendiri).
@@ -172,33 +186,22 @@ class MpvPlayer:
         except Exception:
             pass
 
-    def _exchange(self, conn, rid: int, payload: bytes, timeout: float) -> Optional[dict]:
-        """Tulis satu perintah & baca balasan ber-request_id cocok (bounded)."""
-        try:
-            if IS_WIN:
-                os.write(conn, payload)
-            else:
-                conn.sendall(payload)
-        except OSError:
-            return None
+    def _read_reply(self, rid: int, timeout: float) -> Optional[dict]:
+        """Baca sampai balasan ber-request_id cocok (bounded, non-blocking)."""
         deadline = time.time() + timeout
-        buf = b""
         while time.time() < deadline:
             try:
-                if IS_WIN:
-                    chunk = os.read(conn, 8192)
-                else:
-                    chunk = conn.recv(8192)
+                chunk = self._conn_read(16384)
             except BlockingIOError:
-                time.sleep(0.01)
+                time.sleep(0.001)
                 continue
-            except (OSError, socket.timeout):
+            except OSError:
                 return None
             if not chunk:
                 return None
-            buf += chunk
-            while b"\n" in buf:
-                line, buf = buf.split(b"\n", 1)
+            self._rxbuf += chunk
+            while b"\n" in self._rxbuf:
+                line, self._rxbuf = self._rxbuf.split(b"\n", 1)
                 line = line.strip()
                 if not line:
                     continue
@@ -219,29 +222,24 @@ class MpvPlayer:
                 {"command": command, "request_id": rid}
             ).encode("utf-8") + b"\n"
 
-            # One-shot: buka koneksi per perintah, tutup selalu (finally).
-            # Bila balasan tidak kunjung datang, reset & ulangi sekali.
+            # Koneksi persisten. Bila putus di tengah jalan (mis. mpv di-restart
+            # oleh Flutter), sambung ulang lalu ulangi sekali.
             for _ in range(2):
-                conn = self._try_open()
-                if conn is None:
-                    self._reset()
-                    self._ensure()
-                    conn = self._try_open()
-                if conn is None:
-                    continue
                 try:
-                    res = self._exchange(conn, rid, payload, timeout)
-                finally:
-                    self._close_conn(conn)
+                    self._conn_write(payload)
+                except OSError:
+                    self._disconnect()
+                    self._ensure()
+                    continue
+                res = self._read_reply(rid, timeout)
                 if res is not None:
                     return res
-                # Koneksi diduga gagal -> reset state, ulangi sekali.
-                self._reset()
+                self._disconnect()
                 self._ensure()
             return None
 
     def _reset(self) -> None:
-        self._stop = True
+        self._disconnect()
         # Hanya matikan proses mpv yang KITA spawn sendiri. mpv yang
         # dijalankan Flutter (external) dibiarkan hidup.
         if self._proc and self._proc.poll() is None:
@@ -336,32 +334,35 @@ class MpvPlayer:
     # -- FX ---------------------------------------------------------------
     def _build_af(self, fx: Dict[str, Any]) -> str:
         parts: List[str] = []
+        lavfi: List[str] = []   # filter libavfilter digabung jadi 1 graph
 
         # Channel / vocal guide (lagu karaoke "support L-R").
+        # Catatan: filter `pan` native mpv TIDAK jalan di build ini (error
+        # INVALID_PARAMETER), jadi kita pakai `pan` libavfilter lewat lavfi.
         channel = str(fx.get("channel") or "stereo").lower()
         music = KARAOKE_MUSIC_CHANNEL  # 'left' atau 'right'
         if channel == "left":
-            parts.append("pan=stereo|FL=FL|FR=FL")
+            lavfi.append("pan=stereo|c0=c0|c1=c0")
         elif channel == "right":
-            parts.append("pan=stereo|FL=FR|FR=FR")
+            lavfi.append("pan=stereo|c0=c1|c1=c1")
         elif channel == "mono":
-            parts.append("pan=mono|c0=0.5*FL+0.5*FR")
+            lavfi.append("pan=mono|c0=0.5*c0+0.5*c1")
         elif channel in ("music", "instrumental"):
             # Ambil kanal musik (tanpa vokal) ke kedua sisi.
             if music == "right":
-                parts.append("pan=stereo|FL=FR|FR=FR")
+                lavfi.append("pan=stereo|c0=c1|c1=c1")
             else:
-                parts.append("pan=stereo|FL=FL|FR=FL")
+                lavfi.append("pan=stereo|c0=c0|c1=c0")
         elif channel in ("vocal", "guide"):
             if music == "right":
-                parts.append("pan=stereo|FL=FL|FR=FL")
+                lavfi.append("pan=stereo|c0=c0|c1=c0")
             else:
-                parts.append("pan=stereo|FL=FR|FR=FR")
+                lavfi.append("pan=stereo|c0=c1|c1=c1")
         elif channel in ("vocal-off", "vocaloff", "cancel"):
             # Phase cancel (buang vokal di tengah).
-            parts.append("pan=stereo|FL=0.5*FL-0.5*FR|FR=0.5*FR-0.5*FL")
+            lavfi.append("pan=stereo|c0=0.5*c0-0.5*c1|c1=0.5*c1-0.5*c0")
 
-        # Echo / reverb (libavfilter aecho via lavfi).
+        # Echo / reverb (libavfilter aecho).
         try:
             echo = int(float(fx.get("echo") or 0))
         except Exception:
@@ -369,7 +370,10 @@ class MpvPlayer:
         if echo > 0:
             decay = min(0.9, 0.1 + (echo / 100.0) * 0.8)
             delay = int(180 + echo * 6)  # ms
-            parts.append(f"lavfi=[aecho=0.8:{decay:.2f}:{delay}:0.35]")
+            lavfi.append(f"aecho=0.8:{decay:.2f}:{delay}:0.35")
+
+        if lavfi:
+            parts.append("lavfi=[" + ",".join(lavfi) + "]")
 
         # EQ bass / treble.
         try:
@@ -386,13 +390,15 @@ class MpvPlayer:
             parts.append(f"equalizer=f=8000:width_type=o:width=2:g={treble:.1f}")
 
         # Key shift / pitch (rubberband; butuh build mpv dengan librubberband).
+        # Opsi jumlah pitch adalah `pitch-scale` (BUKAN `pitch` yang berupa
+        # pilihan kualitas/speed).
         try:
             pitch = float(fx.get("pitch") or 0)
         except Exception:
             pitch = 0.0
         if abs(pitch) >= 0.01:
             ratio = 2.0 ** (pitch / 12.0)
-            parts.append(f"rubberband=pitch={ratio:.5f}")
+            parts.append(f"rubberband=pitch-scale={ratio:.5f}")
 
         return ",".join(parts)
 
