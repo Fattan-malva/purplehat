@@ -21,7 +21,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="controller.css?v=20261012k">
+    <link rel="stylesheet" href="controller.css?v=20261012l">
     <script>
         // ==== ATURAN KERAS: controller hanya boleh tampil sebagai aplikasi ====
         (function () {
@@ -55,7 +55,7 @@
 
     <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
     <script src="/shared/protocol.js?v=20261012a"></script>
-    <script src="/shared/i18n.js?v=20261012b"></script>
+    <script src="/shared/i18n.js?v=20261012c"></script>
     <script src="/vendor/jsqr/dist/jsQR.js"></script>
 </head>
 
@@ -138,6 +138,9 @@
             </div>
 
             <div class="chips" id="search-tabs">
+                <button class="src-tab" data-src="karaoke">
+                    <i class="fas fa-microphone-lines src-kr" title="Karaoke" data-i18n-title="src.karaokeTitle"></i> Karaoke
+                </button>
                 <button class="src-tab mode-active" data-src="youtube">
                     <i class="fab fa-youtube src-yt" title="Available on YouTube" data-i18n-title="src.youtubeTitle"></i> YouTube
                 </button>
@@ -246,37 +249,70 @@
             </div>
 
             <div class="modal-body">
-                <div class="fx-item">
-                    <div class="row">
-                        <span class="label"><i data-lucide="audio-waveform"></i> <span data-i18n="fx.echo">Echo Delay</span></span>
-                        <span class="val" id="echo-val">40%</span>
-                    </div>
-                    <input type="range" min="0" max="100" value="40" aria-label="Echo delay" data-i18n-aria="fx.echoAria"
-                        oninput="document.getElementById('echo-val').innerText = this.value + '%'">
-                </div>
-
+                <!-- Key Shift / Pitch (berlaku untuk sumber Karaoke via mpv) -->
                 <div class="row">
                     <span class="label"><i data-lucide="music-2"></i> <span data-i18n="fx.keyShift">Key Shift</span></span>
                     <div class="stepper">
-                        <button class="btn-step sm" onclick="adjustPitch(-1)" aria-label="Lower pitch" data-i18n-aria="fx.pitchDown">
+                        <button class="btn-step sm" id="pitch-down" aria-label="Lower pitch" data-i18n-aria="fx.pitchDown">
                             <i data-lucide="minus"></i>
                         </button>
                         <div class="stepper-val" id="pitch-display">0</div>
-                        <button class="btn-step sm" onclick="adjustPitch(1)" aria-label="Raise pitch" data-i18n-aria="fx.pitchUp">
+                        <button class="btn-step sm" id="pitch-up" aria-label="Raise pitch" data-i18n-aria="fx.pitchUp">
                             <i data-lucide="plus"></i>
                         </button>
                     </div>
                 </div>
 
-                <div class="row toggle-row">
-                    <div class="toggle-text">
-                        <span class="label-strong" data-i18n="fx.vocalCancel">Vocal Cancel</span>
-                        <span class="hint" data-i18n="fx.vocalCancelHint">Remove original track vocals</span>
+                <!-- Tempo / kecepatan (tanpa mengubah nada) -->
+                <div class="fx-item">
+                    <div class="row">
+                        <span class="label"><i data-lucide="gauge"></i> <span data-i18n="fx.tempo">Tempo</span></span>
+                        <span class="val" id="tempo-val">1.00x</span>
                     </div>
-                    <label class="switch">
-                        <input type="checkbox" id="vocal-toggle" aria-label="Vocal Cancel" data-i18n-aria="fx.vocalCancel">
-                        <span class="track"></span>
-                    </label>
+                    <input type="range" id="tempo-range" min="0.5" max="2" step="0.05" value="1"
+                        aria-label="Tempo" data-i18n-aria="fx.tempo">
+                </div>
+
+                <!-- Echo / reverb -->
+                <div class="fx-item">
+                    <div class="row">
+                        <span class="label"><i data-lucide="audio-waveform"></i> <span data-i18n="fx.echo">Echo Delay</span></span>
+                        <span class="val" id="echo-val">0%</span>
+                    </div>
+                    <input type="range" id="echo-range" min="0" max="100" value="0" aria-label="Echo delay" data-i18n-aria="fx.echoAria">
+                </div>
+
+                <!-- EQ: Bass -->
+                <div class="fx-item">
+                    <div class="row">
+                        <span class="label"><i data-lucide="activity"></i> <span data-i18n="fx.bass">Bass</span></span>
+                        <span class="val" id="bass-val">0</span>
+                    </div>
+                    <input type="range" id="bass-range" min="-10" max="10" step="1" value="0" aria-label="Bass" data-i18n-aria="fx.bass">
+                </div>
+
+                <!-- EQ: Treble -->
+                <div class="fx-item">
+                    <div class="row">
+                        <span class="label"><i data-lucide="sparkles"></i> <span data-i18n="fx.treble">Treble</span></span>
+                        <span class="val" id="treble-val">0</span>
+                    </div>
+                    <input type="range" id="treble-range" min="-10" max="10" step="1" value="0" aria-label="Treble" data-i18n-aria="fx.treble">
+                </div>
+
+                <!-- Channel audio L/R + panduan vokal (lagu karaoke multi-kanal) -->
+                <div class="fx-item">
+                    <div class="row">
+                        <span class="label"><i data-lucide="radio"></i> <span data-i18n="fx.channel">Channel / Vocal</span></span>
+                    </div>
+                    <div class="fx-channels" id="fx-channels">
+                        <button type="button" class="fx-chip" data-ch="stereo" data-i18n="fx.chStereo">Stereo</button>
+                        <button type="button" class="fx-chip" data-ch="music" data-i18n="fx.chMusic">Musik</button>
+                        <button type="button" class="fx-chip" data-ch="vocal" data-i18n="fx.chVocal">Vokal</button>
+                        <button type="button" class="fx-chip" data-ch="left" data-i18n="fx.chLeft">Kiri (L)</button>
+                        <button type="button" class="fx-chip" data-ch="right" data-i18n="fx.chRight">Kanan (R)</button>
+                        <button type="button" class="fx-chip" data-ch="vocal-off" data-i18n="fx.chVocalOff">Hilangkan Vokal</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -307,7 +343,7 @@
                         <i data-lucide="plus"></i>
                     </button>
                 </div>
-                <p class="hint vol-hint" data-i18n="volume.hint">Press and hold −/+ to adjust quickly.</p>
+                <p class="hint vol-hint" data-i18n="volume.hint">Press and hold -/+ to adjust quickly.</p>
             </div>
         </div>
     </div>
@@ -388,20 +424,7 @@
         </div>
     </div>
 
-    <script>
-        // Pitch Control Logic
-        let currentPitch = 0;
-        const pitchDisplay = document.getElementById('pitch-display');
-        function adjustPitch(amount) {
-            currentPitch += amount;
-            if (currentPitch > 6) currentPitch = 6;
-            if (currentPitch < -6) currentPitch = -6;
-            if (currentPitch > 0) pitchDisplay.innerText = '+' + currentPitch;
-            else pitchDisplay.innerText = String(currentPitch);
-            pitchDisplay.classList.toggle('is-on', currentPitch !== 0);
-        }
-    </script>
-    <script src="controller.js?v=20261012i"></script>
+    <script src="controller.js?v=20261012j"></script>
 </body>
 
 </html>

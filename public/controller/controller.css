@@ -1042,6 +1042,37 @@ input:focus-visible {
   gap: 8px;
 }
 
+/* Pilihan channel audio L/R + panduan vokal (lagu karaoke multi-kanal) */
+.fx-channels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fx-chip {
+  flex: 1 1 auto;
+  min-width: 84px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--line-soft);
+  font-size: 13px;
+  font-weight: 600;
+  color: inherit;
+  transition: background .15s, border-color .15s, transform .12s;
+}
+
+.fx-chip:active {
+  transform: scale(.96);
+}
+
+.fx-chip.is-on {
+  background: rgba(168, 85, 247, 0.18);
+  border-color: rgba(168, 85, 247, 0.6);
+  color: var(--accent-hi);
+}
+
 .stepper {
   display: flex;
   align-items: center;
@@ -1259,7 +1290,8 @@ input[type="range"]::-moz-range-thumb {
     gap: 4px;
   }
 
-  .src-tab .fab {
+  .src-tab .fab,
+  .src-tab .fas {
     font-size: 12px;
   }
 }
@@ -1268,7 +1300,8 @@ input[type="range"]::-moz-range-thumb {
   transform: scale(.96);
 }
 
-.src-tab .fab {
+.src-tab .fab,
+.src-tab .fas {
   font-size: 13px;
 }
 
@@ -1282,6 +1315,10 @@ input[type="range"]::-moz-range-thumb {
 
 .src-sp {
   color: #1db954;
+}
+
+.src-kr {
+  color: #a855f7;
 }
 
 /* ---------- Results: isi area tengah, scrollbar disembunyikan ---------- */

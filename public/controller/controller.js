@@ -30,7 +30,7 @@ var state = { current: null, queue: [], playing: false, position: 0, duration: 0
 // posisi bar supaya tidak goyang saat STATE_SYNC masuk.
 var isScrubbing = false;
 const API_BASE = localStorage.getItem('ph_api_base') || '';
-var searchSource = 'youtube'; // 'youtube' | 'soundcloud' | 'spotify'
+var searchSource = 'youtube'; // 'karaoke' | 'youtube' | 'soundcloud' | 'spotify'
 
 function send(type, payload) {
   if (ws && ws.readyState === WebSocket.OPEN) {
@@ -267,7 +267,8 @@ function bindUI() {
       const src = btn.dataset.src;
       if (src === 'spotify') { onSpotifyTabClick(btn); return; }
       setSearchSource(src);
-      if (document.getElementById('search-input').value.trim()) search();
+      // Karaoke langsung memuat semua lagu walau kolom pencarian kosong.
+      if (document.getElementById('search-input').value.trim() || src === 'karaoke') search();
     });
   });
 
@@ -317,6 +318,8 @@ function bindUI() {
       return;
     }
     document.getElementById('fx-modal').classList.remove('hidden');
+    loadKaraokeFx();
+    renderFxUI();
     refreshIcons();
   });
   // Tombol disabled tidak memicu 'click', jadi pakai pointerdown supaya tetap
@@ -355,6 +358,9 @@ function bindUI() {
   document.querySelectorAll('.modal').forEach(m => {
     m.addEventListener('click', (e) => { if (e.target === m) m.classList.add('hidden'); });
   });
+
+  // Kontrol FX/Tuning (key, tempo, echo, EQ, channel) untuk sumber Karaoke.
+  bindFxControls();
 }
 
 // ===== Progress bar: bisa diklik & diseret (scrub) =====
@@ -535,16 +541,94 @@ function syncFxButton() {
   refreshIcons();
 }
 
+// ===== FX & Tuning (sumber Karaoke -> dikirim ke pemutar mpv lewat backend) =====
+// Nilai yang dikirim: pitch (key shift), tempo, echo, bass, treble, channel.
+// Semuanya benar-benar mengubah suara mpv (lihat backend/karaoke/mpv.py).
+var karaokeFx = { pitch: 0, echo: 0, tempo: 1.0, bass: 0, treble: 0, channel: 'stereo' };
+var fxSendTimer = null;
+
+function fxSet(patch) {
+  Object.assign(karaokeFx, patch);
+  renderFxUI();
+  if (fxSendTimer) clearTimeout(fxSendTimer);
+  fxSendTimer = setTimeout(function () {
+    fxSendTimer = null;
+    fetch('/api/karaoke/player/fx', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(karaokeFx)
+    }).catch(function () {});
+  }, 120);
+}
+
+// Muat nilai FX yang tersimpan di backend saat modal dibuka.
+function loadKaraokeFx() {
+  fetch('/api/karaoke/player/fx', { cache: 'no-store' })
+    .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+    .then(function (fx) {
+      if (!fx || typeof fx !== 'object') return;
+      karaokeFx.pitch = Math.round(Number(fx.pitch || 0));
+      karaokeFx.echo = Math.round(Number(fx.echo || 0));
+      karaokeFx.tempo = Number(fx.tempo || 1);
+      karaokeFx.bass = Math.round(Number(fx.bass || 0));
+      karaokeFx.treble = Math.round(Number(fx.treble || 0));
+      karaokeFx.channel = fx.channel || 'stereo';
+      renderFxUI();
+    })
+    .catch(function () {});
+}
+
+function renderFxUI() {
+  var pd = document.getElementById('pitch-display');
+  if (pd) {
+    pd.innerText = karaokeFx.pitch > 0 ? ('+' + karaokeFx.pitch) : String(karaokeFx.pitch);
+    pd.classList.toggle('is-on', karaokeFx.pitch !== 0);
+  }
+  setFxRange('tempo-range', karaokeFx.tempo, function (v) { return Number(v).toFixed(2) + 'x'; });
+  setFxRange('echo-range', karaokeFx.echo, function (v) { return v + '%'; });
+  setFxRange('bass-range', karaokeFx.bass);
+  setFxRange('treble-range', karaokeFx.treble);
+  document.querySelectorAll('#fx-channels .fx-chip').forEach(function (b) {
+    b.classList.toggle('is-on', b.dataset.ch === karaokeFx.channel);
+  });
+}
+
+function setFxRange(id, val, fmt) {
+  var el = document.getElementById(id);
+  if (el) el.value = val;
+  var out = document.getElementById(id.replace('-range', '-val'));
+  if (out) out.innerText = fmt ? fmt(val) : String(val);
+}
+
+function bindFxControls() {
+  var pd = document.getElementById('pitch-down');
+  if (pd) pd.addEventListener('click', function () { fxSet({ pitch: Math.max(-6, karaokeFx.pitch - 1) }); });
+  var pu = document.getElementById('pitch-up');
+  if (pu) pu.addEventListener('click', function () { fxSet({ pitch: Math.min(6, karaokeFx.pitch + 1) }); });
+  var tr = document.getElementById('tempo-range');
+  if (tr) tr.addEventListener('input', function () { fxSet({ tempo: parseFloat(this.value) }); });
+  var er = document.getElementById('echo-range');
+  if (er) er.addEventListener('input', function () { fxSet({ echo: parseInt(this.value, 10) }); });
+  var br = document.getElementById('bass-range');
+  if (br) br.addEventListener('input', function () { fxSet({ bass: parseInt(this.value, 10) }); });
+  var tb = document.getElementById('treble-range');
+  if (tb) tb.addEventListener('input', function () { fxSet({ treble: parseInt(this.value, 10) }); });
+  document.querySelectorAll('#fx-channels .fx-chip').forEach(function (b) {
+    b.addEventListener('click', function () { fxSet({ channel: b.dataset.ch }); });
+  });
+}
+
 // ===== Pencarian + pagination tak berujung (terpicu saat scroll ke bawah) =====
 var resultsState = { query: '', src: null, page: 1, offset: 0, hasMore: false, loading: false, limit: 20 };
 
 async function search() {
   const q = document.getElementById('search-input').value.trim();
-  if (!q) return;
+  // Karaoke menampilkan SEMUA lagu (MstSongBank) walau query kosong.
+  if (!q && searchSource !== 'karaoke') return;
   const el = document.getElementById('results');
   el.classList.remove('hidden');
   resultsState = { query: q, src: searchSource, page: 1, offset: 0, hasMore: true, loading: true, limit: 20 };
-  const srcName = searchSource === 'soundcloud' ? 'SoundCloud' : (searchSource === 'spotify' ? 'Spotify' : 'YouTube');
+  const srcName = searchSource === 'soundcloud' ? 'SoundCloud' : (searchSource === 'spotify' ? 'Spotify' : (searchSource === 'karaoke' ? 'Karaoke' : 'YouTube'));
   el.innerHTML = '<div class="state-msg"><i data-lucide="loader-circle" class="spin"></i> ' + escapeHtml(tr('search.searching', { src: srcName })) + '</div>';
   refreshIcons();
   try {
@@ -566,6 +650,9 @@ async function fetchPage(append) {
     url = `${API_BASE}/api/search-soundcloud?q=${encodeURIComponent(q)}&limit=${resultsState.limit}&page=${append ? resultsState.page : 1}`;
   } else if (resultsState.src === 'spotify') {
     url = `${API_BASE}/api/search-spotify?q=${encodeURIComponent(q)}&limit=${resultsState.limit}&page=${append ? resultsState.page : 1}`;
+  } else if (resultsState.src === 'karaoke') {
+    // Bank lagu (MstSongBank) memakai offset/limit. Query boleh kosong = semua lagu.
+    url = `${API_BASE}/api/karaoke/search?q=${encodeURIComponent(q)}&limit=${resultsState.limit}&offset=${append ? resultsState.offset : 0}`;
   } else {
     url = `${API_BASE}/api/search?q=${encodeURIComponent(q)}&limit=${resultsState.limit}&offset=${append ? resultsState.offset : 0}`;
   }
@@ -575,6 +662,12 @@ async function fetchPage(append) {
   if (resultsState.src === 'soundcloud' || resultsState.src === 'spotify') {
     const items = data.data || [];
     return { items, hasMore: !!(data.hasNext && items.length === resultsState.limit) };
+  }
+  if (resultsState.src === 'karaoke') {
+    // Backend: { items, total, offset, limit, hasMore }
+    const items = data.items || (Array.isArray(data) ? data : []);
+    const hasMore = (data.hasMore !== undefined) ? !!data.hasMore : items.length === resultsState.limit;
+    return { items, hasMore };
   }
   const items = data || [];
   return { items, hasMore: items.length === resultsState.limit };
@@ -618,6 +711,7 @@ async function loadMore() {
 function sourceIcon(src) {
   if (src === 'soundcloud') return '<i class="fab fa-soundcloud src-sc" title="' + escapeAttr(tr('src.soundcloudTitle')) + '"></i>';
   if (src === 'spotify') return '<i class="fab fa-spotify src-sp" title="' + escapeAttr(tr('src.spotifyTitle')) + '"></i>';
+  if (src === 'karaoke') return '<i class="fas fa-microphone-lines src-kr" title="' + escapeAttr(tr('src.karaokeTitle')) + '"></i>';
   return '<i class="fab fa-youtube src-yt" title="' + escapeAttr(tr('src.youtubeTitle')) + '"></i>';
 }
 
@@ -626,6 +720,9 @@ function addSongToQueue(item, src, playNow) {
     send(PH.MSG.ADD_SONG, { source: 'spotify', trackId: item.trackId, title: item.title, artist: item.artist, thumbnail: item.thumbnail, playNow: !!playNow });
   } else if (src === 'soundcloud') {
     send(PH.MSG.ADD_SONG, { source: 'soundcloud', trackId: item.trackId, title: item.title, artist: item.artist, thumbnail: item.thumbnail, playNow: !!playNow });
+  } else if (src === 'karaoke') {
+    // Lagu karaoke: path file share (LAN/UNC) + id bank lagu.
+    send(PH.MSG.ADD_SONG, { source: 'karaoke', songId: item.songId, title: item.title, artist: item.singer || '', path: item.path, playNow: !!playNow });
   } else {
     send(PH.MSG.ADD_SONG, { source: 'youtube', videoId: item.videoId, title: item.title, artist: item.channelName, thumbnail: item.thumbnail, playNow: !!playNow });
   }
@@ -644,7 +741,7 @@ function openConfirmAdd(item, src) {
   var t = document.getElementById('confirm-title');
   if (t) t.textContent = item.title || '';
   var s = document.getElementById('confirm-sub');
-  if (s) s.textContent = [item.artist || item.channelName || '', item.duration || ''].filter(Boolean).join(' • ');
+  if (s) s.textContent = [item.artist || item.channelName || item.singer || '', item.duration || ''].filter(Boolean).join(' • ');
   document.getElementById('confirm-modal').classList.remove('hidden');
   refreshIcons();
 }
@@ -658,7 +755,7 @@ function confirmAddToQueue() {
 
 function buildResultRow(item) {
   const src = item.source || resultsState.src || 'youtube';
-  const sub = [item.artist || item.channelName || '', item.duration || ''].filter(Boolean).join(' • ');
+  const sub = [item.artist || item.channelName || item.singer || '', item.duration || ''].filter(Boolean).join(' • ');
   const thumb = item.thumbnail
     ? `<img class="thumb" src="${item.thumbnail}" alt="${escapeHtml(item.title || '')}">`
     : `<div class="thumb"><i data-lucide="music"></i></div>`;
@@ -747,10 +844,11 @@ function render() {
   }
   const subEl = document.getElementById('np-sub');
   if (state.current) {
-    const src = state.current.source === 'soundcloud' ? 'soundcloud'
-      : (state.current.source === 'spotify' ? 'spotify' : 'youtube');
+    const rawSrc = state.current.source;
+    const src = rawSrc === 'soundcloud' ? 'soundcloud'
+      : (rawSrc === 'spotify' ? 'spotify' : (rawSrc === 'karaoke' ? 'karaoke' : 'youtube'));
     const artist = state.current.artist || '';
-    const label = src === 'soundcloud' ? 'SoundCloud' : (src === 'spotify' ? 'Spotify' : 'YouTube');
+    const label = src === 'soundcloud' ? 'SoundCloud' : (src === 'spotify' ? 'Spotify' : (src === 'karaoke' ? 'Karaoke' : 'YouTube'));
     const subHtml = `${artist ? escapeHtml(artist) + ' &bull; ' : ''}${sourceIcon(src)} ${label}`;
     setMarquee(subEl, subHtml, 1.2);
   } else {
@@ -783,7 +881,7 @@ function render() {
 function queueSignature() {
   const q = state.queue || [];
   const parts = q.map(function (s) {
-    return [s.title || '', s.artist || '', s.source || '', s.videoId || s.trackId || '', s.thumbnail || ''].join('\u0001');
+    return [s.title || '', s.artist || '', s.source || '', s.videoId || s.trackId || s.songId || '', s.thumbnail || '', s.path || ''].join('\u0001');
   });
   return (state.current ? state.current.index : -1) + '\u0002' + parts.join('\u0003');
 }
@@ -1263,6 +1361,6 @@ setInterval(() => { if (!fallbackMode) send(PH.MSG.REQUEST_STATE, {}); }, 3000);
 // })();
 
 
-// Default pencarian: query "breakbeat" sudah terisi, hasil langsung tampil sejak awal.
-document.getElementById('search-input').value = 'breakbeat';
-search();
+// Default pencarian dikosongkan: karaoke menampilkan SEMUA lagu (MstSongBank)
+// saat query kosong (lihat fetchPage untuk sumber 'karaoke'). Tidak ada
+// auto-search saat load; pengguna menekan Cari atau pindah tab sumber.

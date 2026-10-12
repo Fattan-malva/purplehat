@@ -2,49 +2,43 @@
 // - Serves static files (screen + controller)
 // - WebSocket relay between screen (player) & controller (mobile)
 // - Pairing via 6-char code + QR
-// - Data persisted to JSON (backend/data/purplehat.json)
+// - Identitas room (MAC -> PairingCode) disimpan di SQL Server (tabel MstRoom)
+//   lewat backend FastAPI. Queue/posisi playback cukup di memori.
 
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const fs = require('fs');
 const http = require('http');
 const WebSocket = require('ws');
 const QRCode = require('qrcode');
 
 const PORT = process.env.PORT || 3000;
 const publicDir = path.join(__dirname, '..', 'public');
-const dataDir = path.join(__dirname, '..', 'backend', 'data');
-const dataFile = path.join(dataDir, 'purplehat.json');
+const API_BASE = () => `http://localhost:${process.env.API_PORT || 8000}`;
 
-if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-
-function loadData() {
-  try {
-    return JSON.parse(fs.readFileSync(dataFile, 'utf8'));
-  } catch (e) {
-    return { rooms: {} };
-  }
-}
-function saveData(data) {
-  fs.writeFileSync(dataFile, JSON.stringify(data, null, 2));
-}
-
-const rooms = loadData().rooms;
+// Runtime rooms (queue/posisi/volume) - TIDAK dipersist (hanya di memori).
+const rooms = {};
 const sockets = new Map(); // socket -> {role, code, id}
 
-// Bersihkan room sisa (tidak ada layar aktif) lebih dari 24 jam saat server start
-(function cleanupOldRooms() {
-  const day = 24 * 60 * 60 * 1000;
-  let changed = false;
-  Object.keys(rooms).forEach((code) => {
-    if (Date.now() - (rooms[code].createdAt || 0) > day) {
-      delete rooms[code];
-      changed = true;
-    }
+// ---- Helper ke backend FastAPI (Python) --------------------------------
+async function apiGet(pathname) {
+  const r = await fetch(`${API_BASE()}${pathname}`, { cache: 'no-store' });
+  const txt = await r.text();
+  let data = null;
+  try { data = txt ? JSON.parse(txt) : null; } catch (e) { data = txt; }
+  return { status: r.status, data };
+}
+async function apiSend(method, pathname, body) {
+  const r = await fetch(`${API_BASE()}${pathname}`, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
   });
-  if (changed) saveData({ rooms });
-})();
+  const txt = await r.text();
+  let data = null;
+  try { data = txt ? JSON.parse(txt) : null; } catch (e) { data = txt; }
+  return { status: r.status, data };
+}
 
 const app = express();
 app.set('trust proxy', true); // penting untuk tunneling (ngrok/cloudflare)
@@ -185,6 +179,62 @@ app.get('/api/spotify/embed-proxy', async (req, res) => {
   }
 });
 
+// ==== Karaoke (bank lagu SQL Server + pemutar mpv) ==========================
+const KARAOKE_BASE = () => `http://localhost:${process.env.API_PORT || 8000}/karaoke`;
+
+// Pencarian lagu karaoke (semua lagu di MstSongBank tampil di search).
+app.get('/api/karaoke/search', async (req, res) => {
+  try {
+    const qs = new URLSearchParams(req.query).toString();
+    const r = await fetch(`${KARAOKE_BASE()}/search?${qs}`);
+    const data = await r.json();
+    res.status(r.status).json(data);
+  } catch (e) {
+    res.status(502).json({ error: 'Backend API tidak tersedia. Jalankan backend di port 8000.' });
+  }
+});
+
+// Status pemutar mpv.
+app.get('/api/karaoke/player/state', async (req, res) => {
+  try {
+    const r = await fetch(`${KARAOKE_BASE()}/player/state`);
+    const data = await r.json();
+    res.status(r.status).json(data);
+  } catch (e) {
+    res.status(502).json({ error: 'Backend API tidak tersedia.' });
+  }
+});
+
+// Parameter FX aktif (key/echo/tempo/EQ/channel).
+app.get('/api/karaoke/player/fx', async (req, res) => {
+  try {
+    const r = await fetch(`${KARAOKE_BASE()}/player/fx`);
+    const data = await r.json();
+    res.status(r.status).json(data);
+  } catch (e) {
+    res.status(502).json({ error: 'Backend API tidak tersedia.' });
+  }
+});
+
+// Teruskan perintah player (load/play/pause/toggle/stop/seek/volume/fx) ke backend.
+// Body JSON diteruskan apa adanya. Pakai satu handler agar ringkas & konsisten.
+app.post('/api/karaoke/player/:action', async (req, res) => {
+  const action = String(req.params.action || '');
+  const allowed = ['load', 'play', 'pause', 'toggle', 'stop', 'seek', 'volume', 'fx'];
+  if (!allowed.includes(action)) return res.status(400).json({ error: 'Aksi tidak dikenal' });
+  try {
+    const r = await fetch(`${KARAOKE_BASE()}/player/${action}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body || {}),
+    });
+    const data = await r.json();
+    res.status(r.status).json(data);
+  } catch (e) {
+    res.status(502).json({ error: 'Backend API tidak tersedia.' });
+  }
+});
+
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
@@ -196,11 +246,29 @@ function makeCode() {
 }
 
 function getRoom(code) {
-  if (!rooms[code]) {
-    rooms[code] = { code, createdAt: Date.now(), queue: [], currentIndex: -1, playing: false, volume: 30, position: 0, duration: 0, sp_dc: null };
-    saveData({ rooms });
+  const c = String(code || '').toUpperCase();
+  if (!rooms[c]) {
+    rooms[c] = { code: c, createdAt: Date.now(), roomId: null, mac: null, queue: [], currentIndex: -1, playing: false, volume: 30, position: 0, duration: 0, sp_dc: null };
   }
-  return rooms[code];
+  return rooms[c];
+}
+
+// Ambil room dari memori; bila belum ada, muat identitasnya dari DB (MstRoom).
+// Dipakai agar room hasil sesi/restart sebelumnya tetap bisa diakses controller.
+async function loadRoom(code) {
+  const c = String(code || '').toUpperCase();
+  if (rooms[c]) return rooms[c];
+  try {
+    const r = await apiGet('/room/' + encodeURIComponent(c));
+    if (r.status === 200 && r.data) {
+      const room = getRoom(c);
+      room.roomId = r.data.roomId || null;
+      room.mac = r.data.mac || null;
+      room.sp_dc = r.data.sp_dc || null;
+      return room;
+    }
+  } catch (e) {}
+  return null;
 }
 
 // ==== Presence long-poll =====================================================
@@ -232,14 +300,15 @@ function flushPresence(code) {
 var saveTimer = null;
 
 function persistRoom(code) {
-  // Deferred write: STATE_SYNC dari layar bisa datang beruntun saat tombol
-  // volume ditekan cepat. writeFileSync sinkron per pesan memblokir event loop
-  // Node sehingga relay perintah lain (play/next/seek) ikut tersendat.
+  // Identitas room ada di DB; yang perlu disinkronkan hanyalah flag IsRunning.
+  // Debounce karena STATE_SYNC bisa datang beruntun (mis. volume ditekan cepat).
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     saveTimer = null;
-    try { saveData({ rooms }); } catch (e) {}
-  }, 400);
+    const room = rooms[code];
+    if (!room) return;
+    apiSend('PUT', `/room/${encodeURIComponent(code)}/running`, { running: !!room.playing }).catch(() => {});
+  }, 500);
 }
 
 function broadcastToRoom(code, msg, exceptRole) {
@@ -251,16 +320,47 @@ function broadcastToRoom(code, msg, exceptRole) {
   });
 }
 
-// API: create room
-app.post('/api/room/create', (req, res) => {
-  let code = makeCode();
-  while (rooms[code]) code = makeCode();
+// API: create/resolve room. PairingCode stabil per device (MAC dikirim player/Flutter).
+app.post('/api/room/create', async (req, res) => {
+  const mac = (req.query && req.query.mac) || (req.body && req.body.mac) || '';
+  let code = null;
+  let roomId = null;
+  let spDc = null;
+  try {
+    const r = await apiGet('/room/resolve?mac=' + encodeURIComponent(mac));
+    if (r.status === 200 && r.data && r.data.code) {
+      code = String(r.data.code).toUpperCase();
+      roomId = r.data.roomId || null;
+      spDc = r.data.sp_dc || null;
+    }
+  } catch (e) { /* backend/DB belum siap -> fallback kode acak di memori */ }
+
+  if (!code) {
+    code = makeCode();
+    while (rooms[code]) code = makeCode();
+  }
+
   const room = getRoom(code);
+  if (roomId) room.roomId = roomId;
+  if (mac) room.mac = String(mac);
+  if (spDc) room.sp_dc = spDc;
+
   const forwardedHost = req.headers['x-forwarded-host'];
   const finalBase = process.env.PUBLIC_URL
     ? process.env.PUBLIC_URL.replace(/\/$/, '')
     : (req.protocol + '://' + (forwardedHost || req.get('host'))).replace(/\/$/, '');
-  res.json({ code, qr: finalBase + '/controller/qr.html?pair=' + code, baseUrl: finalBase });
+  res.json({ code, qr: finalBase + '/controller/qr.html?pair=' + code, baseUrl: finalBase, roomId });
+});
+
+// API: resolve room langsung berdasarkan MAC (dipakai player/Flutter bila perlu).
+app.get('/api/room/resolve', async (req, res) => {
+  const mac = req.query.mac || '';
+  try {
+    const r = await apiGet('/room/resolve?mac=' + encodeURIComponent(mac));
+    res.status(r.status).json(r.data);
+  } catch (e) {
+    res.status(502).json({ error: 'Backend API tidak tersedia. Jalankan backend di port 8000.' });
+  }
 });
 
 // API: presence long-poll (dipakai halaman QR layar untuk menunggu controller).
@@ -289,8 +389,9 @@ app.get('/api/room/:code/presence', (req, res) => {
 });
 
 // API: check room (full state for polling fallback)
-app.get('/api/room/:code', (req, res) => {
-  const room = rooms[req.params.code];
+app.get('/api/room/:code', async (req, res) => {
+  const code = req.params.code.toUpperCase();
+  const room = await loadRoom(code);
   if (!room) return res.status(404).json({ error: 'Room tidak ditemukan' });
   const current = room.queue[room.currentIndex] || null;
   res.json({
@@ -320,9 +421,10 @@ app.post('/api/room/:code/command', (req, res) => {
 });
 
 // API: sp_dc per room (cookie login Spotify). Dipakai sumber Spotify.
-// Disimpan di backend/data/purplehat.json -> rooms[code].sp_dc
-app.get('/api/room/:code/spdc', (req, res) => {
-  const room = rooms[req.params.code.toUpperCase()];
+// Nilai disimpan di DB (MstRoom.SP_DC) lewat backend Python.
+app.get('/api/room/:code/spdc', async (req, res) => {
+  const code = req.params.code.toUpperCase();
+  const room = await loadRoom(code);
   if (!room) return res.status(404).json({ error: 'Room tidak ditemukan' });
   res.setHeader('Cache-Control', 'no-store');
   res.json({ has: !!room.sp_dc });
@@ -330,7 +432,8 @@ app.get('/api/room/:code/spdc', (req, res) => {
 
 // Validasi sp_dc tersimpan (controller tidak perlu tahu nilainya).
 app.get('/api/room/:code/spdc/validate', async (req, res) => {
-  const room = rooms[req.params.code.toUpperCase()];
+  const code = req.params.code.toUpperCase();
+  const room = await loadRoom(code);
   if (!room) return res.status(404).json({ error: 'Room tidak ditemukan' });
   if (!room.sp_dc) return res.status(409).json({ error: 'sp_dc belum diatur' });
   try {
@@ -342,37 +445,46 @@ app.get('/api/room/:code/spdc/validate', async (req, res) => {
   }
 });
 
-app.post('/api/room/:code/spdc', (req, res) => {
+app.post('/api/room/:code/spdc', async (req, res) => {
   const code = req.params.code.toUpperCase();
-  const room = rooms[code];
+  const room = await loadRoom(code);
   if (!room) return res.status(404).json({ error: 'Room tidak ditemukan' });
   const spDc = (req.body && req.body.sp_dc ? String(req.body.sp_dc) : '').trim();
   if (!spDc || spDc.length < 20) return res.status(400).json({ error: 'sp_dc tidak valid' });
   room.sp_dc = spDc;
-  saveData({ rooms });
+  // Simpan permanen di DB (MstRoom.SP_DC).
+  apiSend('PUT', `/room/${encodeURIComponent(code)}/sp_dc`, { sp_dc: spDc }).catch(() => {});
   // Teruskan ke layar player supaya frame Spotify bisa menggunakannya.
   broadcastToRoom(code, { type: 'sp_dc', payload: { sp_dc: spDc }, ts: Date.now() }, 'controller');
   res.json({ ok: true });
 });
 
-app.delete('/api/room/:code/spdc', (req, res) => {
+app.delete('/api/room/:code/spdc', async (req, res) => {
   const code = req.params.code.toUpperCase();
-  const room = rooms[code];
-  if (room) { room.sp_dc = null; saveData({ rooms }); }
+  const room = await loadRoom(code);
+  if (room) {
+    room.sp_dc = null;
+    apiSend('PUT', `/room/${encodeURIComponent(code)}/sp_dc`, { sp_dc: null }).catch(() => {});
+  }
   broadcastToRoom(code, { type: 'sp_dc', payload: { sp_dc: null }, ts: Date.now() }, 'controller');
   res.json({ ok: true });
 });
 
-// API: delete room (dipanggil saat player logout, supaya tidak numpuk di file data)
+// API: reset room runtime (dipanggil saat player logout/closing).
+// Room TIDAK dihapus dari DB, agar PairingCode tetap stabil per device (MAC).
 app.delete('/api/room/:code', (req, res) => {
   const code = req.params.code.toUpperCase();
   if (rooms[code]) {
-    delete rooms[code];
-    saveData({ rooms });
+    rooms[code].queue = [];
+    rooms[code].currentIndex = -1;
+    rooms[code].playing = false;
+    rooms[code].position = 0;
+    rooms[code].duration = 0;
+    // Tandai IsRunning=false di DB (tanpa menghapus identitas room).
+    apiSend('PUT', `/room/${encodeURIComponent(code)}/running`, { running: false }).catch(() => {});
   }
   // Beri tahu controller di room ini lalu tutup socket-nya, supaya tidak
-  // menggantung di room yang sudah dihapus (mis. layar logout saat HP masih
-  // terhubung). Controller akan kembali ke layar pairing.
+  // menggantung di room yang sudah direset. Controller akan kembali ke pairing.
   sockets.forEach((meta, sock) => {
     if (meta.code !== code) return;
     if (meta.role === 'controller') {
@@ -444,7 +556,7 @@ wss.on('connection', (ws, req) => {
       const spDc = (msg.payload && msg.payload.sp_dc ? String(msg.payload.sp_dc) : '').trim();
       if (spDc && spDc.length >= 20) {
         room.sp_dc = spDc;
-        saveData({ rooms });
+        apiSend('PUT', `/room/${encodeURIComponent(code)}/sp_dc`, { sp_dc: spDc }).catch(() => {});
       }
     }
 

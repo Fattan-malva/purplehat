@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Purplehat - Karaoke Player</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; background: #000; overflow: hidden; }
+
+    /* Tampilan latar karaoke. Video/audio sebenarnya diputar oleh mpv di
+       server; panel ini adalah "panggung" visual + pengendali mpv. */
+    #stage {
+      width: 100%; height: 100%;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 18px; text-align: center;
+      background:
+        radial-gradient(1200px 600px at 50% -10%, rgba(168, 85, 247, 0.35), transparent 60%),
+        radial-gradient(900px 500px at 50% 120%, rgba(59, 130, 246, 0.25), transparent 60%),
+        #07060b;
+      color: #fff;
+      font-family: 'Poppins', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    }
+    #stage .mic {
+      width: 96px; height: 96px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 44px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 0 60px rgba(168, 85, 247, 0.45);
+    }
+    #title {
+      font-size: clamp(20px, 3.2vw, 44px);
+      font-weight: 700; line-height: 1.2;
+      max-width: 90%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    #artist {
+      font-size: clamp(13px, 1.6vw, 20px);
+      font-weight: 500; color: rgba(255, 255, 255, 0.6);
+      max-width: 90%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    #badge {
+      margin-top: 8px;
+      font-size: 12px; font-weight: 600; letter-spacing: 3px;
+      text-transform: uppercase; color: rgba(255, 255, 255, 0.45);
+    }
+  </style>
+</head>
+<body>
+  <div id="stage">
+    <div class="mic">🎤</div>
+    <div id="title">Karaoke</div>
+    <div id="artist"></div>
+    <div id="badge">Karaoke</div>
+  </div>
+  <script>
+    // ==== Karaoke player (kontrol mpv di server lewat backend) ====
+    // Protokol sama seperti pemutar lain: induk (screen.js) mengirim perintah
+    // via postMessage, dan dokumen ini melaporkan {state}/{ended} ke induk.
+    // Perbedaannya: tidak ada media di dalam iframe - mpv di server yang
+    // benar-benar memutar file. Dokumen ini hanya jembatan + tampilan.
+    var volume = 100;
+    var loaded = false;
+    var lastPos = 0;
+    var lastDur = 0;
+    var endedHandled = false;
+
+    function post(m) {
+      try { parent.postMessage(Object.assign({ ph: 1 }, m), '*'); } catch (e) {}
+    }
+
+    function api(action, body) {
+      return fetch('/api/karaoke/player/' + action, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body || {})
+      }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; });
+    }
+
+    function setMeta(title, artist) {
+      var t = document.getElementById('title');
+      var a = document.getElementById('artist');
+      if (t) t.textContent = title || 'Karaoke';
+      if (a) a.textContent = artist || '';
+    }
+
+    function load(song) {
+      loaded = true;
+      endedHandled = false;
+      setMeta(song.title, song.artist);
+      api('load', { path: song.path, title: song.title });
+      // Kirim volume setelah load (nilai = volume frame: 100 saat mode desktop
+      // supaya master volume OS tetap jadi pengendali utama).
+      api('volume', { vol: volume });
+    }
+
+    // Terima perintah dari halaman induk
+    window.addEventListener('message', function (e) {
+      var d = e.data;
+      if (!d || !d.ph) return;
+      switch (d.cmd) {
+        case 'load':
+          if (d.volume != null) volume = d.volume;
+          load(d);
+          break;
+        case 'play':
+          api('play');
+          break;
+        case 'pause':
+          api('pause');
+          break;
+        case 'seek':
+          api('seek', { to: Math.max(0, d.to || 0) });
+          break;
+        case 'volume':
+          volume = d.vol;
+          api('volume', { vol: volume });
+          break;
+        case 'replay':
+          endedHandled = false;
+          api('seek', { to: 0 }).then(function () { api('play'); });
+          break;
+        case 'stop':
+          loaded = false;
+          api('stop');
+          break;
+      }
+    });
+
+    // Pantau status mpv -> kirim state/ended ke induk.
+    function poll() {
+      if (!loaded) return;
+      fetch('/api/karaoke/player/state', { cache: 'no-store' })
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+        .then(function (st) {
+          if (!st || !st.available) {
+            post({ type: 'state', playing: false, position: 0, duration: 0 });
+            return;
+          }
+          lastPos = st.position || 0;
+          lastDur = st.duration || 0;
+          post({ type: 'state', playing: !!st.playing && !st.paused, position: lastPos, duration: lastDur });
+          if (st.ended && !endedHandled) {
+            endedHandled = true;
+            post({ type: 'ended' });
+          }
+        })
+        .catch(function () {});
+    }
+    setInterval(poll, 1000);
+
+    // Saat dokumen dilepas (ganti sumber / stop), pastikan mpv berhenti.
+    window.addEventListener('pagehide', function () { try { api('stop'); } catch (e) {} });
+    window.addEventListener('beforeunload', function () { try { api('stop'); } catch (e) {} });
+
+    // Dokumen siap -> induk boleh mengirim perintah 'load'.
+    post({ type: 'ready' });
+  </script>
+</body>
+</html>

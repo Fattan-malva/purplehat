@@ -10,6 +10,21 @@ var navigating = false;
 
 function t(key, params) { return (window.PH && PH.i18n) ? PH.i18n.t(key, params) : key; }
 
+// MAC/ID device dikirim OLEH PLAYER (Flutter), bukan dibaca server.
+// Flutter bisa menyuntikkannya sebagai:
+//   - window.purplehatDeviceMac = "A4-42-3B-19-96-8C"  (evaluateJavascript), atau
+//   - window.purplehat.deviceMac, atau
+//   - query string  ?mac=A4-42-3B-19-96-8C  pada URL /screen/index.html
+function deviceMac() {
+  try {
+    if (window.purplehatDeviceMac) return String(window.purplehatDeviceMac);
+    if (window.purplehat && window.purplehat.deviceMac) return String(window.purplehat.deviceMac);
+    var p = new URLSearchParams(location.search).get('mac');
+    if (p) return p;
+  } catch (e) {}
+  return '';
+}
+
 // Setelah isi digandakan untuk animasi, terapkan ulang terjemahan ke salinan.
 function applyI18n() {
   if (window.PH && PH.i18n) PH.i18n.apply(document);
@@ -18,7 +33,11 @@ function applyI18n() {
 async function init() {
   try {
     if (!roomCode) {
-      const res = await fetch('/api/room/create', { method: 'POST' });
+      const res = await fetch('/api/room/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mac: deviceMac() })
+      });
       const data = await res.json();
       roomCode = data.code;
       sessionStorage.setItem('ph_code', roomCode);
