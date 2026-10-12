@@ -98,7 +98,7 @@ function sendMpvCommand(command) {
       const timeout = setTimeout(function() {
         pendingMpvCommands.delete(requestId);
         resolve({ ok: false, error: 'timeout', command: command });
-      }, 4500);
+      }, 12000);
       pendingMpvCommands.set(requestId, {
         resolve: resolve,
         timeout: timeout,
@@ -237,8 +237,9 @@ function sendLoad(song) {
 }
 
 // Muat lagu ke frame; ganti dokumen frame jika sumber berbeda
-function startSong(song) {
+function startSong(song, stopRetry) {
   const src = songSource(song);
+  stopRetry = stopRetry || 0;
   const f = document.getElementById('player-frame');
   const idle = document.getElementById('idle-screen');
   const transitionId = ++sourceTransitionId;
@@ -272,8 +273,14 @@ function startSong(song) {
     sendMpvCommand(['stop']).then(function(result) {
       if (transitionId !== sourceTransitionId) return;
       if (!result || !result.ok) {
+        if (stopRetry < 2) {
+          setTimeout(function() {
+            if (transitionId === sourceTransitionId) startSong(song, stopRetry + 1);
+          }, 250);
+          return;
+        }
         const status = document.getElementById('status');
-        if (status) status.textContent = 'Waiting for karaoke player to stop…';
+        if (status) status.textContent = 'Could not stop karaoke player; check mpv IPC.';
         return;
       }
       frameSrc = null;
@@ -523,6 +530,9 @@ function handleMessage(msg) {
 // layar): matikan pemutar, hapus room, buang kode, lalu kembali ke menu QR
 // yang akan otomatis membuat kode room BARU.
 function fullLogout() {
+  // Hentikan sumber Karaoke tetapi biarkan proses mpv tetap standby untuk
+  // pairing berikutnya. Native runner menyembunyikan child video setelah ACK.
+  if (currentSource === 'karaoke') sendMpvCommand(['stop']);
   closeFrame();
   try { if (ws) ws.close(); } catch (e) {}
   const code = roomCode;
@@ -658,7 +668,9 @@ function stopPlayback() {
 function closeFrame() {
   const f = document.getElementById('player-frame');
   frameReady = false;
-  frameSrc = null;
+  // Tetap tandai Karaoke sampai mpv menerima STOP. Bila controller menekan
+  // Play/Next lagi, transisi ke iframe harus menunggu ACK stop yang nyata.
+  frameSrc = currentSource === 'karaoke' ? 'karaoke' : null;
   pendingSong = null;
   if (f) {
     try { f.src = 'about:blank'; } catch (e) {}
