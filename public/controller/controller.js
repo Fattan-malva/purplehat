@@ -1101,8 +1101,9 @@ function setVolume(v) {
   v = Math.max(0, Math.min(100, v));
   v = Math.round(v / 2) * 2;
   volumeTarget = v;
-  // Abaikan echo state dari jaringan untuk 1.5 detik setelah input terakhir.
-  volumeLocalUntil = Date.now() + 1500;
+  // Jaga target lokal sampai WebSocket/long-poll sempat membawa nilai terbaru.
+  // Fallback polling berjalan tiap 2 detik, jadi gunakan jendela lebih panjang.
+  volumeLocalUntil = Date.now() + (fallbackMode ? 5000 : 2500);
   state.volume = v;
   updateVolUI();
   send(PH.MSG.VOLUME, { vol: v });
