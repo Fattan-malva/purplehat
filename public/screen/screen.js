@@ -128,11 +128,46 @@ function startSong(song) {
     frameReady = false;
     pendingSong = song;
     if (f) f.src = frameURL(src);
+    // Lazy-start mpv saat pertama kali memuat karaoke
+    if (src === 'karaoke' && window.startMpv) {
+      window.startMpv();
+    }
   } else if (frameReady) {
     sendLoad(song);
   } else {
     pendingSong = song;
   }
+}
+
+// Tunggu mpv ready sebelum load lagu karaoke (hanya mode desktop)
+function waitForMpvReadyAndLoad(song) {
+  if (!isDesktop || songSource(song) !== 'karaoke') {
+    sendLoad(song);
+    return;
+  }
+  // Cek apakah mpv sudah ready
+  if (window.startMpv) {
+    // startMpv juga akan memastikan mpv jalan
+    window.startMpv();
+  }
+  // Tunggu sebentar lalu cek readiness via bridge
+  setTimeout(function() {
+    if (window.postToHost) {
+      // Kirim permintaan cek ke Flutter
+      window.postToHost({ type: 'checkMpvReady' });
+      window.onMpvReady = function(ready) {
+        if (ready) {
+          sendLoad(song);
+        } else {
+          // Belum ready, coba lagi sebentar
+          setTimeout(function() { waitForMpvReadyAndLoad(song); }, 200);
+        }
+      };
+    } else {
+      // Fallback: kirim load langsung
+      sendLoad(song);
+    }
+  }, 100);
 }
 
 window.addEventListener('message', (e) => {
@@ -141,7 +176,12 @@ window.addEventListener('message', (e) => {
   if (d.type === 'ready') {
     frameReady = true;
     if (pendingSong) {
-      sendLoad(pendingSong);
+      // Untuk karaoke, tunggu mpv ready sebelum load
+      if (currentSource === 'karaoke' && isDesktop) {
+        waitForMpvReadyAndLoad(pendingSong);
+      } else {
+        sendLoad(pendingSong);
+      }
       pendingSong = null;
     } else {
       sendFrame({ cmd: 'volume', vol: frameVolume() });
