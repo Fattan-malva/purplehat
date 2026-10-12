@@ -73,11 +73,16 @@ function goToPlayer() {
           location.href = 'player.html';
           return;
         }
-        if (attempts++ === 0 && window.startMpv) {
+        if (attempts === 0 && window.startMpv) {
+          attempts++;
           window.startMpv();
           return;
         }
+        attempts++;
         if (Date.now() - startedAt < 15000) {
+          // Coba startup kembali bila kegagalan sebelumnya karena HWND/mpv
+          // belum siap. ensureStarted mencegah proses start yang tumpang tindih.
+          if (attempts % 4 === 0 && window.startMpv) window.startMpv();
           setTimeout(prepareMpv, 250);
           return;
         }
