@@ -180,6 +180,9 @@ window.onMpvCommandResult = function(requestId, result) {
         mediaPosition = 0;
         mediaDuration = 0;
         endedHandled = false;
+        // Baca durasi segera setelah load. Polling berkala berikutnya hanya
+        // berjalan saat benar-benar ada lagu yang sedang dimainkan.
+        postToHost({ type: 'mpvState' });
       } else if (command[0] === 'set_property' && command[1] === 'pause') {
         isPlaying = command[2] === false;
       } else if (command[0] === 'stop') {
@@ -301,7 +304,9 @@ function startSong(song) {
 function pollKaraoke() {
   if (currentSource !== 'karaoke') return;
   if (isDesktop) {
-    if (mpvStateRequestPending) return;
+    // Saat pause/idle, status sudah diketahui dari respons perintah. Tidak
+    // perlu membanjiri native IPC dengan pembacaan properti yang tak berubah.
+    if (!isPlaying || mpvStateRequestPending) return;
     mpvStateRequestPending = true;
     postToHost({ type: 'mpvState' });
     return;
@@ -311,7 +316,7 @@ function pollKaraoke() {
     .then(applyKaraokeState)
     .catch(function () { mpvStateRequestPending = false; });
 }
-setInterval(pollKaraoke, 1000);
+setInterval(pollKaraoke, 1500);
 
 // Pada wrapper Windows, tunggu konfirmasi kesiapan IPC sebelum memuat file.
 function waitForMpvReadyAndLoad(song) {
