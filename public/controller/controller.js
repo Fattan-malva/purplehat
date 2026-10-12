@@ -26,6 +26,10 @@ var reconnectAttempts = 0;
 var suppressReconnect = false;
 var reconnectTimer = null;
 var state = { current: null, queue: [], playing: false, position: 0, duration: 0, volume: 30, lyricsAvailable: null, modes: { loop: false, shuffle: false, loopQueue: false } };
+// Volume tampil optimistis selama tombol ditekan agar STATE_SYNC yang terlambat
+// tidak membuat angka UI bergerak maju-mundur.
+var volumeTarget = 30;
+var volumeLocalUntil = 0;
 // Sedang menyeret progress bar (scrub). Selama true, render() tidak menimpa
 // posisi bar supaya tidak goyang saat STATE_SYNC masuk.
 var isScrubbing = false;
@@ -135,6 +139,8 @@ function showPairScreen() {
   renderStatus();
   document.getElementById('queue-badge').textContent = '0';
   state = { current: null, queue: [], playing: false, position: 0, duration: 0, volume: 30, lyricsAvailable: null, modes: { loop: false, shuffle: false, loopQueue: false } };
+  volumeTarget = 30;
+  volumeLocalUntil = 0;
   updateVolUI();
   syncModeButtons();
 }
@@ -205,15 +211,17 @@ function pollState() {
   fetch('/api/room/' + roomCode)
     .then(r => r.ok ? r.json() : Promise.reject())
     .then(data => {
+      const keepLocalVolume = Date.now() < volumeLocalUntil;
       state = {
         current: data.current,
         queue: data.queue || [],
         playing: !!data.playing,
         position: data.position || 0,
         duration: data.duration || 0,
-        volume: data.volume ?? 30,
+        volume: keepLocalVolume ? volumeTarget : (data.volume ?? 30),
         modes: state.modes
       };
+      if (!keepLocalVolume) volumeTarget = state.volume;
       render();
     })
     .catch(() => {});
@@ -224,7 +232,17 @@ function handleMessage(msg) {
   const p = msg.payload || {};
   switch (msg.type) {
     case PH.MSG.STATE_SYNC:
-      if (p.state) { state = Object.assign({}, state, p.state); render(); }
+      if (p.state) {
+        const keepLocalVolume = Date.now() < volumeLocalUntil;
+        const localVolume = volumeTarget;
+        state = Object.assign({}, state, p.state);
+        if (keepLocalVolume) {
+          state.volume = localVolume;
+        } else {
+          volumeTarget = state.volume ?? 30;
+        }
+        render();
+      }
       break;
     case PH.MSG.KARAOKE_FX_STATE:
       if (p.fx && typeof p.fx === 'object') {
@@ -1082,6 +1100,9 @@ function updateVolUI() {
 function setVolume(v) {
   v = Math.max(0, Math.min(100, v));
   v = Math.round(v / 2) * 2;
+  volumeTarget = v;
+  // Abaikan echo state dari jaringan untuk 1.5 detik setelah input terakhir.
+  volumeLocalUntil = Date.now() + 1500;
   state.volume = v;
   updateVolUI();
   send(PH.MSG.VOLUME, { vol: v });
@@ -1104,11 +1125,11 @@ function bindHoldVolume(btnId, dir) {
   }
 
   function step() {
-    const before = state.volume ?? 30;
+    const before = volumeTarget;
     setVolume(before + dir * 2);
-    // Sudah mentok (tidak berubah): hentikan agar tidak mengirim perintah
-    // sia-sia ke jaringan.
-    if ((state.volume ?? 30) === before) stop();
+    // Increment mengambil nilai target lokal, bukan volume dari STATE_SYNC
+    // yang mungkin terlambat melewati jaringan.
+    if (volumeTarget === before) stop();
   }
 
   btn.addEventListener('pointerdown', (e) => {

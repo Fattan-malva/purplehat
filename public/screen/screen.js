@@ -150,12 +150,37 @@ function applyKaraokeState(st) {
 
 window.onMpvState = applyKaraokeState;
 window.onMpvCommandResult = function(requestId, result) {
-  if (result && result.ok) return;
+  const command = result && result.command;
+  if (result && result.ok) {
+    if (currentSource === 'karaoke' && Array.isArray(command)) {
+      if (command[0] === 'loadfile') {
+        isPlaying = true;
+        mediaPosition = 0;
+        mediaDuration = 0;
+        endedHandled = false;
+      } else if (command[0] === 'set_property' && command[1] === 'pause') {
+        isPlaying = command[2] === false;
+      } else if (command[0] === 'stop') {
+        isPlaying = false;
+        mediaPosition = 0;
+        mediaDuration = 0;
+      }
+      broadcastState();
+    } else if (command && command[0] === 'stop' && currentIndex < 0) {
+      isPlaying = false;
+      mediaPosition = 0;
+      mediaDuration = 0;
+      broadcastState();
+    }
+    return;
+  }
+
   console.error('PurpleHat mpv command failed:', requestId, result);
   const status = document.getElementById('status');
   if (status && currentSource === 'karaoke') {
     status.textContent = 'Karaoke player error: ' +
       ((result && (result.message || result.error)) || 'mpv IPC error');
+    postToHost({ type: 'mpvState' });
   }
 };
 
@@ -190,25 +215,39 @@ function sendLoad(song) {
 function startSong(song) {
   const src = songSource(song);
   const f = document.getElementById('player-frame');
+  const idle = document.getElementById('idle-screen');
   stoppedSong = null;
   currentSource = src;
   lyricsAvailable = null;
-    if (f) {
-      if (src !== 'karaoke') f.classList.remove('hidden');
+
+  // Karaoke bukan iframe. Sebelum mpv memuat video, hentikan dan lepaskan
+  // frame YouTube/SoundCloud/Spotify sebelumnya agar audionya tidak tertinggal.
+  if (src === 'karaoke') {
+    if (frameSrc !== 'karaoke') {
+      if (frameSrc && frameSrc !== 'karaoke') sendFrame({ cmd: 'stop' });
+      if (f) {
+        try { f.src = 'about:blank'; } catch (e) {}
+        f.classList.add('hidden');
+      }
+      frameReady = false;
+      pendingSong = null;
+      frameSrc = 'karaoke';
     }
-  // Sembunyikan idle saat karaoke dimainkan (biar video mpv kelihatan)
-  const idle = document.getElementById('idle-screen');
+    if (f) f.classList.add('hidden');
+    if (idle) idle.classList.add('hidden');
+    waitForMpvReadyAndLoad(song);
+    return;
+  }
+
+  // Berpindah dari mpv ke iframe: hentikan mpv dulu agar tidak ada audio
+  // karaoke yang terus berjalan saat sumber lain diputar.
+  if (frameSrc === 'karaoke') sendMpvCommand(['stop']);
+  if (f) f.classList.remove('hidden');
   if (idle) idle.classList.add('hidden');
+
   if (frameSrc !== src) {
-    if (frameSrc === 'karaoke') {
-      sendMpvCommand(['stop']);
-    }
+    if (frameSrc && frameSrc !== 'karaoke') sendFrame({ cmd: 'stop' });
     frameSrc = src;
-    if (src === 'karaoke') {
-      // No iframe for karaoke; load directly via MPV.
-      waitForMpvReadyAndLoad(song);
-      return;
-    }
     frameReady = false;
     pendingSong = song;
     if (f) f.src = frameURL(src);
@@ -619,8 +658,10 @@ function playNext(skipRemoveCurrent) {
 
 function replay() {
   if (currentSource === 'karaoke') {
-    sendMpvCommand(['seek', 0, 'absolute']);
-    sendMpvCommand(['set_property', 'pause', false]);
+    // Muat ulang file sebagai satu IPC command, menghindari race antara seek
+    // dan unpause yang sebelumnya dikirim hampir bersamaan.
+    const song = queue[currentIndex];
+    if (song && song.path) sendMpvCommand(['loadfile', song.path, 'replace']);
   } else {
     sendFrame({ cmd: 'replay' });
   }
@@ -648,10 +689,12 @@ function togglePlay() {
     return;
   }
   if (currentSource === 'karaoke') {
+    // Callback native memperbarui isPlaying berdasarkan hasil mpv yang nyata.
     sendMpvCommand(['set_property', 'pause', !isPlaying]);
-  } else {
-    sendFrame({ cmd: isPlaying ? 'pause' : 'play' });
+    return;
   }
+
+  sendFrame({ cmd: isPlaying ? 'pause' : 'play' });
   isPlaying = !isPlaying;
   broadcastState();
 }
