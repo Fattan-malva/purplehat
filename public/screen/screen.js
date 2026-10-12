@@ -690,7 +690,7 @@ function togglePlay() {
   }
   if (currentSource === 'karaoke') {
     // Callback native memperbarui isPlaying berdasarkan hasil mpv yang nyata.
-    sendMpvCommand(['set_property', 'pause', !isPlaying]);
+    sendMpvCommand(['set_property', 'pause', isPlaying]);
     return;
   }
 
