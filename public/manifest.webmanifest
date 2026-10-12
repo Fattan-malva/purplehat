@@ -2,13 +2,15 @@
   "name": "Purplehat - Controller",
   "short_name": "Purplehat",
   "description": "Controller karaoke: cari lagu, atur antrian, kontrol player.",
+  "id": "/controller/index.html",
   "start_url": "/controller/index.html",
   "scope": "/",
   "display": "fullscreen",
   "display_override": ["fullscreen", "standalone", "minimal-ui"],
   "orientation": "any",
-  "protocol_handlers": [
-    { "protocol": "web+purplehat", "url": "/controller/open.html?p=%s" }
+  "launch_handler": { "client_mode": "navigate-existing" },
+  "related_applications": [
+    { "platform": "webapp", "url": "/manifest.webmanifest", "id": "/controller/index.html" }
   ],
   "background_color": "#0a0a0c",
   "theme_color": "#0a0a0c",

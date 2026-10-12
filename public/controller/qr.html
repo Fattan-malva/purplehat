@@ -18,7 +18,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="controller.css?v=20261012h">
-    <script src="/shared/i18n.js?v=20261012a"></script>
+    <script src="/shared/i18n.js?v=20261012b"></script>
 </head>
 
 <body class="splash-body">
@@ -45,11 +45,12 @@
                 codeEl.classList.remove('hidden');
             }
 
-            // Simpan sesi scan -> gerbang instalasi
+            // Simpan sesi scan -> gerbang instalasi.
+            // PENTING: proses pemasangan tidak membawa roomcode. Kode pairing
+            // hanya disimpan lokal, lalu dipakai saat tombol "Buka" ditekan.
             localStorage.setItem('ph_gate_pending', '1');
 
-            const qs = pair ? '?pair=' + encodeURIComponent(pair) : '';
-            setTimeout(() => location.replace('gate-install.html' + qs), 500);
+            setTimeout(() => location.replace('gate-install.html'), 500);
         })();
     </script>
 </body>

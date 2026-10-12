@@ -184,10 +184,10 @@
       'gate.manualToggle': 'Chrome tidak menampilkan pemasangan? Lihat cara pasang manual',
       'gate.step1': 'Ketuk <b>⋮</b> (menu Chrome) di pojok kanan atas.',
       'gate.step2': 'Pilih <b>Instal aplikasi</b> / <b>Tambahkan ke layar utama</b>, lalu konfirmasi.',
-      'gate.step3': 'Selesaikan pemasangan. Halaman ini otomatis lanjut ke tahap membuka aplikasi begitu Chrome memberi tanda pemasangan selesai.',
+      'gate.step3': 'Selesaikan pemasangan. Setelah aplikasi benar-benar ada di layar utama, halaman ini menampilkan tombol "Buka Purplehat".',
       'gate.manualOpen': 'Sudah Dipasang — Buka Purplehat',
       'gate.openTitle': 'Terpasang!',
-      'gate.openText': 'Purplehat berhasil dipasang. Membuka aplikasinya…',
+      'gate.openText': 'Purplehat sudah terpasang di layar utama HP kamu. Ketuk tombol di bawah untuk membuka aplikasinya.',
       'gate.openLink': 'Buka Purplehat',
       'gate.openHint': 'Kalau yang terbuka tetap tab ini, buka Purplehat dari ikon di layar utama HP kamu.',
       'gate.iosTitle': 'Pasang Purplehat',
@@ -200,7 +200,8 @@
       'gate.progressReady': 'Tahap 1/3 · Chrome siap memasang. Ketuk "Pasang Sekarang" untuk melanjutkan.',
       'gate.progressInstalling': 'Tahap 2/3 · Selesaikan pemasangan di jendela Chrome…',
       'gate.progressFinishing': 'Tahap 2/3 · Menyelesaikan pemasangan…',
-      'gate.progressDone': 'Tahap 3/3 · Aplikasi terpasang. Ketuk "Buka Purplehat" atau buka dari ikon di layar utama.',
+      'gate.progressVerifying': 'Tahap 3/3 · Memeriksa apakah aplikasi sudah ada di layar utama…',
+      'gate.progressDone': 'Tahap 3/3 · Aplikasi terpasang di layar utama. Ketuk "Buka Purplehat" untuk masuk.',
       'gate.progressOpening': 'Tahap 3/3 · Membuka aplikasi Purplehat…',
       'gate.progressInstalled': 'Tahap 3/3 · Aplikasi sudah terpasang. Ketuk "Buka Purplehat" untuk membuka…',
       'gate.progressAppOpened': 'Purplehat sedang terbuka di aplikasi. Tab ini bisa ditutup.',
@@ -217,7 +218,7 @@
       'gate.promptFail': 'Chrome tidak bisa menampilkan pemasangan. Pasang lewat menu ⋮ (langkah manual di bawah).',
       'gate.cancelled': 'Pemasangan dibatalkan. Ketuk "Pasang Sekarang" lagi, atau pasang lewat menu ⋮.',
       'gate.iosStillBrowser': 'Masih terbuka di browser. Purplehat harus dibuka dari <b>ikon di layar utama</b> (bukan dari tab Safari). Kalau ikonnya belum ada, ikuti langkah di atas dulu.',
-      'gate.openHint2': 'Belum membuka aplikasi? Kalau Purplehat sudah terpasang tapi tombol ini tidak bisa membukanya, hapus lalu pasang ulang dari halaman ini (Chrome perlu mendaftarkan pintu "web+purplehat"), atau buka Purplehat langsung dari ikon di layar utama HP kamu.',
+      'gate.openHint2': 'Belum membuka aplikasi? Kalau Purplehat sudah terpasang tapi tombol ini tidak bisa membukanya, coba hapus dan pasang ulang dari halaman ini, atau buka Purplehat langsung dari ikon di layar utama HP kamu.',
 
       // ---- Splash QR ----
       'qr.opening': 'Membuka Purplehat…'
@@ -385,10 +386,10 @@
       'gate.manualToggle': "Chrome not showing the install prompt? See manual steps",
       'gate.step1': 'Tap <b>⋮</b> (Chrome menu) in the top-right corner.',
       'gate.step2': 'Choose <b>Install app</b> / <b>Add to Home screen</b>, then confirm.',
-      'gate.step3': 'Finish the installation. This page automatically continues to the "open app" stage once Chrome signals the installation is done.',
+      'gate.step3': 'Finish the installation. When the app is really on your home screen, this page shows the "Open Purplehat" button.',
       'gate.manualOpen': 'Already Installed — Open Purplehat',
       'gate.openTitle': 'Installed!',
-      'gate.openText': 'Purplehat installed successfully. Opening the app…',
+      'gate.openText': 'Purplehat is installed on your home screen. Tap the button below to open the app.',
       'gate.openLink': 'Open Purplehat',
       'gate.openHint': "If this tab still opens, open Purplehat from the icon on your phone's home screen.",
       'gate.iosTitle': 'Install Purplehat',
@@ -401,7 +402,8 @@
       'gate.progressReady': 'Stage 1/3 · Chrome is ready to install. Tap "Install Now" to continue.',
       'gate.progressInstalling': 'Stage 2/3 · Complete the installation in the Chrome window…',
       'gate.progressFinishing': 'Stage 2/3 · Finishing the installation…',
-      'gate.progressDone': 'Stage 3/3 · App installed. Tap "Open Purplehat" or open it from the home screen icon.',
+      'gate.progressVerifying': 'Stage 3/3 · Checking whether the app is already on your home screen…',
+      'gate.progressDone': 'Stage 3/3 · App installed on your home screen. Tap "Open Purplehat" to enter.',
       'gate.progressOpening': 'Stage 3/3 · Opening the Purplehat app…',
       'gate.progressInstalled': 'Stage 3/3 · App already installed. Tap "Open Purplehat" to open…',
       'gate.progressAppOpened': 'Purplehat is opening in the app. You can close this tab.',
@@ -418,7 +420,7 @@
       'gate.promptFail': "Chrome couldn't show the install prompt. Install via the ⋮ menu (manual steps below).",
       'gate.cancelled': 'Installation cancelled. Tap "Install Now" again, or install via the ⋮ menu.',
       'gate.iosStillBrowser': 'Still open in the browser. Purplehat must be opened from the <b>home screen icon</b> (not from a Safari tab). If the icon is missing, follow the steps above first.',
-      'gate.openHint2': 'Still not opening? If Purplehat is installed but this button cannot open it, uninstall and reinstall from this page (Chrome must register the "web+purplehat" door), or open Purplehat directly from the icon on your phone\'s home screen.',
+      'gate.openHint2': 'Still not opening? If Purplehat is installed but this button cannot open it, uninstall and reinstall from this page, or open Purplehat directly from the icon on your phone\'s home screen.',
 
       // ---- QR splash ----
       'qr.opening': 'Opening Purplehat…'

@@ -2,12 +2,17 @@
 // Logic identik dengan versi sebelumnya; hanya nama class pada markup hasil render yang disesuaikan dengan stylesheet baru.
 
 // ==== PWA: dibuka sebagai aplikasi (standalone) atau biasa di browser ====
-const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
-    window.navigator.standalone === true;
+function isAppMode() {
+  return window.matchMedia('(display-mode: standalone)').matches ||
+         window.matchMedia('(display-mode: fullscreen)').matches ||
+         window.matchMedia('(display-mode: minimal-ui)').matches ||
+         window.matchMedia('(display-mode: window-controls-overlay)').matches ||
+         window.navigator.standalone === true;
+}
 
 // ==== Gerbang instalasi ====
 var gateRedirected = false;
-if (!isStandalone && (/(Android|iPhone|iPad|iPod|Mobile)/i.test(navigator.userAgent) ||
+if (!isAppMode() && (/(Android|iPhone|iPad|iPod|Mobile)/i.test(navigator.userAgent) ||
         localStorage.getItem('ph_gate_pending') === '1')) {
     gateRedirected = true;
     location.replace('gate-install.html' +
@@ -1200,7 +1205,7 @@ if (gateRedirected) {
   // dialihkan ke gate-install.html
 } else if (pair) {
   connect(pair);
-} else if (isStandalone) {
+} else if (isAppMode()) {
   const lastCode = localStorage.getItem('ph_last_code');
   if (lastCode) connect(lastCode);
 }

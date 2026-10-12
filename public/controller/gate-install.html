@@ -18,22 +18,22 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="controller.css?v=20261012h">
-    <script src="/shared/i18n.js?v=20261012a"></script>
+    <script src="/shared/i18n.js?v=20261012b"></script>
 </head>
 
 <body class="gate-body">
 
     <!-- ==== GERBANG INSTALASI (gate) ====
-         Alur: qr.html -> halaman ini -> pasang aplikasi -> aplikasi terbuka
-         -> index.html (controller).
+         Alur: qr.html -> halaman ini -> pasang aplikasi -> user ketuk "Buka"
+         -> aplikasi terbuka (membawa pairing code) -> index.html (controller).
 
          Aturan keras:
-         - Tidak ada timer tebakan: tahapan progress hanya berpindah saat
-           kejadian nyata terjadi (beforeinstallprompt, userChoice,
-           appinstalled).
-         - Tidak ada jalan pintas "lanjut di browser". Di HP, index.html
-           akan memantulkan tab browser kembali ke halaman ini selama
-           belum berjalan sebagai aplikasi (standalone). -->
+         - Proses PEMASANGAN tidak membawa roomcode. Pairing code hanya disimpan
+           lokal, lalu dipakai saat tombol "Buka" ditekan.
+         - "Terpasang!" (gate-open-title) HANYA muncul setelah aplikasi benar-benar
+           ada di perangkat, diverifikasi lewat navigator.getInstalledRelatedApps().
+           Tidak ada tebakan timer: kecepatan pemasangan tiap HP berbeda.
+         - Aplikasi dibuka HANYA saat user menekan tombol (manual), bukan otomatis. -->
     <main class="gate-wrap">
 
         <!-- Android: layar pasang aplikasi (tanpa jalan pintas) -->
@@ -47,17 +47,17 @@
             <ol id="gate-steps" class="gate-steps hidden">
                 <li data-i18n-html="gate.step1">Tap <b>⋮</b> (Chrome menu) in the top-right corner.</li>
                 <li data-i18n-html="gate.step2">Choose <b>Install app</b> / <b>Add to Home screen</b>, then confirm.</li>
-                <li data-i18n-html="gate.step3">Finish the installation. This page automatically continues to the "open app" stage once Chrome signals the installation is done.</li>
+                <li data-i18n-html="gate.step3">Finish the installation. When the app is really on your home screen, this page shows the "Open Purplehat" button.</li>
             </ol>
             <a id="gate-manual-open" class="btn-primary gate-link hidden" href="index.html" data-i18n="gate.manualOpen">Already Installed — Open Purplehat</a>
         </section>
 
-        <!-- Sudah terpasang -> hanya bisa maju ke aplikasi, bukan ke browser -->
+        <!-- Sudah terpasang & TERVERIFIKASI -> user ketuk untuk membuka aplikasi -->
         <section id="gate-open" class="install-modal-box hidden" role="dialog" aria-modal="true">
             <div class="install-modal-icon"><i class="fas fa-check"></i></div>
             <h3 id="gate-open-title" data-i18n="gate.openTitle">Installed!</h3>
             <div class="gate-slot"></div>
-            <p id="gate-open-text" data-i18n="gate.openText">Purplehat installed successfully. Opening the app…</p>
+            <p id="gate-open-text" data-i18n="gate.openText">Purplehat is installed on your home screen. Tap the button below to open the app.</p>
             <a id="gate-open-link" class="btn-primary gate-link" href="index.html" data-i18n="gate.openLink">Open Purplehat</a>
             <p class="hint" id="gate-open-hint" data-i18n="gate.openHint">If this tab still opens, open Purplehat from the icon on your phone's home screen.</p>
         </section>
@@ -76,7 +76,7 @@
         </section>
 
         <!-- Progress instalasi: dipindahkan ke dalam kartu yang sedang aktif
-             oleh JS. Lebar bar hanya berubah saat kejadian nyata terjadi. -->
+             oleh JS. Lebar bar hanya berubah saat tahapan nyata berubah. -->
         <div id="gate-progress" class="gate-progress hidden" role="status" aria-live="polite">
             <div class="gate-progress-track">
                 <div id="gate-progress-bar" class="gate-progress-bar"></div>
@@ -86,39 +86,63 @@
     </main>
 
     <script>
-        // ==== Logika gerbang instalasi ====
-        // Tahapan (tanpa timer tebakan):
-        //   1/3 menunggu beforeinstallprompt  ->  2/3 prompt Chrome terbuka
-        //   ->  3/3 appinstalled / sudah terpasang  ->  buka aplikasi.
+        // ==== Gerbang instalasi (Android) ====
+        // Alur sederhana: pasang -> VERIFIKASI benar-benar terpasang -> user
+        // menekan "Buka" (membawa pairing code) -> aplikasi terbuka.
         (function () {
-            const params = new URLSearchParams(location.search);
-            const pair = (params.get('pair') || '').toUpperCase().trim();
+            'use strict';
+
+            var el = function (id) { return document.getElementById(id); };
+            function t(key) { return (window.PH && PH.i18n) ? PH.i18n.t(key) : key; }
+            // Set teks yang BUKAN teks default data-i18n. Atributnya dilepas
+            // supaya tidak ditimpa PH.i18n.apply() saat DOMContentLoaded.
+            function setText(id, key) {
+                var node = el(id);
+                node.removeAttribute('data-i18n');
+                node.removeAttribute('data-i18n-html');
+                node.textContent = t(key);
+            }
+            function setHtml(id, key) {
+                var node = el(id);
+                node.removeAttribute('data-i18n');
+                node.removeAttribute('data-i18n-html');
+                node.innerHTML = t(key);
+            }
+
+            function isAppMode() {
+              return window.matchMedia('(display-mode: standalone)').matches ||
+                     window.matchMedia('(display-mode: fullscreen)').matches ||
+                     window.matchMedia('(display-mode: minimal-ui)').matches ||
+                     window.matchMedia('(display-mode: window-controls-overlay)').matches ||
+                     window.navigator.standalone === true;
+            }
+
+            // ---- Pairing code: simpan untuk tombol "Buka", JANGAN di URL ----
+            var params = new URLSearchParams(location.search);
+            var cameBack = params.get('back') === '1';
+            var pair = (params.get('pair') || localStorage.getItem('ph_last_code') || '')
+                .toUpperCase().trim();
             if (pair) localStorage.setItem('ph_last_code', pair);
-            const qs = pair ? '?pair=' + encodeURIComponent(pair) : '';
-            const controllerUrl = 'index.html' + qs;
-            // true = index.html memantulkan tab browser ke sini (gagal jadi aplikasi)
-            const cameBack = params.get('back') === '1';
+            // Bersihkan URL supaya proses pemasangan tidak membawa roomcode.
+            try { history.replaceState(null, '', location.pathname); } catch (e) { }
 
-            const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
-                window.navigator.standalone === true;
-            const isAndroid = /Android/i.test(navigator.userAgent);
-            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+            var openUrl = 'index.html' + (pair ? '?pair=' + encodeURIComponent(pair) : '');
+
+            // ---- Deteksi lingkungan ----
+            var isApp = isAppMode();
+            var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
                 (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-
-            const el = (id) => document.getElementById(id);
-            function t(key, params) { return (window.PH && PH.i18n) ? PH.i18n.t(key, params) : key; }
-            const CARDS = ['gate-install', 'gate-open', 'gate-ios'];
+            var isAndroid = /Android/i.test(navigator.userAgent);
+            // API ini yang benar-benar tahu aplikasi sudah terpasang di HP.
+            var canVerify = typeof navigator.getInstalledRelatedApps === 'function';
+            var CARDS = ['gate-install', 'gate-open', 'gate-ios'];
 
             function showCard(id) {
-                CARDS.forEach(c => el(c).classList.toggle('hidden', c !== id));
-                const progress = el('gate-progress');
-                const slot = id === 'gate-ios' ? null : el(id).querySelector('.gate-slot');
-                if (slot) {
-                    slot.appendChild(progress);
-                    progress.classList.remove('hidden');
-                } else {
-                    progress.classList.add('hidden');
-                }
+                CARDS.forEach(function (c) { el(c).classList.toggle('hidden', c !== id); });
+                var progress = el('gate-progress');
+                var slot = id === 'gate-ios' ? null : el(id).querySelector('.gate-slot');
+                if (slot) { slot.appendChild(progress); progress.classList.remove('hidden'); }
+                else { progress.classList.add('hidden'); }
             }
 
             function setProgress(pct, label, indeterminate) {
@@ -127,229 +151,174 @@
                 el('gate-progress').classList.toggle('is-indeterminate', !!indeterminate);
             }
 
-            // Lolos gerbang: hanya untuk aplikasi (standalone) atau desktop
-            function goController() {
+            // Lolos gerbang: hanya aplikasi (standalone) / desktop.
+            function goApp() {
                 localStorage.removeItem('ph_gate_pending');
-                location.replace(controllerUrl);
+                location.replace(openUrl);
             }
 
-            if (isStandalone) return goController();
-            if (!isAndroid && !isIOS) return goController(); // desktop: mode preview
+            // ---- Buka aplikasi lewat protocol handler (membawa pairing code) ----
+            function launchApp() {
+                var target = pair ? ('pair/' + encodeURIComponent(pair)) : 'open';
+                // Build absolute URL that the WebAPK can handle.
+                var scheme = location.protocol.replace(':', '');
+                var targetPath = pair ? ('/controller/index.html?pair=' + encodeURIComponent(pair)) : '/controller/index.html';
+                window.location.href = 'intent://' + location.host + targetPath +
+                    '#Intent;scheme=' + scheme + ';S.browser_fallback_url=' + encodeURIComponent(location.origin + targetPath) + ';end';
 
-            // HP: kunci gerbang. controller.js akan memantulkan tab browser
-            // ke sini selama belum berjalan sebagai aplikasi.
+            }
+
+            if (isApp) { goApp(); return; }
+            if (!isAndroid && !isIOS) { goApp(); return; } // desktop = mode preview
             localStorage.setItem('ph_gate_pending', '1');
 
-            // ==== iOS Safari: petunjuk manual (tanpa prompt) ====
+            // ================= iOS (tanpa prompt, murni manual) =================
             if (isIOS) {
-                el('gate-ios-open').href = controllerUrl;
-                if (cameBack) {
-                    el('gate-ios-text').innerHTML = t('gate.iosStillBrowser');
-                }
+                el('gate-ios-open').href = openUrl;
+                if (cameBack) setHtml('gate-ios-text', 'gate.iosStillBrowser');
                 showCard('gate-ios');
                 return;
             }
 
-            // ==== Android ====
-            let deferredPrompt = null;
-            let stage = 'wait'; // 'wait' | 'installing' | 'open'
+            // ================= Android =================
+            var deferredPrompt = null; // event beforeinstallprompt dari Chrome
+            var installed = false;     // true HANYA setelah diverifikasi terpasang
+            var pollTimer = null;
 
-            // Deteksi kapabilitas NYATA (bukan tebakan timer): Android tanpa
-            // beforeinstallprompt (WebView/browser bawaan aplikasi, Firefox,
-            // dll) -> langkah manual langsung dibuka, tombol pasang disembunyikan
-            // sampai event-nya benar-benar datang.
-            var noPromptLikely = /\(wv\)/i.test(navigator.userAgent) ||
-                /Firefox\//i.test(navigator.userAgent) ||
-                !/Chrome\//i.test(navigator.userAgent);
-            var isWebView = /\(wv\)/i.test(navigator.userAgent);
+            function stopPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
 
-            const DEFAULT_TEXT = t('gate.installText');
-
-            el('gate-open-link').href = controllerUrl;
-            el('gate-manual-open').href = controllerUrl;
-
-            // Klik "Buka Purplehat" di Android -> openNow() langsung meminta
-            // Android mencari & membuka aplikasi terpasang (via intent),
-            // BUKAN navigasi ahref biasa supaya tab ini tidak reload.
-            el('gate-open-link').addEventListener('click', function (e) {
-                if (isAndroid) { e.preventDefault(); openNow(); }
-            });
-            el('gate-manual-open').addEventListener('click', function (e) {
-                if (isAndroid) { e.preventDefault(); openNow(); }
-            });
-
-            function setInstallIdle(msg) {
-                stage = 'wait';
-                showCard('gate-install');
-                el('gate-install-text').textContent = msg || DEFAULT_TEXT;
-                setProgress(deferredPrompt ? 35 : 20,
-                    deferredPrompt ? t('gate.progressReady') : t('gate.progressWaiting'),
-                    false);
-                const btn = el('gate-install-btn');
-                btn.disabled = !deferredPrompt;
-                btn.textContent = deferredPrompt ? t('gate.installBtn') : t('gate.installBtnWaiting');
-                // Browser tanpa dukungan pasang -> jangan tunjukkan tombol yang
-                // tidak akan pernah bisa diklik (sampai event-nya datang)
-                btn.classList.toggle('hidden', !deferredPrompt && noPromptLikely);
+            // Tanya Android: apakah WebAPK Purplehat benar-benar ada di perangkat?
+            function verify() {
+                if (!canVerify) return Promise.resolve(false);
+                return navigator.getInstalledRelatedApps()
+                    .then(function (apps) { return !!(apps && apps.length); })
+                    .catch(function () { return false; });
             }
 
-            function showBouncedState() {
-                stage = 'open';
-                showCard('gate-open');
-                el('gate-open-title').textContent = t('gate.bouncedTitle');
-                el('gate-open-text').textContent = t('gate.bouncedText');
-                el('gate-open-hint').textContent = t('gate.bouncedHint');
-                setProgress(100, t('gate.progressDone'), false);
-                el('gate-open-link').href = controllerUrl;
-            }
-
-            // ==== Peluncur aplikasi via intent (langsung cari app-nya) ====
-            // Manifest mendaftarkan protocol handler "web+purplehat" pada
-            // WebAPK. Tanpa navigasi ahref: pakai intent:// supaya Chrome
-            // menyerahkan ke Android intent resolver yang LANGSUNG mencari
-            // aplikasi dengan intent-filter web+purplehat. Kalau ketemu ->
-            // app terbuka; kalau tidak -> tab TIDAK reload (cuma notifikasi
-            // "no apps" sekilas) dan petunjuk cadangan muncul di bawah.
-            function appLaunchUrl() {
-                return 'web+purplehat:pair/' + encodeURIComponent(pair || 'open');
-            }
-
-            function openNow() {
-                if (!isAndroid) return location.href = controllerUrl;
-
-                // intent data yang diterima aplikasi = web+purplehat:pair/KODE
-                const intentUrl = 'intent://pair/' + encodeURIComponent(pair || 'open') +
-                    '#Intent;scheme=web+purplehat;end';
-                try {
-                    window.location.href = intentUrl;
-                } catch (e) {
-                    window.open(appLaunchUrl(), '_self'); // pemutar tanpa dukungan intent://
-                }
-
-                // Kalau aplikasinya tidak tertangkap, tab tetap terlihat ->
-                // beri tahu langkah yang pasti (halaman tidak diubah).
-                setTimeout(function () {
-                    if (!document.hidden && stage === 'open') {
-                        el('gate-open-hint').textContent = t('gate.openHint2');
-                    }
-                }, 1200);
-            }
-
-            function onInstalled() {
-                if (stage === 'open') return;
-                stage = 'open';
-                localStorage.setItem('ph_installed', '1');
-                showCard('gate-open');
-
+            function showInstalled() {
+                if (installed) return;
+                installed = true;
+                stopPolling();
+                el('gate-open-link').href = openUrl;
                 el('gate-open-title').textContent = t('gate.openTitle');
                 el('gate-open-text').textContent = t('gate.openText');
                 el('gate-open-hint').textContent = t('gate.openHint');
-                setProgress(100, t('gate.progressOpening'), true);
-                el('gate-open-link').href = controllerUrl;
-
-                // Jeda "settle" sebentar setelah event appinstalled sebelum
-                // mencoba buka otomatis. Ini bukan tebakan status — progress
-                // sudah 100% dari kejadian nyata; tujuannya hanya memberi
-                // waktu WebAPK selesai commit pemasangannya.
-                setTimeout(function () {
-                    if (stage === 'open' && !document.hidden) openNow();
-                }, 1200);
+                showCard('gate-open');
+                setProgress(100, t('gate.progressDone'), false);
             }
 
-            // Pemasangan selesai (kejadian nyata dari Chrome)
-            window.addEventListener('appinstalled', () => onInstalled());
+            function checkInstalled() {
+                if (installed) return;
+                verify().then(function (yes) { if (yes) showInstalled(); });
+            }
 
-            window.addEventListener('beforeinstallprompt', (e) => {
+            // Cek berkala sampai benar-benar terpasang (bukan menebak waktu).
+            function startPolling() {
+                if (pollTimer || installed) return;
+                pollTimer = setInterval(checkInstalled, 2500);
+            }
+
+            function showInstallCard() {
+                showCard('gate-install');
+                var btn = el('gate-install-btn');
+                btn.classList.remove('hidden');
+                if (deferredPrompt) {
+                    btn.disabled = false;
+                    btn.textContent = t('gate.installBtn');
+                    setProgress(35, t('gate.progressReady'), false);
+                } else {
+                    btn.disabled = true;
+                    btn.textContent = t('gate.installBtnWaiting');
+                    setProgress(20, t('gate.progressWaiting'), false);
+                }
+            }
+
+            // Chrome siap memasang.
+            window.addEventListener('beforeinstallprompt', function (e) {
                 e.preventDefault();
                 deferredPrompt = e;
-
-                // Ternyata belum terpasang (mis. flag lama) -> kembali ke layar pasang
-                if (stage === 'open') {
-                    localStorage.removeItem('ph_installed');
-                    return setInstallIdle(null);
-                }
-                if (stage === 'wait') setInstallIdle(null);
+                if (installed) return;
+                showInstallCard();
             });
 
-            // Saat aplikasi mengambil alih layar, tab ini kehilangan fokus
-            // (hanya saat tahap membuka sedang berjalan / bar bergerak)
-            document.addEventListener('visibilitychange', () => {
-                if (document.hidden && stage === 'open' &&
-                    el('gate-progress').classList.contains('is-indeterminate')) {
-                    setProgress(100, t('gate.progressAppOpened'), false);
-                }
+            // Chrome melaporkan pemasangan selesai -> tetap verifikasi dulu.
+            window.addEventListener('appinstalled', function () {
+                if (installed) return;
+                if (!canVerify) { showInstalled(); return; } // tanpa API, pakai sinyal OS
+                checkInstalled();
+                startPolling();
             });
 
-            el('gate-install-btn').addEventListener('click', async () => {
+            // Tombol pasang.
+            el('gate-install-btn').addEventListener('click', function () {
                 if (!deferredPrompt) return;
-                const ev = deferredPrompt;
+                var ev = deferredPrompt;
                 deferredPrompt = null;
-                stage = 'installing';
-                const btn = el('gate-install-btn');
+                var btn = el('gate-install-btn');
                 btn.disabled = true;
                 btn.textContent = t('gate.installing');
                 setProgress(60, t('gate.progressInstalling'), true);
 
-                try {
-                    await ev.prompt();
-                } catch (err) {
-                    el('gate-steps').classList.remove('hidden');
-                    return setInstallIdle(t('gate.promptFail'));
-                }
-
-                let choice = null;
-                try { choice = await ev.userChoice; } catch (err) { }
-
-                if (choice && choice.outcome === 'accepted') {
-                    // Baru DISETUJUI, belum tentu SELESAI. "Terpasang!" hanya
-                    // boleh muncul dari event appinstalled (kejadian nyata).
-                    // Tetap di tahap 2 sambil menunggu event tersebut.
-                    setProgress(90, t('gate.progressFinishing'), true);
-                } else if (choice) {
-                    el('gate-steps').classList.remove('hidden');
-                    setInstallIdle(t('gate.cancelled'));
-                }
-                // choice == null: Chrome belum memberi hasil -> TETAP di tahap 2,
-                // jangan menebak dengan timer.
+                Promise.resolve()
+                    .then(function () { return ev.prompt(); })
+                    .then(function () { return ev.userChoice; })
+                    .then(function (choice) {
+                        if (choice && choice.outcome === 'accepted') {
+                            // Disetujui ≠ selesai. Tunggu verifikasi pemasangan nyata.
+                            setProgress(90, t('gate.progressVerifying'), true);
+                            checkInstalled();
+                            startPolling();
+                        } else {
+                            // Dibatalkan: kembali ke keadaan siap pasang.
+                            showInstallCard();
+                            el('gate-steps').classList.remove('hidden');
+                        }
+                    })
+                    .catch(function () {
+                        el('gate-steps').classList.remove('hidden');
+                        showInstallCard();
+                        setText('gate-install-text', 'gate.promptFail');
+                    });
             });
 
-            el('gate-manual-toggle').addEventListener('click', () => {
-                const steps = el('gate-steps');
+            // Tombol "Buka Purplehat" (manual) -> bawa pairing code ke aplikasi.
+            el('gate-open-link').addEventListener('click', function (e) {
+                if (!isAndroid) return; // biarkan href biasa untuk desktop/iOS
+                e.preventDefault();
+                launchApp();
+                // Kalau tab ini masih terlihat, aplikasi kemungkinan tidak tertangkap.
+                setTimeout(function () {
+                    if (!document.hidden) setText('gate-open-hint', 'gate.openHint2');
+                }, 1500);
+            });
+
+            // Tautan cadangan "Sudah Dipasang — Buka Purplehat" di kartu pasang.
+            el('gate-manual-open').href = openUrl;
+            el('gate-manual-open').addEventListener('click', function (e) {
+                if (!isAndroid) return;
+                e.preventDefault();
+                launchApp();
+            });
+
+            el('gate-manual-toggle').addEventListener('click', function () {
+                var steps = el('gate-steps');
                 steps.classList.toggle('hidden');
                 el('gate-manual-open').classList.toggle('hidden', steps.classList.contains('hidden'));
             });
 
-            // ==== Pilihan awal saat halaman dimuat (tanpa timer) ====
-            if (cameBack && localStorage.getItem('ph_installed') === '1') {
-                // Terpantul dari index.html -> hanya bisa maju ke aplikasi,
-                // bukan kembali ke browser
-                showBouncedState();
-            } else if (cameBack) {
-                setInstallIdle(t('gate.notInstalled'));
-            } else if (localStorage.getItem('ph_installed') === '1') {
-                // Sudah pernah terpasang (scan QR berikutnya). Peluncuran
-                // protocol dari script saat LOAD sangat mungkin diblokir Chrome
-                // (butuh user gesture), jadi tidak auto-launch: user ketuk
-                // tombol "Buka Purplehat" -> openNow() me-resolve via intent.
-                stage = 'open';
-                showCard('gate-open');
-                el('gate-open-title').textContent = t('gate.alreadyTitle');
-                el('gate-open-text').textContent = t('gate.alreadyText');
-                el('gate-open-hint').textContent = t('gate.alreadyHint');
-                el('gate-open-link').href = controllerUrl;
-                setProgress(100, t('gate.progressInstalled'), false);
-            } else if (noPromptLikely) {
-                // Kapabilitas (deteksi UA, bukan timer): langsung buka langkah
-                // manual supaya tidak menunggu "Chrome" selamanya di browser
-                // yang memang tidak bisa memasang.
-                setInstallIdle(isWebView
-                    ? t('gate.cantInstallWebview')
-                    : t('gate.cantInstallBrowser'));
+            // ---- Keadaan awal: verifikasi dulu, jangan menebak ----
+            showInstallCard();
+            if (!canVerify) {
+                // Browser tanpa API verifikasi: arahkan ke langkah manual.
+                el('gate-install-btn').classList.add('hidden');
                 el('gate-steps').classList.remove('hidden');
                 el('gate-manual-open').classList.remove('hidden');
-            } else {
-                setInstallIdle(null);
             }
+            verify().then(function (yes) {
+                if (yes) { showInstalled(); return; }
+                if (cameBack) setText('gate-install-text', 'gate.notInstalled');
+                startPolling(); // menangkap pemasangan manual lewat menu ⋮
+            });
         })();
     </script>
 </body>
