@@ -133,6 +133,19 @@ KARAOKE_MUSIC_CHANNEL=left    ; kanal musik pada file karaoke L/R
   perlu spawn sendiri, pasang mpv dari <https://mpv.io/installation/> atau isi
   `MPV_PATH` dengan lokasi `mpv.exe`.
 
+> **Koneksi IPC bersifat "one-shot".** Setiap perintah membuka koneksi baru ke
+> named pipe mpv lalu menutupnya kembali. Ini menghindari koneksi basi yang
+> membuat pipe macet setelah mpv dibunuh / dijalankan ulang (mis. player Flutter
+> di-restart). Named pipe mpv di Windows bersifat **single-instance**: hanya satu
+> klien pada satu waktu, karena itu semua perintah di-serialisasi.
+
+> **Catatan topologi.** Named pipe bersifat lokal pada mesin tempat mpv berjalan.
+> Jadi `MPV_IPC_PIPE` pada backend harus menunjuk ke pipe di mesin yang sama
+> dengan mpv (kiosk = server = satu mesin). Bila backend dipisah ke server lain,
+> arahkan ke pipe jarak jauh (`\\HOST\pipe\purplehat-mpv`) dan pastikan mpv
+> mengizinkan akses remote, atau jalankan mpv di sisi backend (hentikan mpv di
+> player Flutter agar tidak bentrok).
+
 > **MAC tidak ada di `.env`.** Identitas device dikirim oleh player (Flutter),
 > lihat bagian 5.
 

@@ -153,11 +153,13 @@ class MpvPlayer:
                 "atau set MPV_PATH ke lokasi mpv.exe."
             ) from exc
 
-        # Tunggu pipe IPC muncul.
+        # Tunggu pipe IPC muncul (~6 detik).
         last = None
         ok = False
-        for _ in range(120):  # ~6 detik
-            if self._pipe_available(timeout=0.2):
+        for _ in range(120):
+            conn = self._try_open()
+            if conn is not None:
+                self._close_conn(conn)
                 ok = True
                 break
             last = "pipe belum muncul"
