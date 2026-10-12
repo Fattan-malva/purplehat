@@ -31,6 +31,8 @@ var lyricsAvailable = null;     // true/false/null: lirik tersinkron untuk lagu 
 var endedHandled = false;
 var karaokeFxState = { pitch: 0, echo: 0, tempo: 1.0, bass: 0, treble: 0, channel: 'stereo' };
 var mpvCommandCounter = 0;
+var pendingMpvCommands = new Map();
+var sourceTransitionId = 0;
 var mpvStateRequestPending = false;
 
 function t(key, params) { return (window.PH && PH.i18n) ? PH.i18n.t(key, params) : key; }
@@ -91,12 +93,23 @@ function getState() {
 // ==== Pemutar mpv lokal (wrapper Windows) ==================================
 function sendMpvCommand(command) {
   if (isDesktop) {
-    postToHost({
-      type: 'mpvCommand',
-      command: command,
-      requestId: ++mpvCommandCounter
+    const requestId = ++mpvCommandCounter;
+    return new Promise(function(resolve) {
+      const timeout = setTimeout(function() {
+        pendingMpvCommands.delete(requestId);
+        resolve({ ok: false, error: 'timeout', command: command });
+      }, 4500);
+      pendingMpvCommands.set(requestId, {
+        resolve: resolve,
+        timeout: timeout,
+        command: command
+      });
+      postToHost({
+        type: 'mpvCommand',
+        command: command,
+        requestId: requestId
+      });
     });
-    return;
   }
 
   // Fallback web untuk deployment yang memang menyediakan mpv di backend.
@@ -114,13 +127,16 @@ function sendMpvCommand(command) {
   } else if (name === 'set_property' && command[1] === 'pause') {
     action = command[2] ? 'pause' : 'play';
   }
-  if (!action) return;
-  fetch('/api/karaoke/player/' + action, {
-    method: action === 'stop' || action === 'play' || action === 'pause'
-      ? 'POST' : 'POST',
+  if (!action) return Promise.resolve({ ok: true });
+  return fetch('/api/karaoke/player/' + action, {
+    method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
-  }).catch(function() {});
+  }).then(function(response) {
+    return { ok: response.ok, error: response.ok ? null : 'http_error', command: command };
+  }).catch(function(error) {
+    return { ok: false, error: String(error), command: command };
+  });
 }
 
 function applyKaraokeState(st) {
@@ -150,6 +166,12 @@ function applyKaraokeState(st) {
 
 window.onMpvState = applyKaraokeState;
 window.onMpvCommandResult = function(requestId, result) {
+  const pending = pendingMpvCommands.get(requestId);
+  if (pending) {
+    clearTimeout(pending.timeout);
+    pendingMpvCommands.delete(requestId);
+    pending.resolve(result || { ok: false, error: 'empty_result' });
+  }
   const command = result && result.command;
   if (result && result.ok) {
     if (currentSource === 'karaoke' && Array.isArray(command)) {
@@ -216,6 +238,7 @@ function startSong(song) {
   const src = songSource(song);
   const f = document.getElementById('player-frame');
   const idle = document.getElementById('idle-screen');
+  const transitionId = ++sourceTransitionId;
   stoppedSong = null;
   currentSource = src;
   lyricsAvailable = null;
@@ -239,14 +262,30 @@ function startSong(song) {
     return;
   }
 
-  // Berpindah dari mpv ke iframe: hentikan mpv dulu agar tidak ada audio
-  // karaoke yang terus berjalan saat sumber lain diputar.
-  if (frameSrc === 'karaoke') sendMpvCommand(['stop']);
+  // Jangan mulai iframe baru sebelum mpv benar-benar menerima STOP. Ini
+  // mencegah audio karaoke overlap jika perintah native/IPC sedikit lambat.
+  if (frameSrc === 'karaoke') {
+    if (f) f.classList.add('hidden');
+    sendMpvCommand(['stop']).then(function(result) {
+      if (transitionId !== sourceTransitionId) return;
+      if (!result || !result.ok) {
+        const status = document.getElementById('status');
+        if (status) status.textContent = 'Waiting for karaoke player to stop…';
+        return;
+      }
+      frameSrc = null;
+      frameReady = false;
+      pendingSong = null;
+      startSong(song);
+    });
+    return;
+  }
+
   if (f) f.classList.remove('hidden');
   if (idle) idle.classList.add('hidden');
 
   if (frameSrc !== src) {
-    if (frameSrc && frameSrc !== 'karaoke') sendFrame({ cmd: 'stop' });
+    if (frameSrc) sendFrame({ cmd: 'stop' });
     frameSrc = src;
     frameReady = false;
     pendingSong = song;
