@@ -600,8 +600,8 @@ input:focus-visible {
 
 .art {
   position: relative;
-  width: 52px;
-  height: 52px;
+  width: clamp(40px, 12vw, 140px);
+  height: clamp(40px, 12vw, 140px);
   border-radius: 12px;
   overflow: hidden;
   flex-shrink: 0;
@@ -714,8 +714,10 @@ input:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: clamp(6px, 2vw, 12px);
   flex: 0 1 auto;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .btn-round {
@@ -828,8 +830,8 @@ input:focus-visible {
   }
 
   .btn-play {
-    width: 52px;
-    height: 52px;
+    width: clamp(40px, 12vw, 140px);
+    height: clamp(40px, 12vw, 140px);
   }
 
   .master-inline {
@@ -1476,7 +1478,17 @@ input[type="range"]::-moz-range-thumb {
   border-radius: 14px;
   background: rgba(0, 0, 0, 0.25);
   border: 1px solid transparent;
-  transition: background .2s, border-color .2s;
+  transition: background .2s, border-color .2s, transform .18s cubic-bezier(.2, .7, .3, 1);
+}
+
+/* Saat drag aktif: tetangga yang bergeser pakai GPU supaya mulus. */
+.queue-list.dragging-active .queue-item {
+  will-change: transform;
+}
+
+.queue-list.dragging-active {
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .queue-item.is-playing {
@@ -1718,9 +1730,31 @@ input[type="range"]::-moz-range-thumb {
   max-width: 440px;
 }
 
-/* ---------- Modal: konfirmasi "Putar Sekarang" ---------- */
+/* ---------- Modal: konfirmasi "Putar Sekarang" / "Add to Up Next" ---------- */
 .modal-box-confirm {
   max-width: 440px;
+}
+
+/* Konfirmasi "Add to Up Next" tampil di TENGAH layar (bukan bottom-sheet). */
+#confirm-modal {
+  align-items: center;
+  padding: 20px;
+}
+
+#confirm-modal .modal-box {
+  animation: modalPop .2s cubic-bezier(.2, .8, .3, 1.08);
+}
+
+@keyframes modalPop {
+  from {
+    transform: scale(.94);
+    opacity: 0;
+  }
+
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .confirm-song {
@@ -1904,7 +1938,7 @@ input[type="range"]::-moz-range-thumb {
 
   #main-ui.flex {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 1.15fr);
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 2fr) minmax(0, 0.95fr);
     grid-template-rows: auto minmax(0, 1fr);
     grid-template-areas:
       "header header header"
@@ -1967,22 +2001,26 @@ input[type="range"]::-moz-range-thumb {
       "bar"
       "tools";
     grid-template-rows: 1fr auto auto;
-    gap: 12px;
+    gap: 6px;
     padding: 16px 14px 14px;
   }
 
   .dock-now {
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    align-items: stretch;
+    justify-content: flex-start;
     text-align: center;
-    gap: 10px;
+    gap: 6px;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
   }
 
   .now-body {
     flex: 0 0 auto;
     width: 100%;
     align-items: center;
+    margin-top: auto;
   }
 
   .now-title,
@@ -1994,46 +2032,63 @@ input[type="range"]::-moz-range-thumb {
     justify-content: center;
   }
 
+  /* Thumbnail: lebar penuh mengikuti container + selalu persegi.
+     Tinggi otomatis = lebar, jadi tidak melar memanjang ke bawah. */
   .art {
-    width: 104px;
-    height: 104px;
-    border-radius: 20px;
+    flex: 0 0 auto;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    height: auto;
+    min-height: 0;
+    border-radius: 24px;
   }
 
   .dock-tools {
     flex-direction: column;
     align-items: stretch;
-    gap: 10px;
+    gap: clamp(6px, 1.4vh, 10px);
+    min-width: 0;
   }
 
+  /* Deret tombol transport: boleh membungkus baris + mengecil mengikuti
+     lebar kolom controller, supaya tidak pernah keluar dari container. */
   .transport {
     justify-content: center;
-    gap: 8px;
+    flex-wrap: wrap;
+    gap: clamp(4px, 1.4vw, 8px);
+    min-width: 0;
   }
 
   .btn-play {
-    width: 54px;
-    height: 54px;
+    width: clamp(38px, 7vw, 54px);
+    height: clamp(38px, 7vw, 54px);
   }
 
   .btn-play .lucide {
-    width: 22px;
-    height: 22px;
+    width: clamp(16px, 2.4vw, 22px);
+    height: clamp(16px, 2.4vw, 22px);
   }
 
   .btn-round {
-    width: 40px;
-    height: 40px;
+    width: clamp(30px, 5.5vw, 40px);
+    height: clamp(30px, 5.5vw, 40px);
+  }
+
+  .btn-round .lucide {
+    width: clamp(13px, 2vw, 17px);
+    height: clamp(13px, 2vw, 17px);
   }
 
   .master-inline {
     justify-content: center;
-    gap: 6px;
+    flex-wrap: wrap;
+    gap: clamp(4px, 1vw, 6px);
+    min-width: 0;
   }
 
   .master-inline .btn-step.sm {
-    width: 34px;
-    height: 34px;
+    width: clamp(26px, 4.5vw, 34px);
+    height: clamp(26px, 4.5vw, 34px);
   }
 
   .now-title {
@@ -2079,26 +2134,28 @@ input[type="range"]::-moz-range-thumb {
   }
 
   .dock-tools {
-    gap: 10px;
+    gap: clamp(6px, 1.4vh, 10px);
   }
 
+  /* Tetap boleh membungkus & mengecil agar tak keluar container */
   .transport {
-    gap: 6px;
+    gap: clamp(4px, 1.2vw, 6px);
+    flex-wrap: wrap;
   }
 
   .btn-play {
-    width: 46px;
-    height: 46px;
+    width: clamp(34px, 6vw, 46px);
+    height: clamp(34px, 6vw, 46px);
   }
 
   .btn-round {
-    width: 36px;
-    height: 36px;
+    width: clamp(28px, 5vw, 36px);
+    height: clamp(28px, 5vw, 36px);
   }
 
   .master-inline .btn-step.sm {
-    width: 32px;
-    height: 32px;
+    width: clamp(26px, 4.5vw, 32px);
+    height: clamp(26px, 4.5vw, 32px);
   }
 
   .master-inline .bar {
@@ -2749,4 +2806,109 @@ input[type="range"] {
   font-size: 14px;
   line-height: 1.65;
   color: #d4d4d8;
+}
+
+/* --------------------------------------------------------------------------
+   Halaman Setting — LANSKAP / layar lebar
+   Susun ulang jadi 2 kolom supaya memanfaatkan lebar layar dan tidak perlu
+   banyak scroll vertikal di HP yang diputar mendatar.
+   -------------------------------------------------------------------------- */
+@media (min-width: 900px),
+(orientation: landscape) and (min-width: 640px) {
+
+  .settings-wrap {
+    max-width: 960px;
+    height: 100dvh;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto auto 1fr;
+    align-content: start;
+    column-gap: 18px;
+    row-gap: 14px;
+    padding: 12px max(18px, var(--safe-r)) calc(18px + var(--safe-b)) max(18px, var(--safe-l));
+  }
+
+  /* Header membentang penuh di atas */
+  .settings-wrap>.settings-top {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  /* Kolom kiri: pemilih bahasa */
+  .settings-wrap>.settings-group {
+    grid-column: 1;
+    grid-row: 2;
+    align-self: start;
+  }
+
+  /* Kolom kanan: daftar Tentang/Privasi lalu Logout */
+  .settings-wrap>.settings-list:nth-of-type(2) {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .settings-wrap>.settings-list:nth-of-type(3) {
+    grid-column: 2;
+    grid-row: 3;
+    align-self: start;
+  }
+
+  /* Versi aplikasi di bawah kolom kiri */
+  .settings-wrap>.settings-version {
+    grid-column: 1;
+    grid-row: 3;
+    align-self: end;
+    text-align: left;
+    padding-left: 4px;
+  }
+
+  /* Sedikit lebih rapat agar muat tanpa scroll */
+  .settings-row {
+    padding: 11px 12px;
+  }
+
+  .lang-opt {
+    padding: 11px 14px;
+  }
+
+  /* Modal info: di lanskap jadikan kartu tengah, bukan bottom-sheet */
+  .settings-body .modal {
+    align-items: center;
+    padding: 14px;
+  }
+
+  .settings-body .modal-box {
+    max-width: 620px;
+    max-height: 88dvh;
+    padding: 16px 18px;
+  }
+}
+
+/* Lanskap pendek (HP mendatar): rapatkan lagi jarak vertikal */
+@media (orientation: landscape) and (max-height: 430px) {
+  .settings-wrap {
+    row-gap: 10px;
+    column-gap: 14px;
+    padding: 8px max(14px, var(--safe-r)) calc(12px + var(--safe-b)) max(14px, var(--safe-l));
+  }
+
+  .settings-top h1 {
+    font-size: 16px;
+  }
+
+  .settings-row {
+    padding: 9px 11px;
+  }
+
+  .lang-opt {
+    padding: 9px 12px;
+  }
+
+  .lang-opt .lang-flag {
+    height: 22px;
+  }
+
+  .settings-list {
+    gap: 1px;
+  }
 }

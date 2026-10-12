@@ -855,109 +855,125 @@ function renderQueue() {
   refreshQueueMarquees();
 }
 
-// Drag & drop Up Next: tahan ikon 6-titik lalu geser. Item langsung berpindah
-// tempat mengikuti jari (live reorder) dengan animasi halus (FLIP), lalu urutan
-// final dikirim ke layar sekali saat jari/mouse dilepas.
+// Drag & drop Up Next: tahan ikon 6-titik lalu geser. Selama menggeser, item
+// HANYA dipindah lewat `transform` (tidak menyentuh DOM / getBoundingClientRect
+// berulang) sehingga tidak ada layout thrash -> tidak macet/menumpuk. Urutan
+// final baru di-commit ke DOM & dikirim ke layar saat jari dilepas.
 function bindQueueDrag(item, idx, handle) {
   const list = document.getElementById('queue-list');
   if (!list) return;
   let dragging = false;
   let pointerId = null;
-  let startY = 0;
-  let lastY = 0;
+  let startY = 0;      // posisi jari saat mulai
+  let pendingY = 0;    // posisi jari terbaru
+  let raf = 0;
+  let geoms = [];      // [{ el, top, height }] urutan awal (koordinat relatif list)
+  let dragIndex = idx;
+  let curIndex = idx;
+  let rowPitch = 0;    // jarak antar item (termasuk gap)
 
-  function itemsArr() {
-    return Array.prototype.slice.call(list.querySelectorAll('.queue-item'));
-  }
-
-  function applyTransform() {
-    item.style.transform = 'translateY(' + (lastY - startY) + 'px)';
-  }
-
-  function clearAnims(el) {
-    if (el.getAnimations) el.getAnimations().forEach(a => { try { a.cancel(); } catch (err) {} });
-  }
-
-  // Pindahkan item di DOM, lalu kompensasi posisi jari (startY) supaya item
-  // tetap di bawah jari, dan animasikan elemen lain yang bergeser (FLIP).
-  function reorder(mutate) {
-    const els = itemsArr();
-    els.forEach(clearAnims);
-    const before = new Map();
-    els.forEach(el => before.set(el, el.getBoundingClientRect().top));
-    const itemBefore = item.getBoundingClientRect().top;
-    mutate();
-    const itemAfter = item.getBoundingClientRect().top;
-    startY += (itemAfter - itemBefore);
-    els.forEach(el => {
-      if (el === item) return;
-      const oldTop = before.get(el);
-      if (oldTop == null) return;
-      const dy = oldTop - el.getBoundingClientRect().top;
-      if (dy) {
-        el.animate(
-          [{ transform: 'translateY(' + dy + 'px)' }, { transform: 'translateY(0px)' }],
-          { duration: 170, easing: 'cubic-bezier(.2,.7,.3,1)' }
-        );
-      }
+  function measure() {
+    const els = Array.prototype.slice.call(list.querySelectorAll('.queue-item'));
+    els.forEach(function (el) { el.style.transform = ''; });
+    dragIndex = els.indexOf(item);
+    curIndex = dragIndex;
+    geoms = els.map(function (el) {
+      return { el: el, top: el.offsetTop, height: el.offsetHeight };
     });
-    applyTransform();
+    // offsetTop mengabaikan transform -> aman dipakai walau ada animasi.
+    rowPitch = geoms.length > 1 ? (geoms[1].top - geoms[0].top) : (item.offsetHeight + 8);
+  }
+
+  // Geser tetangga sesuai slot barunya (memakai transform, bukan ubah DOM).
+  function applyShifts() {
+    const order = geoms.map(function (g) { return g.el; });
+    const without = order.filter(function (el) { return el !== item; });
+    const newOrder = without.slice();
+    newOrder.splice(curIndex, 0, item);
+    geoms.forEach(function (g, oldIdx) {
+      if (g.el === item) return;
+      const newIdx = newOrder.indexOf(g.el);
+      const shift = (newIdx - oldIdx) * rowPitch;
+      g.el.style.transform = shift ? 'translateY(' + shift + 'px)' : '';
+    });
+  }
+
+  function process() {
+    raf = 0;
+    if (!dragging) return;
+    const delta = pendingY - startY;
+    item.style.transform = 'translateY(' + delta + 'px)';
+
+    // Hitung slot tujuan berdasarkan pusat item yang sedang digeser.
+    const base = geoms[dragIndex];
+    if (!base) return;
+    const center = base.top + base.height / 2 + delta;
+    let next = 0;
+    for (let i = 0; i < geoms.length; i++) {
+      if (i === dragIndex) continue;
+      const g = geoms[i];
+      if (g.top + g.height / 2 < center) next++;
+    }
+    if (next !== curIndex) {
+      curIndex = next;
+      applyShifts();
+    }
+  }
+
+  function scheduleMove() {
+    if (raf) return;
+    raf = requestAnimationFrame(process);
+  }
+
+  // Commit urutan ke DOM. Transform dibersihkan bersamaan dengan pemindahan
+  // node (posisi dasar baru = posisi hasil transform), transition dimatikan
+  // sesaat supaya tidak ada lompatan visual.
+  function commit() {
+    const order = geoms.map(function (g) { return g.el; });
+    const without = order.filter(function (el) { return el !== item; });
+    const newOrder = without.slice();
+    newOrder.splice(curIndex, 0, item);
+    geoms.forEach(function (g) { g.el.style.transition = 'none'; });
+    geoms.forEach(function (g) { g.el.style.transform = ''; });
+    newOrder.forEach(function (el) { list.appendChild(el); });
+    void list.offsetHeight; // flush sekali
+    geoms.forEach(function (g) { g.el.style.transition = ''; });
   }
 
   function onDown(e) {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
+    if (list.querySelectorAll('.queue-item').length < 2) return;
     dragging = true;
     queueDragging = true;
     pointerId = e.pointerId;
     startY = e.clientY;
-    lastY = e.clientY;
+    pendingY = e.clientY;
+    measure();
     item.classList.add('dragging');
+    list.classList.add('dragging-active');
     try { handle.setPointerCapture(pointerId); } catch (err) {}
   }
 
   function onMove(e) {
     if (!dragging) return;
-    e.preventDefault();
-    lastY = e.clientY;
-    applyTransform();
-
-    // Tukar posisi dengan tetangga begitu pusat item melewati pusat tetangga.
-    let guard = 0;
-    while (guard++ < 40) {
-      const rect = item.getBoundingClientRect();
-      const center = rect.top + rect.height / 2;
-      const next = item.nextElementSibling;
-      const prev = item.previousElementSibling;
-      let moved = false;
-      if (next) {
-        const nr = next.getBoundingClientRect();
-        if (center > nr.top + nr.height / 2) {
-          reorder(() => list.insertBefore(next, item));
-          moved = true;
-        }
-      }
-      if (!moved && prev) {
-        const pr = prev.getBoundingClientRect();
-        if (center < pr.top + pr.height / 2) {
-          reorder(() => list.insertBefore(item, prev));
-          moved = true;
-        }
-      }
-      if (!moved) break;
-    }
+    pendingY = e.clientY;
+    scheduleMove();
   }
 
   function onUp() {
     if (!dragging) return;
+    if (raf) { cancelAnimationFrame(raf); raf = 0; }
+    process(); // hitung slot terakhir (masih dalam status dragging)
     dragging = false;
     queueDragging = false;
+    const finalIndex = curIndex;
+    commit();
     item.classList.remove('dragging');
-    item.style.transform = '';
+    list.classList.remove('dragging-active');
     try { handle.releasePointerCapture(pointerId); } catch (err) {}
-    const newIdx = itemsArr().indexOf(item);
-    if (newIdx >= 0 && newIdx !== idx) send(PH.MSG.MOVE_SONG, { index: idx, to: newIdx });
+    if (finalIndex !== dragIndex) send(PH.MSG.MOVE_SONG, { index: dragIndex, to: finalIndex });
   }
 
   handle.addEventListener('pointerdown', onDown);
