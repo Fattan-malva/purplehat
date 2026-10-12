@@ -20,7 +20,7 @@ var modeLoopQueue = false;  // loop semua antrian (lagu tidak dihapus setelah di
 var stoppedSong = null;
 
 // ==== Frame playback ====
-var currentSource = 'youtube'; // sumber lagu aktif
+var currentSource = 'karaoke'; // sumber lagu aktif
 var frameSrc = null;            // dokumen yang sedang dimuat di iframe ('youtube'|'soundcloud'|'spotify')
 var frameReady = false;         // frame sudah kirim pesan 'ready'
 var pendingSong = null;         // lagu yang menunggu frame siap
@@ -88,7 +88,7 @@ function getState() {
 function frameURL(src) {
   if (src === 'soundcloud') return '/screen/soundcloud/player-sc.html';
   if (src === 'spotify') return '/screen/spotify/player-spty.html?v=20261010n';
-  if (src === 'karaoke') return '/screen/karaoke/player-kr.html?v=20261012a';
+  if (src === 'karaoke') return '';
   return '/screen/youtube/player-yt.html';
 }
 
@@ -114,30 +114,63 @@ function sendLoad(song) {
 function startSong(song) {
   const src = songSource(song);
   const f = document.getElementById('player-frame');
-  stoppedSong = null; // lagu mulai lagi -> memori "lagu yang di-Stop" tidak relevan
+  stoppedSong = null;
   currentSource = src;
-  lyricsAvailable = null; // status lirik di-reset; frame Spotify akan melaporkan ulang
-  if (f) f.classList.remove('hidden');
+  lyricsAvailable = null;
+    if (f) {
+      if (src !== 'karaoke') f.classList.remove('hidden');
+    }
+  // Sembunyikan idle saat karaoke dimainkan (biar video mpv kelihatan)
+  const idle = document.getElementById('idle-screen');
+  if (idle) idle.classList.add('hidden');
   if (frameSrc !== src) {
-    // Ganti dokumen frame -> pemutar lama dimatikan total.
-    // Karaoke: beri perintah stop dulu (mpv berhenti) sebelum dokumen dilepas.
-    if (frameSrc === 'karaoke' && src !== 'karaoke') {
+    if (frameSrc === 'karaoke') {
       sendFrame({ cmd: 'stop' });
     }
     frameSrc = src;
+    if (src === 'karaoke') {
+      // No iframe for karaoke; load directly via MPV.
+      waitForMpvReadyAndLoad(song);
+      return;
+    }
     frameReady = false;
     pendingSong = song;
     if (f) f.src = frameURL(src);
-    // Lazy-start mpv saat pertama kali memuat karaoke
-    if (src === 'karaoke' && window.startMpv) {
-      window.startMpv();
-    }
   } else if (frameReady) {
     sendLoad(song);
   } else {
     pendingSong = song;
   }
 }
+
+// Poll MPV state for karaoke (no iframe) and update UI
+function pollKaraoke() {
+  if (currentSource !== 'karaoke') return;
+  fetch('/api/karaoke/player/state', { cache: 'no-store' })
+    .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+    .then(function (st) {
+      if (!st || !st.available) {
+        isPlaying = false;
+        mediaPosition = 0;
+        mediaDuration = 0;
+        broadcastState();
+        return;
+      }
+      mediaPosition = st.position || 0;
+      mediaDuration = st.duration || 0;
+      isPlaying = !!st.playing && !st.paused;
+      broadcastState();
+      if (st.ended && !endedHandled) {
+        endedHandled = true;
+        // Mimic "ended" handling from iframe messages
+        isPlaying = false;
+        if (modeLoop) sendFrame({ cmd: 'replay' });
+        else playNext();
+      }
+    })
+    .catch(function () {});
+}
+setInterval(pollKaraoke, 1000);
 
 // Tunggu mpv ready sebelum load lagu karaoke (hanya mode desktop)
 function waitForMpvReadyAndLoad(song) {
@@ -176,12 +209,7 @@ window.addEventListener('message', (e) => {
   if (d.type === 'ready') {
     frameReady = true;
     if (pendingSong) {
-      // Untuk karaoke, tunggu mpv ready sebelum load
-      if (currentSource === 'karaoke' && isDesktop) {
-        waitForMpvReadyAndLoad(pendingSong);
-      } else {
-        sendLoad(pendingSong);
-      }
+      sendLoad(pendingSong);
       pendingSong = null;
     } else {
       sendFrame({ cmd: 'volume', vol: frameVolume() });
@@ -439,16 +467,15 @@ function stopPlayback() {
   isPlaying = false;
   mediaPosition = 0;
   mediaDuration = 0;
-  // Tutup TOTAL pemutar (YouTube/SoundCloud/Spotify/Karaoke), bukan sekadar
-  // pause. 1) kirim perintah stop (agar pemutar berhenti rapi), lalu
-  // 2) lepaskan dokumen iframe (about:blank) sehingga suara benar-benar mati
-  //    dan tinggal idle screen. Untuk Karaoke, dokumen frame yang dilepas akan
-  //    menghentikan mpv (lihat pagehide di karaoke/player-kr.html).
+  // Tutup TOTAL pemutar (YouTube/SoundCloud/Spotify/Karaoke)
   sendFrame({ cmd: 'stop' });
   closeFrame();
   updateUI();
   send(PH.MSG.QUEUE_UPDATE, { queue });
   broadcastState();
+  // Pastikan tampil idle
+  const idle = document.getElementById('idle-screen');
+  if (idle) idle.classList.remove('hidden');
 }
 
 // Lepaskan dokumen pemutar supaya tidak ada audio yang tertinggal.
@@ -461,6 +488,9 @@ function closeFrame() {
     try { f.src = 'about:blank'; } catch (e) {}
     f.classList.add('hidden');
   }
+  // Kembalikan ke idle
+  const idle = document.getElementById('idle-screen');
+  if (idle) idle.classList.remove('hidden');
 }
 
 function playNext(skipRemoveCurrent) {

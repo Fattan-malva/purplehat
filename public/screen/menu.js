@@ -61,6 +61,9 @@ function goToPlayer() {
   if (navigating) return;
   navigating = true;
   document.getElementById('status').textContent = t('screen.status.connected');
+  if (window.startMpv) {
+    try { window.startMpv(); } catch (e) {}
+  }
   location.href = 'player.html';
 }
 
