@@ -226,6 +226,12 @@ function handleMessage(msg) {
     case PH.MSG.STATE_SYNC:
       if (p.state) { state = Object.assign({}, state, p.state); render(); }
       break;
+    case PH.MSG.KARAOKE_FX_STATE:
+      if (p.fx && typeof p.fx === 'object') {
+        Object.assign(karaokeFx, p.fx);
+        renderFxUI();
+      }
+      break;
     case PH.MSG.QUEUE_UPDATE:
       if (p.queue) { state.queue = p.queue; renderQueue(); }
       break;
@@ -553,29 +559,14 @@ function fxSet(patch) {
   if (fxSendTimer) clearTimeout(fxSendTimer);
   fxSendTimer = setTimeout(function () {
     fxSendTimer = null;
-    fetch('/api/karaoke/player/fx', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(karaokeFx)
-    }).catch(function () {});
+    send(PH.MSG.KARAOKE_FX, { fx: Object.assign({}, karaokeFx) });
   }, 120);
 }
 
-// Muat nilai FX yang tersimpan di backend saat modal dibuka.
+// Minta nilai FX dari layar, karena mpv yang aktif berada di kiosk Windows.
 function loadKaraokeFx() {
-  fetch('/api/karaoke/player/fx', { cache: 'no-store' })
-    .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
-    .then(function (fx) {
-      if (!fx || typeof fx !== 'object') return;
-      karaokeFx.pitch = Math.round(Number(fx.pitch || 0));
-      karaokeFx.echo = Math.round(Number(fx.echo || 0));
-      karaokeFx.tempo = Number(fx.tempo || 1);
-      karaokeFx.bass = Math.round(Number(fx.bass || 0));
-      karaokeFx.treble = Math.round(Number(fx.treble || 0));
-      karaokeFx.channel = fx.channel || 'stereo';
-      renderFxUI();
-    })
-    .catch(function () {});
+  renderFxUI();
+  send(PH.MSG.KARAOKE_FX_REQUEST, {});
 }
 
 function renderFxUI() {

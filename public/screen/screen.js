@@ -28,6 +28,10 @@ var mediaPosition = 0;          // detik, dari frame
 var mediaDuration = 0;          // detik, dari frame
 var sp_dc = null;               // cookie login Spotify (per room, dari server)
 var lyricsAvailable = null;     // true/false/null: lirik tersinkron untuk lagu Spotify aktif
+var endedHandled = false;
+var karaokeFxState = { pitch: 0, echo: 0, tempo: 1.0, bass: 0, treble: 0, channel: 'stereo' };
+var mpvCommandCounter = 0;
+var mpvStateRequestPending = false;
 
 function t(key, params) { return (window.PH && PH.i18n) ? PH.i18n.t(key, params) : key; }
 
@@ -84,6 +88,77 @@ function getState() {
   };
 }
 
+// ==== Pemutar mpv lokal (wrapper Windows) ==================================
+function sendMpvCommand(command) {
+  if (isDesktop) {
+    postToHost({
+      type: 'mpvCommand',
+      command: command,
+      requestId: ++mpvCommandCounter
+    });
+    return;
+  }
+
+  // Fallback web untuk deployment yang memang menyediakan mpv di backend.
+  const name = command[0];
+  let action = null;
+  let body = {};
+  if (name === 'loadfile') {
+    action = 'load';
+    body = { path: command[1], title: command[1] };
+  } else if (name === 'stop') {
+    action = 'stop';
+  } else if (name === 'seek') {
+    action = 'seek';
+    body = { to: command[1] };
+  } else if (name === 'set_property' && command[1] === 'pause') {
+    action = command[2] ? 'pause' : 'play';
+  }
+  if (!action) return;
+  fetch('/api/karaoke/player/' + action, {
+    method: action === 'stop' || action === 'play' || action === 'pause'
+      ? 'POST' : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  }).catch(function() {});
+}
+
+function applyKaraokeState(st) {
+  mpvStateRequestPending = false;
+  if (currentSource !== 'karaoke') return;
+  if (!st || !st.available) {
+    isPlaying = false;
+    mediaPosition = 0;
+    mediaDuration = 0;
+    broadcastState();
+    return;
+  }
+  mediaPosition = Number(st.position) || 0;
+  mediaDuration = Number(st.duration) || 0;
+  isPlaying = !!st.playing && !st.paused;
+  broadcastState();
+
+  if (st.ended && !endedHandled) {
+    endedHandled = true;
+    isPlaying = false;
+    if (modeLoop) replay();
+    else playNext();
+  } else if (!st.ended) {
+    endedHandled = false;
+  }
+}
+
+window.onMpvState = applyKaraokeState;
+window.onMpvCommandResult = function(requestId, result) {
+  if (result && result.ok) return;
+  console.error('PurpleHat mpv command failed:', requestId, result);
+  const status = document.getElementById('status');
+  if (status && currentSource === 'karaoke') {
+    status.textContent = 'Karaoke player error: ' +
+      ((result && (result.message || result.error)) || 'mpv IPC error');
+  }
+};
+
 // ==== Komunikasi dengan frame pemutar ====
 function frameURL(src) {
   if (src === 'soundcloud') return '/screen/soundcloud/player-sc.html';
@@ -104,7 +179,8 @@ function sendLoad(song) {
   } else if (src === 'spotify') {
     sendFrame({ cmd: 'load', trackId: song.trackId, sp_dc: sp_dc, volume: frameVolume() });
   } else if (src === 'karaoke') {
-    sendFrame({ cmd: 'load', path: song.path, title: song.title, artist: song.artist, volume: frameVolume() });
+    endedHandled = false;
+    sendMpvCommand(['loadfile', song.path, 'replace']);
   } else {
     sendFrame({ cmd: 'load', videoId: song.videoId, volume: frameVolume() });
   }
@@ -125,7 +201,7 @@ function startSong(song) {
   if (idle) idle.classList.add('hidden');
   if (frameSrc !== src) {
     if (frameSrc === 'karaoke') {
-      sendFrame({ cmd: 'stop' });
+      sendMpvCommand(['stop']);
     }
     frameSrc = src;
     if (src === 'karaoke') {
@@ -143,64 +219,56 @@ function startSong(song) {
   }
 }
 
-// Poll MPV state for karaoke (no iframe) and update UI
+// Poll mpv lokal di Windows; backend polling tetap dipakai sebagai web fallback.
 function pollKaraoke() {
   if (currentSource !== 'karaoke') return;
+  if (isDesktop) {
+    if (mpvStateRequestPending) return;
+    mpvStateRequestPending = true;
+    postToHost({ type: 'mpvState' });
+    return;
+  }
   fetch('/api/karaoke/player/state', { cache: 'no-store' })
     .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
-    .then(function (st) {
-      if (!st || !st.available) {
-        isPlaying = false;
-        mediaPosition = 0;
-        mediaDuration = 0;
-        broadcastState();
-        return;
-      }
-      mediaPosition = st.position || 0;
-      mediaDuration = st.duration || 0;
-      isPlaying = !!st.playing && !st.paused;
-      broadcastState();
-      if (st.ended && !endedHandled) {
-        endedHandled = true;
-        // Mimic "ended" handling from iframe messages
-        isPlaying = false;
-        if (modeLoop) sendFrame({ cmd: 'replay' });
-        else playNext();
-      }
-    })
-    .catch(function () {});
+    .then(applyKaraokeState)
+    .catch(function () { mpvStateRequestPending = false; });
 }
 setInterval(pollKaraoke, 1000);
 
-// Tunggu mpv ready sebelum load lagu karaoke (hanya mode desktop)
+// Pada wrapper Windows, tunggu konfirmasi kesiapan IPC sebelum memuat file.
 function waitForMpvReadyAndLoad(song) {
   if (!isDesktop || songSource(song) !== 'karaoke') {
     sendLoad(song);
     return;
   }
-  // Cek apakah mpv sudah ready
-  if (window.startMpv) {
-    // startMpv juga akan memastikan mpv jalan
-    window.startMpv();
+
+  let startRequested = false;
+  let attempts = 0;
+  function checkReady() {
+    window.onMpvReady = function(ready) {
+      if (ready) {
+        endedHandled = false;
+        sendLoad(song);
+        return;
+      }
+      if (!startRequested && window.startMpv) {
+        startRequested = true;
+        window.startMpv();
+        return;
+      }
+      if (attempts++ < 50) {
+        setTimeout(checkReady, 250);
+        return;
+      }
+      const status = document.getElementById('status');
+      if (status) status.textContent = 'Karaoke player is not ready. Check mpv.exe and IPC.';
+      isPlaying = false;
+      broadcastState();
+    };
+    if (window.postToHost) window.postToHost({ type: 'checkMpvReady' });
+    else sendLoad(song);
   }
-  // Tunggu sebentar lalu cek readiness via bridge
-  setTimeout(function() {
-    if (window.postToHost) {
-      // Kirim permintaan cek ke Flutter
-      window.postToHost({ type: 'checkMpvReady' });
-      window.onMpvReady = function(ready) {
-        if (ready) {
-          sendLoad(song);
-        } else {
-          // Belum ready, coba lagi sebentar
-          setTimeout(function() { waitForMpvReadyAndLoad(song); }, 200);
-        }
-      };
-    } else {
-      // Fallback: kirim load langsung
-      sendLoad(song);
-    }
-  }, 100);
+  checkReady();
 }
 
 window.addEventListener('message', (e) => {
@@ -289,6 +357,25 @@ function handleMessage(msg) {
   switch (msg.type) {
     case PH.MSG.JOIN:
       send(PH.MSG.STATE_SYNC, { state: getState() });
+      send(PH.MSG.KARAOKE_FX_STATE, { fx: karaokeFxState });
+      break;
+    case PH.MSG.KARAOKE_FX_REQUEST:
+      send(PH.MSG.KARAOKE_FX_STATE, { fx: karaokeFxState });
+      break;
+    case PH.MSG.KARAOKE_FX:
+      if (p.fx && typeof p.fx === 'object') {
+        karaokeFxState = Object.assign({}, karaokeFxState, p.fx);
+        if (isDesktop) {
+          postToHost({ type: 'mpvFx', fx: karaokeFxState });
+        } else {
+          fetch('/api/karaoke/player/fx', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(karaokeFxState)
+          }).catch(function () {});
+        }
+        send(PH.MSG.KARAOKE_FX_STATE, { fx: karaokeFxState });
+      }
       break;
     case PH.MSG.ADD_SONG: addSong(p); break;
     case PH.MSG.REMOVE_SONG: removeSong(p.index); break;
@@ -467,8 +554,9 @@ function stopPlayback() {
   isPlaying = false;
   mediaPosition = 0;
   mediaDuration = 0;
-  // Tutup TOTAL pemutar (YouTube/SoundCloud/Spotify/Karaoke)
-  sendFrame({ cmd: 'stop' });
+  // Hentikan player yang benar: mpv lokal untuk Karaoke, iframe untuk sumber lain.
+  if (currentSource === 'karaoke') sendMpvCommand(['stop']);
+  else sendFrame({ cmd: 'stop' });
   closeFrame();
   updateUI();
   send(PH.MSG.QUEUE_UPDATE, { queue });
@@ -530,7 +618,12 @@ function playNext(skipRemoveCurrent) {
 }
 
 function replay() {
-  sendFrame({ cmd: 'replay' });
+  if (currentSource === 'karaoke') {
+    sendMpvCommand(['seek', 0, 'absolute']);
+    sendMpvCommand(['set_property', 'pause', false]);
+  } else {
+    sendFrame({ cmd: 'replay' });
+  }
   broadcastState();
 }
 
@@ -554,13 +647,22 @@ function togglePlay() {
     else if (queue.length) playNext();
     return;
   }
-  sendFrame({ cmd: isPlaying ? 'pause' : 'play' });
+  if (currentSource === 'karaoke') {
+    sendMpvCommand(['set_property', 'pause', !isPlaying]);
+  } else {
+    sendFrame({ cmd: isPlaying ? 'pause' : 'play' });
+  }
   isPlaying = !isPlaying;
   broadcastState();
 }
 
 function seekTo(to) {
-  sendFrame({ cmd: 'seek', to: Math.max(0, to || 0) });
+  const target = Math.max(0, to || 0);
+  if (currentSource === 'karaoke') {
+    sendMpvCommand(['seek', target, 'absolute']);
+  } else {
+    sendFrame({ cmd: 'seek', to: target });
+  }
   broadcastState();
 }
 

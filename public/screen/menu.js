@@ -61,9 +61,37 @@ function goToPlayer() {
   if (navigating) return;
   navigating = true;
   document.getElementById('status').textContent = t('screen.status.connected');
-  if (window.startMpv) {
-    try { window.startMpv(); } catch (e) {}
+
+  // Pada wrapper Windows, jangan pindah ke player.html sampai mpv benar-benar
+  // bisa menerima perintah IPC. mpv tetap tersembunyi di belakang layar pairing.
+  if (window.startMpv && window.postToHost) {
+    var startedAt = Date.now();
+    var attempts = 0;
+    function prepareMpv() {
+      window.onMpvReady = function(ready) {
+        if (ready) {
+          location.href = 'player.html';
+          return;
+        }
+        if (attempts++ === 0 && window.startMpv) {
+          window.startMpv();
+          return;
+        }
+        if (Date.now() - startedAt < 15000) {
+          setTimeout(prepareMpv, 250);
+          return;
+        }
+        navigating = false;
+        document.getElementById('status').textContent = t('screen.status.fail');
+        waitForController();
+      };
+      window.postToHost({ type: 'checkMpvReady' });
+    }
+    prepareMpv();
+    return;
   }
+
+  // Browser biasa (tanpa bridge native) tetap menjalankan mode web.
   location.href = 'player.html';
 }
 

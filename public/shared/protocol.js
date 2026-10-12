@@ -45,7 +45,11 @@ const MSG = {
   SPDC_INVALID: 'sp_dc_invalid',
   // Screen -> controller: lagu Spotify aktif punya lirik tersinkron (true)
   // atau tidak (false). null = belum diketahui.
-  LYRICS_AVAIL: 'lyrics_available'
+  LYRICS_AVAIL: 'lyrics_available',
+  // FX karaoke dari controller diterapkan pada mpv lokal milik layar Windows.
+  KARAOKE_FX: 'karaoke_fx',
+  KARAOKE_FX_REQUEST: 'karaoke_fx_request',
+  KARAOKE_FX_STATE: 'karaoke_fx_state'
 };
 
 function createMsg(type, payload = {}) {
