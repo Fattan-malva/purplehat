@@ -320,10 +320,15 @@ function waitForMpvReadyAndLoad(song) {
     return;
   }
 
+  const transitionId = sourceTransitionId;
   let startRequested = false;
   let attempts = 0;
   function checkReady() {
+    // Hasil kesiapan yang datang terlambat tidak boleh memuat lagu yang sudah
+    // diganti oleh controller.
+    if (transitionId !== sourceTransitionId || currentSource !== 'karaoke') return;
     window.onMpvReady = function(ready) {
+      if (transitionId !== sourceTransitionId || currentSource !== 'karaoke') return;
       if (ready) {
         endedHandled = false;
         sendLoad(song);
@@ -728,8 +733,14 @@ function togglePlay() {
     return;
   }
   if (currentSource === 'karaoke') {
-    // Callback native memperbarui isPlaying berdasarkan hasil mpv yang nyata.
-    sendMpvCommand(['set_property', 'pause', isPlaying]);
+    // Perbarui UI langsung untuk respons tombol; native callback akan
+    // mengonfirmasi atau mengoreksi sesuai hasil aktual dari mpv.
+    const nextPlaying = !isPlaying;
+    isPlaying = nextPlaying;
+    broadcastState();
+    sendMpvCommand(['set_property', 'pause', !nextPlaying]).then(function(result) {
+      if (!result || !result.ok) postToHost({ type: 'mpvState' });
+    });
     return;
   }
 
