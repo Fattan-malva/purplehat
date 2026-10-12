@@ -10,17 +10,17 @@ pemindahan penyimpanan dari `backend/data/purplehat.json` ke **SQL Server**, ser
 
 - **Sumber lagu karaoke** diambil dari tabel `MstSongBank` (kolom `Path` = file
   share LAN/UNC, mis. `\\192.168.234.182\songbank\503.mp4`).
-- **Pemutarnya mpv** dijalankan **oleh player Flutter** (kiosk) memakai `mpv.exe`
-  yang ikut ter-bundle di folder Release, lalu dikendalikan **backend** lewat
-  **JSON IPC** (`--input-ipc-server`, named pipe di Windows).
-  Cara ini **paling ringan di sisi server**: backend hanya menyambung ke pipe
-  yang sudah ada (tanpa mengelola proses mpv), dan semua perintah tetap
-  **realtime**. Bila mpv belum jalan, backend bisa spawn sendiri (`MPV_LAUNCH`).
-  Lihat `purplehat-flutter/docs/KARAOKE.md`.
-- **Controller (HP)** mengirim perintah ke **layar** (screen) lewat WebSocket seperti
-  biasa. Layar meneruskan perintah pemutaran karaoke ke backend (`/api/karaoke/player/*`).
-- **FX / tuning** (key, tempo, echo, EQ, channel L/R + panduan vokal) dikirim
-  **controller → Node → Python → mpv** langsung (HTTP), sehingga responsnya cepat.
+- **Windows desktop**: setelah controller berhasil pairing, screen meminta
+  Flutter menjalankan `mpv.exe` lokal dalam mode standby dan menunggu IPC siap.
+  Perintah playback dan FX dikirim melalui bridge screen → Flutter native runner →
+  named pipe lokal Windows. Backend VPS tidak membuka pipe milik Windows.
+- **Fallback non-desktop**: endpoint `/api/karaoke/player/*` tetap mengontrol mpv
+  yang dapat dijangkau langsung oleh FastAPI (lokal atau konfigurasi backend).
+- **Controller (HP)** mengirim perintah ke screen melalui WebSocket. Screen
+  merutekan sumber YouTube/SoundCloud/Spotify ke iframe, sedangkan Karaoke di
+  Windows dikirim langsung ke pemutar mpv lokal.
+- **FX / tuning** pada Windows juga dikirim melalui WebSocket ke screen lalu
+  diteruskan ke Flutter/mpv lokal; fallback browser tetap dapat memakai HTTP.
 - **Identitas room** (`PairingCode`) **stabil per device**: dicari di `MstRoom`
   berdasarkan identitas device (MAC) yang **dikirim oleh player (Flutter)**.
   Queue/posisi playback tetap **in-memory** saja.
@@ -28,20 +28,24 @@ pemindahan penyimpanan dari `backend/data/purplehat.json` ke **SQL Server**, ser
 Alur data:
 
 ```
-Controller (HP)  --WebSocket-->  Layar/Screen (kiosk)
-                                      |  HTTP (satu origin, lewat tunnel)
-                                      v
-                             Node/Express :3000  --HTTP-->  FastAPI :8000
-                                                                  |  pyodbc
-                                                                  v
-                                                             SQL Server
-                                                                  |
-                                          JSON IPC (named pipe)   v
-                                                            mpv.exe (kiosk)
+Controller (HP) --WebSocket--> Node/Express :3000 --> Screen JS (Flutter WebView)
+                                                          |
+                                                          | Flutter MethodChannel
+                                                          v
+                                                Native Windows runner
+                                                          |
+                                                          | local named-pipe IPC
+                                                          v
+                                                    mpv.exe on Windows
+
+Screen JS --HTTP--> Node/Express --> FastAPI :8000 --pyodbc--> SQL Server
+                                      (song search / room metadata)
 ```
 
-> Catatan: `mpv` dijalankan di **mesin kiosk yang sama** dengan Node + FastAPI.
-> `https://purplehat.mallvaa.xyz` adalah tunnel ke mesin tersebut.
+> Pada mode Flutter Windows, mpv dan named pipe berada di komputer kiosk Windows.
+> FastAPI boleh berada di VPS karena perintah playback Windows tidak dikirim ke
+> named pipe melalui VPS. `https://purplehat.mallvaa.xyz` melayani UI/API; katalog
+> lagu dan room tetap diakses lewat Node/FastAPI.
 
 ---
 
@@ -139,12 +143,12 @@ KARAOKE_MUSIC_CHANNEL=left    ; kanal musik pada file karaoke L/R
 > di-restart). Named pipe mpv di Windows bersifat **single-instance**: hanya satu
 > klien pada satu waktu, karena itu semua perintah di-serialisasi.
 
-> **Catatan topologi.** Named pipe bersifat lokal pada mesin tempat mpv berjalan.
-> Jadi `MPV_IPC_PIPE` pada backend harus menunjuk ke pipe di mesin yang sama
-> dengan mpv (kiosk = server = satu mesin). Bila backend dipisah ke server lain,
-> arahkan ke pipe jarak jauh (`\\HOST\pipe\purplehat-mpv`) dan pastikan mpv
-> mengizinkan akses remote, atau jalankan mpv di sisi backend (hentikan mpv di
-> player Flutter agar tidak bentrok).
+> **Catatan topologi.** Named pipe Windows bersifat lokal secara default. Dalam
+> mode Flutter desktop, native runner mengontrol mpv lokal; FastAPI di VPS tidak
+> memerlukan `MPV_IPC_PIPE` untuk perintah playback tersebut. Gunakan
+> `MPV_LAUNCH=external` bila backend tidak boleh mencoba spawn mpv sendiri dan
+> endpoint backend player tidak dipakai. Jangan menjalankan dua instance mpv pada
+> mesin yang sama dengan nama pipe yang sama.
 
 > **MAC tidak ada di `.env`.** Identitas device dikirim oleh player (Flutter),
 > lihat bagian 5.
