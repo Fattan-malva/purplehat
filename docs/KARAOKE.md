@@ -21,9 +21,12 @@ pemindahan penyimpanan dari `backend/data/purplehat.json` ke **SQL Server**, ser
   Windows dikirim langsung ke pemutar mpv lokal.
 - **FX / tuning** pada Windows juga dikirim melalui WebSocket ke screen lalu
   diteruskan ke Flutter/mpv lokal; fallback browser tetap dapat memakai HTTP.
-- **Identitas room** (`PairingCode`) **stabil per device**: dicari di `MstRoom`
-  berdasarkan identitas device (MAC) yang **dikirim oleh player (Flutter)**.
-  Queue/posisi playback tetap **in-memory** saja.
+- **Identitas room stabil per device, kode pairing selalu segar**: room dicari di
+  `MstRoom` berdasarkan identitas device (MAC) yang **dikirim oleh player
+  (Flutter)** dan disimpan permanen di layar (`localStorage`). `PairingCode`
+  **di-refresh** setiap aplikasi layar dibuka dan setiap logout — baris lama
+  di-`UPDATE`, bukan disisipi room baru. Queue/posisi playback tetap
+  **in-memory** saja.
 
 Alur data:
 
@@ -57,7 +60,7 @@ Screen JS --HTTP--> Node/Express --> FastAPI :8000 --pyodbc--> SQL Server
 | ----------- | ------------- | ------------------------------------------------------ |
 | RoomID      | varchar(50)   | PK. Contoh: `ROOM-01`                                  |
 | MacAddress  | varchar(64)   | Identitas device (MAC `A4-42-3B-19-96-8C`). Unik.      |
-| PairingCode | varchar(10)   | Kode pairing yang tampil di layar. Unik.              |
+| PairingCode | varchar(10)   | Kode pairing yang tampil di layar. Unik. Diganti baru setiap app dibuka / logout. |
 | IsRunning   | bit           | true saat ada lagu berjalan.                          |
 | SP_DC       | varchar(500)  | Cookie login Spotify per room (opsional).              |
 
@@ -207,23 +210,27 @@ Pilih salah satu (keduanya didukung `public/screen/menu.js`):
    (atau `window.purplehat = { deviceMac: "..." };`)
 
 Layar lalu otomatis memanggil `POST /api/room/create` dengan `{ "mac": "..." }`
-dan menampilkan `PairingCode` hasil resolve (stabil per MAC).
+dan menampilkan `PairingCode` hasil **claim** (room dicari per MAC; bila sudah
+ada, `PairingCode`-nya diganti baru — `RoomID`/`MacAddress` tetap).
 
 ### 5.3 Kontrak endpoint yang dipakai Flutter
 
 | Metode | Endpoint                     | Body / Query          | Fungsi                                        |
 | ------ | ---------------------------- | --------------------- | --------------------------------------------- |
-| POST   | `/api/room/create`           | `{ mac }`             | Resolve/buat room → `{ code, qr, roomId }`    |
-| GET    | `/api/room/resolve?mac=...`  | —                     | Resolve langsung (tanpa buat QR)              |
+| POST   | `/api/room/create`           | `{ mac }`             | Claim room (refresh `PairingCode`) → `{ code, qr, roomId }` |
+| GET    | `/api/room/resolve?mac=...`  | —                     | Resolve langsung tanpa ganti kode (stabil)    |
+| GET    | `/api/room/claim?mac=...`    | —                     | Cari room per MAC + ganti `PairingCode`       |
 | GET    | `/api/room/{code}`           | —                     | Cek room ada (dipakai sebelum connect)        |
 | DELETE | `/api/room/{code}`           | —                     | Reset runtime room (room **tidak** dihapus)   |
 | GET    | `/api/room/{code}/presence`  | long-poll             | Tunggu controller (layar QR)                  |
 
 Endpoint Node ini mem-proxy ke FastAPI (`/room/*`).
 
-> **Penting:** `DELETE /api/room/{code}` sekarang hanya me-reset state runtime
-> (queue/posisi) dan menandai `IsRunning=0`; baris `MstRoom` **tidak dihapus**
-> agar `PairingCode` tetap stabil per MAC.
+> **Penting:** `DELETE /api/room/{code}` hanya me-reset state runtime
+> (queue/posisi) dan menandai `IsRunning=0`; baris `MstRoom` **tidak dihapus**.
+> Saat layar kembali ke menu (buka aplikasi / logout), `POST /api/room/create`
+> men-**claim** room yang sama dan mengganti `PairingCode`-nya — sehingga tidak
+> pernah muncul `ROOM` baru untuk device yang sudah terdaftar.
 
 ### 5.4 Endpoint karaoke (dipakai layar & controller)
 
@@ -297,4 +304,6 @@ server/server.js             # proxy room & karaoke ke FastAPI
   Flutter yang menjalankan mpv, atur argumennya di `purplehat-flutter/lib/config.dart`.
 - Channel "musik"/"vokal" mengasumsikan file karaoke berkanal L/R. Sesuaikan
   `KARAOKE_MUSIC_CHANNEL` bila berkas Anda berkebalikan.
-- `DELETE /api/room/{code}` tidak menghapus room dari DB (pairing stabil per MAC).
+- `DELETE /api/room/{code}` tidak menghapus room dari DB. Kode pairing diganti
+  (di-`UPDATE` di baris yang sama) setiap aplikasi layar dibuka / logout, jadi
+  device yang sama tidak pernah menghasilkan `ROOM` baru.

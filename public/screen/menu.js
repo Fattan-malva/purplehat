@@ -15,14 +15,50 @@ function t(key, params) { return (window.PH && PH.i18n) ? PH.i18n.t(key, params)
 //   - window.purplehatDeviceMac = "A4-42-3B-19-96-8C"  (evaluateJavascript), atau
 //   - window.purplehat.deviceMac, atau
 //   - query string  ?mac=A4-42-3B-19-96-8C  pada URL /screen/index.html
+//
+// Nilai yang SUDAH tersimpan (localStorage) selalu diutamakan. Tanpa ini,
+// navigasi internal (mis. logout -> index.html tanpa query) bisa membuat layar
+// memakai MAC acak/lain sehingga DB membuat ROOM baru. Sekali tersimpan,
+// identitas device stabil walau MAC Windows berubah atau injeksi Flutter telat.
+var MAC_KEY = 'ph_mac';
+
+function persistMac(m) {
+  try { if (m) localStorage.setItem(MAC_KEY, m); } catch (e) {}
+}
+
 function deviceMac() {
+  var m = '';
+  try { m = localStorage.getItem(MAC_KEY) || ''; } catch (e) {}
+  if (m) return m;
+  // Belum pernah tersimpan -> ambil dari Flutter, lalu simpan permanen.
   try {
-    if (window.purplehatDeviceMac) return String(window.purplehatDeviceMac);
-    if (window.purplehat && window.purplehat.deviceMac) return String(window.purplehat.deviceMac);
-    var p = new URLSearchParams(location.search).get('mac');
-    if (p) return p;
+    if (window.purplehatDeviceMac) m = String(window.purplehatDeviceMac);
+    else if (window.purplehat && window.purplehat.deviceMac) m = String(window.purplehat.deviceMac);
+    if (!m) {
+      var p = new URLSearchParams(location.search).get('mac');
+      if (p) m = p;
+    }
   } catch (e) {}
-  return '';
+  if (m) persistMac(m);
+  return m;
+}
+
+// Injeksi JS dari Flutter (onPageStarted) bisa datang sesaat SETELAH menu.js
+// jalan. Tunggu sebentar bila identity belum tersedia supaya claim room tidak
+// memakai MAC kosong/fallback yang menghasilkan room baru.
+function waitDeviceMac(timeoutMs) {
+  return new Promise(function (resolve) {
+    var m = deviceMac();
+    if (m) { resolve(m); return; }
+    var startedAt = Date.now();
+    var timer = setInterval(function () {
+      m = deviceMac();
+      if (m || Date.now() - startedAt >= timeoutMs) {
+        clearInterval(timer);
+        resolve(m);
+      }
+    }, 100);
+  });
 }
 
 // Setelah isi digandakan untuk animasi, terapkan ulang terjemahan ke salinan.
@@ -33,10 +69,14 @@ function applyI18n() {
 async function init() {
   try {
     if (!roomCode) {
+      // Setiap kali menu dimuat (= aplikasi baru dibuka ATAU habis logout),
+      // server men-SEGARKAN PairingCode untuk room milik MAC ini. RoomID tetap,
+      // jadi tidak ada ROOM baru.
+      const mac = await waitDeviceMac(1500);
       const res = await fetch('/api/room/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mac: deviceMac() })
+        body: JSON.stringify({ mac: mac })
       });
       const data = await res.json();
       roomCode = data.code;

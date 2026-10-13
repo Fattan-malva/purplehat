@@ -32,6 +32,16 @@ def resolve(mac: str = Query("", description="MAC address device (dikirim oleh p
     return db.resolve_room(mac)
 
 
+@router.get("/claim")
+def claim(mac: str = Query("", description="MAC address device (dikirim oleh player/Flutter)")):
+    """Cari room berdasarkan MAC device dan segarkan PairingCode-nya.
+
+    Dipakai layar saat aplikasi dibuka / player logout: kode pairing baru,
+    tetapi room (RoomID + MacAddress) yang SAMA — tidak membuat room baru.
+    """
+    return db.claim_room(mac)
+
+
 @router.get("/{code}")
 def by_code(code: str):
     room = db.get_room_by_code(code)

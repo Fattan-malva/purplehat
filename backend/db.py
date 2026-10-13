@@ -205,6 +205,48 @@ def resolve_room(mac: Any) -> Dict[str, Any]:
         return {"roomId": rid, "mac": mac_norm, "code": code, "isRunning": False, "sp_dc": None}
 
 
+def claim_room(mac: Any) -> Dict[str, Any]:
+    """Ambil room milik device (MAC) dan SEGARKAN PairingCode-nya.
+
+    Dipakai setiap kali aplikasi layar DIBUKA dan setiap kali player LOGOUT:
+    kode pairing dibuat baru, tetapi RoomID/MacAddress tetap — baris lama di
+    MstRoom di-UPDATE, bukan disisipi room baru. Room baru hanya dibuat bila
+    device benar-benar belum pernah terdaftar.
+    """
+    mac_norm = device_mac_or_fallback(mac)
+    key = mac_key(mac_norm)
+    with _conn_lock, get_conn() as conn:
+        cur = conn.cursor()
+        row = _find_by_mac(cur, key)
+        if row:
+            rid = row[0]
+            code = _unique_code(cur)
+            # Ganti kode pairing + tandai belum berjalan. SP_DC dibiarkan
+            # (login Spotify milik device tetap tersimpan antar sesi).
+            cur.execute(
+                "UPDATE MstRoom SET PairingCode = ?, IsRunning = 0 WHERE RoomID = ?",
+                code, rid,
+            )
+            conn.commit()
+            return {
+                "roomId": rid,
+                "mac": (row[1] or "").strip(),
+                "code": code,
+                "isRunning": False,
+                "sp_dc": row[4],
+            }
+        # Belum ada -> buat baru (sekali saja untuk device ini).
+        rid = _next_room_id(cur)
+        code = _unique_code(cur)
+        cur.execute(
+            "INSERT INTO MstRoom (RoomID, MacAddress, PairingCode, IsRunning, SP_DC) "
+            "VALUES (?, ?, ?, ?, ?)",
+            rid, mac_norm, code, False, None,
+        )
+        conn.commit()
+        return {"roomId": rid, "mac": mac_norm, "code": code, "isRunning": False, "sp_dc": None}
+
+
 def get_room_by_code(code: Any) -> Optional[Dict[str, Any]]:
     c = str(code or "").strip().upper()
     if not c:

@@ -320,14 +320,17 @@ function broadcastToRoom(code, msg, exceptRole) {
   });
 }
 
-// API: create/resolve room. PairingCode stabil per device (MAC dikirim player/Flutter).
+// API: create/claim room. Room stabil per device (MAC dari player/Flutter),
+// tetapi PairingCode di-SEGARKAN tiap kali dipanggil (buka aplikasi / logout):
+// RoomID + MacAddress tetap, hanya kodenya yang diganti. Tidak pernah membuat
+// room baru untuk device yang sudah dikenal.
 app.post('/api/room/create', async (req, res) => {
   const mac = (req.query && req.query.mac) || (req.body && req.body.mac) || '';
   let code = null;
   let roomId = null;
   let spDc = null;
   try {
-    const r = await apiGet('/room/resolve?mac=' + encodeURIComponent(mac));
+    const r = await apiGet('/room/claim?mac=' + encodeURIComponent(mac));
     if (r.status === 200 && r.data && r.data.code) {
       code = String(r.data.code).toUpperCase();
       roomId = r.data.roomId || null;
