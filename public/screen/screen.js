@@ -212,7 +212,7 @@ window.onMpvCommandResult = function(requestId, result) {
 // ==== Komunikasi dengan frame pemutar ====
 function frameURL(src) {
   if (src === 'soundcloud') return '/screen/soundcloud/player-sc.html';
-  if (src === 'spotify') return '/screen/spotify/player-spty.html?v=20261010n';
+  if (src === 'spotify') return '/screen/spotify/player-spty.html?v=20261013c';
   if (src === 'karaoke') return '';
   return '/screen/youtube/player-yt.html';
 }
@@ -494,14 +494,19 @@ function handleMessage(msg) {
       // Command lirik dari controller (tombol FX saat lagu Spotify aktif).
       sendFrame({ cmd: 'lyrics' });
       break;
-    case PH.MSG.SPDC:
+    case PH.MSG.SPDC: {
       // sp_dc tersimpan dari server (saat connect atau setelah diubah).
-      sp_dc = p.sp_dc || null;
-      // Kalau lagu Spotify sedang diputar, teruskan nilai baru ke frame.
-      if (sp_dc && currentIndex >= 0 && queue[currentIndex] && songSource(queue[currentIndex]) === 'spotify') {
+      var nextSpDc = p.sp_dc || null;
+      var spDcChanged = nextSpDc !== sp_dc;
+      sp_dc = nextSpDc;
+      // Hanya kalau nilainya BENAR-BENAR berubah. Server bisa mengirim ulang
+      // sp_dc yang sama; memuat ulang lagu yang sedang diputar akan membuatnya
+      // mengulang dari awal.
+      if (spDcChanged && sp_dc && currentIndex >= 0 && queue[currentIndex] && songSource(queue[currentIndex]) === 'spotify') {
         sendLoad(queue[currentIndex]);
       }
       break;
+    }
     case PH.MSG.LANG:
       // Controller memilih bahasa -> terapkan ke seluruh layar TV.
       if (p.lang && PH.i18n) PH.i18n.setLang(p.lang);
@@ -820,11 +825,32 @@ function updateQueueUI() {
   });
 }
 
-// Browser memblokir autoplay bersuara sebelum ada gesture dari user.
-// Klik pertama di layar memberi gesture ke frame pemutar.
-document.addEventListener('click', () => {
-  if (currentIndex >= 0) sendFrame({ cmd: 'gesture' });
-}, { once: true });
+// Browser memblokir autoplay bersuara sebelum ada gesture dari user. Gestur
+// dikirim LANGSUNG (sinkron) ke frame pemutar yang same-origin supaya
+// user-activation ikut terbawa ke dokumennya; `postMessage` bersifat async
+// sehingga activation-nya bisa hilang di perjalanan. Listener TIDAK sekali-
+// pakai: klik yang terjadi sebelum ada lagu tidak "membakar" kesempatannya.
+var gestureUnlocked = false;
+
+function forwardGesture() {
+  if (gestureUnlocked || currentIndex < 0) return;
+  var f = document.getElementById('player-frame');
+  if (f && f.contentWindow) {
+    try {
+      if (typeof f.contentWindow.phGesturePlay === 'function') {
+        f.contentWindow.phGesturePlay();
+        gestureUnlocked = true;
+        return;
+      }
+    } catch (e) {}
+  }
+  // Cadangan untuk frame yang belum/tidak punya phGesturePlay.
+  sendFrame({ cmd: 'gesture' });
+  gestureUnlocked = true;
+}
+
+document.addEventListener('pointerdown', forwardGesture, { capture: true });
+document.addEventListener('click', forwardGesture, { capture: true });
 
 // Terapkan volume default ke host (OS Windows) sejak halaman dimuat, supaya
 // volume OS langsung sinkron dengan angka yang ditampilkan di controller

@@ -449,11 +449,36 @@
       var embedSeq = 0;
       // Penanda jaring pengaman "lagu habis" (posisi macet di dekat akhir).
       var lastEndWatchPos = -1;
-      var endWatchStalls = 0;
+      var lastEndWatchAt = 0;   // waktu (ms) sejak posisi mulai beku di ujung
       // Embed sendiri melapor "sedang berjalan". Dipakai untuk mengenali kasus
       // autoplay=1 yang menghidupkan lagu sendiri (supaya kita tidak malah
       // mengirim 'toggle' dan menjeda lagu yang sudah jalan).
       var embedReportsPlaying = false;
+      // User menekan pause lewat controller (bukan lagu habis). Dipakai supaya
+      // sinyal "paused" dari embed di dekat ujung lagu tidak disalahartikan
+      // sebagai lagu selesai.
+      var userPaused = false;
+      // trackId yang sedang di-embed. Perintah 'load' yang datang berulang
+      // untuk lagu yang sama tidak boleh memuat ulang embed (lagu mengulang
+      // dari awal). Diisi di loadTrack(), dibandingkan sebelum clearContent().
+      var loadedTrackKey = null;
+      // Penanda urutan 'load'. Kalau dua perintah load datang beruntun (mis.
+      // sebelum embed sempat siap), hanya load TERAKHIR yang boleh render.
+      // Tanpa ini, fetch lagu pertama yang selesai belakangan bisa menambah
+      // iframe kedua -> dua embed berbunyi / lagu "mengulang".
+      var loadSeq = 0;
+
+      // ===== JAM "PERKIRAAN HABIS" (seperti progress bar) =====
+      // Embed Spotify sering berhenti melaporkan posisi beberapa detik SEBELUM
+      // lagu benar-benar habis (dan tidak mengirim 'ended'), sehingga auto-next
+      // tidak pernah jalan. Solusinya: jam sendiri yang mengikuti posisi nyata
+      // (resync tiap laporan), lalu dihitung "sampai durasi = habis". Jam HANYA
+      // berjalan saat lagu benar-benar diputar; setiap jeda/buffering
+      // menghentikannya, jadi pause lama di tengah TIDAK akan bikin next.
+      var clockRunning = false;
+      var clockBasePos = 0;   // posisi (ms) saat jam mulai/resync terakhir
+      var clockBaseAt = 0;    // Date.now() saat clockBasePos di-set
+      var sawPlayback = false; // sudah pernah benar-benar playing (bukan autoplay gagal)
 
       var loadingWrap = document.getElementById('loadingWrap');
       var bgEl = document.getElementById('bg');
@@ -476,10 +501,41 @@
         });
       }
 
+      // ===== JAM "PERKIRAAN HABIS" =====
+      // clockNow(): posisi perkiraan saat ini (ms) menurut jam.
+      function clockNow() {
+        if (!clockRunning) return clockBasePos;
+        return clockBasePos + (Date.now() - clockBaseAt);
+      }
+      // Mulai/reset jam dari posisi nyata saat ini.
+      function clockStart() {
+        clockBasePos = currentPosition > 0 ? currentPosition : clockBasePos;
+        clockBaseAt = Date.now();
+        clockRunning = true;
+      }
+      // Berhenti (pause/buffering): bekukan di posisi perkiraan terakhir.
+      function clockStop() {
+        if (clockRunning) clockBasePos = clockNow();
+        clockRunning = false;
+      }
+      // Ikuti posisi nyata (laporan embed / seek / resume). Tidak mengubah
+      // status running: ini hanya menggeser titik acuan jam.
+      function clockResync(pos) {
+        if (typeof pos !== 'number' || !isFinite(pos) || pos < 0) return;
+        clockBasePos = pos;
+        clockBaseAt = Date.now();
+      }
+      // Dipanggil dari monitoring: true kalau menurut jam lagu sudah habis.
+      function clockReachedEnd() {
+        if (!sawPlayback || !clockRunning || currentDuration <= 0) return false;
+        return clockNow() >= currentDuration - 500;
+      }
+
       function notifyEnded() {
         if (endedSent) return;
         endedSent = true;
         isPlaying = false;
+        clockRunning = false;
         post({ type: 'ended' });
         reportState();
       }
@@ -595,6 +651,15 @@
         });
       });
 
+      // Dipanggil LANGSUNG (sinkron) oleh halaman induk dari dalam event
+      // sentuh/klik asli, supaya user-activation ikut terbawa ke frame ini.
+      // postMessage bersifat async sehingga activation-nya bisa hilang; ini
+      // jalur "kunci" autoplay yang andal di samping flag WebView2.
+      window.phGesturePlay = function () {
+        primePlayback();
+        if (isPlaying) playSound();
+      };
+
       // ===== DETEKSI EMBED SIAP =====
       var EMBED_WAIT_TIMEOUT = 30000;
       var embedWaitRunning = false;
@@ -655,6 +720,22 @@
         try { btn.click(); return true; } catch (e) { return false; }
       }
 
+      // Embed dianggap "siap" begitu UI-nya ada ATAU ia sudah mengirim pesan
+      // IFrame API. Penting saat autoplay=1 menghidupkan lagu sendiri: tombol
+      // play sudah berubah menjadi "Pause" sehingga findPlayButton() null, dan
+      // kalau kita hanya menunggu tombol "Play" kita menunggu sampai timeout.
+      function embedUsable() {
+        if (gotEmbedMsg) return true;
+        var doc;
+        try { doc = getEmbedDoc(); } catch (e) { return false; }
+        if (!doc) return false;
+        if (doc.querySelector('[data-testid="play-pause-button"], [data-testid="playpause-button"]')) return true;
+        if (doc.querySelector('button[aria-label="Pause"], button[aria-label="Jeda"]')) return true;
+        if (findPlayButton()) return true;
+        if (realMediaElements(doc).length) return true;
+        return false;
+      }
+
       function waitForEmbed(onReady) {
         if (embedReady || embedWaitRunning) return;
         embedWaitRunning = true;
@@ -664,7 +745,7 @@
         function attempt() {
           if (embedReady) { embedWaitRunning = false; return; }
           if (isPreviewMode()) { embedWaitRunning = false; spdcInvalid(); return; }
-          var ready = !!findPlayButton();
+          var ready = embedUsable();
           if (ready || Date.now() - startedAt >= EMBED_WAIT_TIMEOUT) {
             embedWaitRunning = false;
             onReady();
@@ -731,10 +812,13 @@
       // mengulang klik/play, karena tombol embed itu TOGGLE - klik kedua
       // justru menjeda lagu yang baru mulai.
       var autoPlaySeq = 0;
+      // Sudah pernah mencoba menghidupkan lagu ini lewat tombol embed (satu
+      // aksi per lagu). Mencegah "double start": lagu sempat jalan lalu
+      // terulang dari awal karena tombol toggle diklik lagi saat sudah jalan.
+      var autoPlayClicked = false;
 
       function autoPlayWatchdog(seq) {
         var tries = 0;
-        var clicked = false;
         var timer = setInterval(function () {
           if (seq !== autoPlaySeq) { clearInterval(timer); return; }
           if (!embedReady) { clearInterval(timer); return; }
@@ -742,12 +826,26 @@
           if (isActuallyPlaying()) {
             clearInterval(timer);
             isPlaying = true;
+            userPaused = false;
             return;
           }
-          // User menjeda -> jangan pernah sentuh tombol play lagi.
-          if (!isPlaying) { clearInterval(timer); return; }
-          if (!clicked && tries > 0) {
-            if (clickEmbedPlayButton()) clicked = true;
+          // User menjeda -> jangan pernah menghidupkan lagi otomatis.
+          if (!isPlaying || userPaused) { clearInterval(timer); return; }
+          // Satu aksi menghidupkan per lagu. Utamakan klik tombol "Play"
+          // (findPlayButton mengabaikan tombol berlabel "Pause" = sedang
+          // jalan, jadi klik ini hanya saat benar-benar belum jalan). Beri
+          // autoplay=1 waktu ~1.6 detik dulu; kalau embed sama sekali belum
+          // merender tombol, baru kirim SATU 'toggle' (bukan 'play').
+          if (!autoPlayClicked) {
+            if (tries >= 4 && clickEmbedPlayButton()) {
+              autoPlayClicked = true;
+            } else if (tries >= 8) {
+              var iframe = getIframe();
+              if (iframe) {
+                try { iframe.contentWindow.postMessage({ command: 'toggle' }, '*'); } catch (e) {}
+              }
+              autoPlayClicked = true;
+            }
           }
           if (++tries > 40) { clearInterval(timer); }   // ~16 detik
         }, 400);
@@ -762,6 +860,7 @@
       function playSound() {
         if (!embedReady) return;
         endedSent = false;
+        userPaused = false;
         // Batalkan watchdog lama, mulai yang baru untuk lagu/percobaan ini.
         var seq = ++autoPlaySeq;
 
@@ -770,35 +869,28 @@
         // lagu yang sudah jalan. Ini sumber autoplay "macet".
         if (isActuallyPlaying()) {
           isPlaying = true;
+          if (!clockRunning) clockStart();
           reportState();
           return;
         }
 
-        var wasPlaying = isPlaying;
         isPlaying = true;
+        if (!clockRunning) clockStart();
         applyVolume();
         primePlayback();
-        if (clickEmbedPlayButton()) {
-          // Tombol "play" milik embed sudah diklik -> pemutaran dilanjutkan
-          // dari posisi saat ini.
-          autoPlayWatchdog(seq);
-          reportState();
-          return;
-        }
-        if (wasPlaying) { reportState(); return; } // sudah berjalan -> jangan kirim apa pun
-        // Tombol belum ada di DOM: pakai 'toggle' (mengikuti status embed),
-        // bukan 'play' yang mengulang dari awal.
-        var iframe = getIframe();
-        if (iframe) {
-          try { iframe.contentWindow.postMessage({ command: 'toggle' }, '*'); } catch (e) {}
-        }
-        autoPlayWatchdog(seq);
         reportState();
+        // JANGAN klik tombol play langsung. Beri embed kesempatan autoplay
+        // sendiri dulu; watchdog yang mengklik SEKALI kalau benar-benar perlu.
+        // Klik langsung + autoplay=1 inilah yang membuat lagu jalan lalu
+        // terulang dari awal.
+        autoPlayWatchdog(seq);
       }
 
       function pauseSound() {
         isPlaying = false;
         embedReportsPlaying = false;   // kita perintahkan jeda
+        userPaused = true;             // jeda disengaja user, bukan lagu habis
+        clockStop();                   // jam "perkiraan habis" ikut berhenti
         autoPlaySeq++;                 // hentikan watchdog autoplay
         var iframe = getIframe();
         // Satu jalur saja: perintah 'pause' resmi. JANGAN sekaligus mengklik
@@ -830,6 +922,8 @@
         endedSent = false;
         isPlaying = false;
         currentPosition = 0;
+        clockBasePos = 0;
+        clockBaseAt = Date.now();
         var iframe = getIframe();
         if (iframe) {
           try { iframe.contentWindow.postMessage({ command: 'seek', timestamp: 0 }, '*'); } catch (e) {}
@@ -874,6 +968,11 @@
           try { media.currentTime = target / 1000; } catch (e) {}
         }
         currentPosition = target;
+        if (currentPosition > 0) sawPlayback = true;
+        // User geser progress: jam langsung ikut posisi baru. Kalau lagu
+        // sedang jalan, teruskan dari sini; kalau tidak, simpan sebagai acuan.
+        if (clockRunning) clockResync(currentPosition);
+        else clockBasePos = currentPosition;
         if (isLyricsActive) postLyric({ type: 'lyric-pos', position: currentPosition });
         reportState();
       }
@@ -936,6 +1035,8 @@
         media.addEventListener('timeupdate', function () {
           currentPosition = (media.currentTime || 0) * 1000;
           if (isFinite(media.duration)) currentDuration = (media.duration || 0) * 1000;
+          if (currentPosition > 0) sawPlayback = true;
+          if (clockRunning) clockResync(currentPosition);
           if (isLyricsActive) postLyric({ type: 'lyric-pos', position: currentPosition });
         });
       }
@@ -986,22 +1087,36 @@
 
           hookEmbedGestures();
 
+          // ---- JAM "PERKIRAAN HABIS" (jalur utama auto-next) ----
+          // Mengikuti posisi nyata (resync tiap laporan) lalu lanjut sendiri
+          // sampai durasi. Ini menangkap kasus embed berhenti melapor posisi
+          // di detik-detik akhir / tidak mengirim 'ended'. Jam hanya jalan saat
+          // benar-benar playing, jadi pause panjang di tengah tidak memicu next.
+          if (!userPaused && clockReachedEnd()) {
+            notifyEnded();
+          }
+
           // ---- JARING PENGAMAN AUTO-NEXT ----
-          // Kalau embed tidak pernah melapor "berhenti di akhir lagu" (banyak
-          // embed diam saja saat lagu habis), posisi yang berhenti/bergera di
-          // dekat akhir lagu tetap diperlakukan sebagai selesai supaya lagu
-          // berikutnya langsung diputar.
-          if (currentDuration > 0 && currentPosition >= currentDuration * 0.9) {
-            if (Math.abs(currentPosition - lastEndWatchPos) < 400) {
-              endWatchStalls++;
-              if (endWatchStalls >= 2) { endWatchStalls = 0; notifyEnded(); }
+          // Cadangan kalau embed tidak pernah melapor "berhenti di akhir lagu".
+          // Hanya berlaku di ujung lagu (sisa <= ~2 detik) DAN posisi benar-
+          // benar beku selama ~3 detik, dan bukan karena user menekan pause.
+          // Ambang persentase (mis. 90%) TIDAK dipakai lagi karena memotong
+          // lagu yang masih berbunyi.
+          if (!userPaused && currentDuration > 0 &&
+              currentPosition >= currentDuration - 2000) {
+            if (Math.abs(currentPosition - lastEndWatchPos) < 200) {
+              if (!lastEndWatchAt) lastEndWatchAt = Date.now();
+              else if (Date.now() - lastEndWatchAt >= 3000) {
+                lastEndWatchAt = 0;
+                notifyEnded();
+              }
             } else {
-              endWatchStalls = 0;
+              lastEndWatchAt = 0;
             }
             lastEndWatchPos = currentPosition;
           } else {
             lastEndWatchPos = -1;
-            endWatchStalls = 0;
+            lastEndWatchAt = 0;
           }
 
           // Deteksi selesai (jaring pengaman selain event 'ended')
@@ -1032,12 +1147,19 @@
         embedWaitRunning = false;
         isPlaying = false;
         embedReportsPlaying = false;
+        userPaused = false;
         endedSent = false;
         lastMedia = null;
         currentPosition = 0;
         currentDuration = 0;
         lastEndWatchPos = -1;
-        endWatchStalls = 0;
+        lastEndWatchAt = 0;
+        autoPlayClicked = false;
+        // Reset jam "perkiraan habis" untuk lagu baru.
+        clockRunning = false;
+        clockBasePos = 0;
+        clockBaseAt = 0;
+        sawPlayback = false;
         // Cari dari dokumen, bukan hanya #content: saat mode lirik aktif embed
         // tinggal di #miniHost, jadi harus ikut dibuang saat ganti lagu.
         document.querySelectorAll('.track-el, .error').forEach(function (el) { el.remove(); });
@@ -1194,9 +1316,21 @@
       }
 
       function loadTrack(id, dc, vol) {
+        // Perintah 'load' untuk lagu yang SAMA yang embed-nya sudah hidup
+        // (mis. server mengirim ulang sp_dc) tidak boleh memuat ulang embed:
+        // itu membuat lagu mengulang dari awal. Cukup perbarui kredensial
+        // dan volume. Kalau lagu tadi sudah selesai (endedSent), muat ulang
+        // memang diinginkan (replay), jadi jangan di-skip.
+        if (id && id === loadedTrackKey && embedReady && !endedSent) {
+          spDc = dc || spDc;
+          if (vol != null) { startVolume = vol; applyVolume(); }
+          return;
+        }
+        loadedTrackKey = id;
         trackId = id;
         spDc = dc || '';
         if (vol != null) startVolume = vol;
+        var seq = ++loadSeq;
         // Batalkan cek lirik lagu sebelumnya & reset status tombol lirik.
         lyricsCheckToken++;
         lyricsAvailable = null;
@@ -1210,6 +1344,7 @@
         fetch('/api/spotify/track?trackId=' + encodeURIComponent(id) +
           (spDc ? '&sp_dc=' + encodeURIComponent(spDc) : ''))
           .then(function (res) {
+            if (seq !== loadSeq) throw { stale: true };
             if (res.status === 400 || res.status === 401 || res.status === 403) {
               var e = new Error('sp_dc'); e.spdc = true; throw e;
             }
@@ -1217,6 +1352,7 @@
             return res.json();
           })
           .then(function (track) {
+            if (seq !== loadSeq) return;
             if (track && track.title) {
               // Server menandai sp_dc kedaluwarsa (spdcValid === false) -> modal.
               if (track.spdcValid === false) { spdcInvalid(); return; }
@@ -1224,6 +1360,8 @@
             } else { var e = new Error('Track tidak ditemukan'); e.spdc = true; throw e; }
           })
           .catch(function (err) {
+            if (err && err.stale) return;
+            if (seq !== loadSeq) return;
             if (err && err.spdc) { spdcInvalid(); }
             else { showError('Failed to load: ' + err.message); post({ type: 'error' }); }
           });
@@ -1299,6 +1437,11 @@
         var type = data.type;
         var payload = data.payload || data.data || {};
 
+        // Pesan pertama dari embed menandakan embed hidup. Jangan menunggu
+        // tombol "Play" (saat autoplay=1 tombolnya sudah berubah jadi "Pause"
+        // sehingga findPlayButton() null dan waitForEmbed() menunggu timeout).
+        if (!embedReady) completeEmbedReady();
+
         if (type === 'ready') { gotEmbedMsg = true; return; }
 
         var pos = payload.position;
@@ -1309,11 +1452,22 @@
           gotEmbedMsg = true;
           isPlaying = true;
           embedReportsPlaying = true;
+          userPaused = false;
+          sawPlayback = true;
+          // Jam "perkiraan habis" mulai dari posisi nyata saat ini.
+          clockStart();
         }
         if (type === 'playback_paused') {
           gotEmbedMsg = true;
           isPlaying = false;
           embedReportsPlaying = false;
+          // Hentikan jam HANYA kalau ini jelas bukan momen habis (masih jauh
+          // dari akhir). Di dekat akhir, biarkan jam terus jalan supaya
+          // auto-next tetap terpicu. Pause yang disengaja user lewat controller
+          // sudah ditangani oleh flag userPaused (di pauseSound()).
+          if (!(currentDuration > 0 && currentPosition >= currentDuration - 15000)) {
+            clockStop();
+          }
         }
         if (type === 'playback_update' || type === 'playhead') {
           gotEmbedMsg = true;
@@ -1324,11 +1478,21 @@
             isPlaying = true;
             embedReportsPlaying = true;
           }
+          // Buffering menghentikan jam (audio tidak maju); begitu selesai
+          // buffering dan lagu tetap jalan, jam dinyalakan lagi.
+          if (payload.isBuffering === true) {
+            clockStop();
+          } else if (isPlaying && !userPaused && !clockRunning) {
+            clockStart();
+          }
         }
 
         // Posisi (ms) diteruskan ke overlay lirik supaya tetap sinkron.
         if (typeof pos === 'number' && pos >= 0) {
           currentPosition = pos;
+          if (currentPosition > 0) sawPlayback = true;
+          // Jam mengikuti posisi nyata (termasuk setelah user geser progress).
+          if (clockRunning) clockResync(currentPosition);
           if (isLyricsActive) postLyric({ type: 'lyric-pos', position: currentPosition });
         }
 
@@ -1339,17 +1503,21 @@
         if (typeof dur === 'number' && dur > 0) currentDuration = dur > 1000 ? dur : dur * 1000;
 
         // ---- LAGU SELESAI (pemicu auto-next) ----
-        // Sama seperti spty-web: lagu dianggap habis kalau embed MELAPOR
-        // berhenti dan posisinya sudah >= 90% durasi. Lebih andal dibanding
-        // menunggu 1 detik terakhir atau event 'ended' yang sering tidak
-        // dikirim embed.
+        // Utama: event 'ended'/'track_ended' dari embed. Cadangan: embed
+        // MELAPOR berhenti (playback_paused / playback_update isPaused) saat
+        // posisinya sudah benar-benar di ujung lagu (sisa <= ~2 detik).
+        // Ambang persentase longgar (90%/95%) TIDAK dipakai: itu memicu ended
+        // saat lagu masih berbunyi sehingga sisa terpotong. Posisi acuan pakai
+        // currentPosition (nilai terakhir yang diketahui), bukan hanya `pos`
+        // pesan ini, karena pesan "paused" sering tidak membawa posisi.
+        var pausedReport = (type === 'playback_paused') || (payload.isPaused === true);
+        var nearEnd = currentDuration > 0 && currentPosition > 0 &&
+                      (currentPosition >= currentDuration - 2500 ||
+                       currentPosition / currentDuration >= 0.97);
         if (type === 'ended' || type === 'track_ended') {
           notifyEnded();
-        } else if (payload.isPaused === true && currentDuration > 0 &&
-                   typeof pos === 'number' && pos >= currentDuration * 0.9) {
-          notifyEnded();
-        } else if (typeof pos === 'number' && currentDuration > 0 && pos >= currentDuration * 0.95) {
-          // Embed kadang tidak mengirim isPaused saat selesai – gunakan ambang posisi.
+        } else if (pausedReport && payload.isBuffering !== true &&
+                   !userPaused && nearEnd) {
           notifyEnded();
         }
       });
